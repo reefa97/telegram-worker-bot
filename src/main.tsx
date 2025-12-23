@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
 import './index.css';
 import { isSupabaseConfigured } from './lib/supabase';
+
+// Use Lazy loading to prevent App crash from breaking the error screen
+const App = React.lazy(() => import('./App'));
 
 if (!isSupabaseConfigured) {
     ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -35,7 +37,13 @@ if (!isSupabaseConfigured) {
 } else {
     ReactDOM.createRoot(document.getElementById('root')!).render(
         <React.StrictMode>
-            <App />
+            <Suspense fallback={
+                <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+                    <div className="text-white">Загрузка приложения...</div>
+                </div>
+            }>
+                <App />
+            </Suspense>
         </React.StrictMode>,
     );
 }
