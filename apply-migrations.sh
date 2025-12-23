@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Migration script for Supabase
+# This script will help you apply all database migrations
+
+echo "🚀 Telegram Worker Tracking System - Database Migration"
+echo "========================================================="
+echo ""
+echo "This script will guide you through applying database migrations."
+echo ""
+echo "📋 Instructions:"
+echo "1. Open Supabase SQL Editor: https://supabase.com/dashboard/project/mxjfqszjpnlmagsikqfk/sql"
+echo "2. Click 'New Query'"
+echo "3. Copy each migration below and run it"
+echo ""
+echo "========================================================="
+echo ""
+
+echo "🔹 MIGRATION 1: Initial Schema"
+echo "Copy the content from: supabase/migrations/20240101000000_initial_schema.sql"
+echo "Or run:"
+echo "cat 'supabase/migrations/20240101000000_initial_schema.sql'"
+echo ""
+read -p "Press Enter when migration 1 is applied..."
+
+echo ""
+echo "🔹 MIGRATION 2: Security Functions"
+echo "Copy the content from: supabase/migrations/20240101000001_security_functions.sql"
+echo "Or run:"
+echo "cat 'supabase/migrations/20240101000001_security_functions.sql'"
+echo ""
+read -p "Press Enter when migration 2 is applied..."
+
+echo ""
+echo "🔹 MIGRATION 3: RLS Policies"
+echo "Copy the content from: supabase/migrations/20240101000002_rls_policies.sql"
+echo "Or run:"
+echo "cat 'supabase/migrations/20240101000002_rls_policies.sql'"
+echo ""
+read -p "Press Enter when migration 3 is applied..."
+
+echo ""
+echo "🔹 MIGRATION 4: Indexes"
+echo "Copy the content from: supabase/migrations/20240101000003_indexes.sql"
+echo "Or run:"
+echo "cat 'supabase/migrations/20240101000003_indexes.sql'"
+echo ""
+read -p "Press Enter when migration 4 is applied..."
+
+echo ""
+echo "✅ All migrations complete!"
+echo ""
+echo "🎯 Next steps:"
+echo "1. Refresh http://localhost:5173 in your browser"
+echo "2. Login with: reefa@reefa.pl / 42fundyk"
+echo "3. You will become the Super Admin!"
+echo ""
