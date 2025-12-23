@@ -1,7 +1,6 @@
-```
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ChevronLeft, ChevronRight, Calendar, Plus, X, Trash2, User, MapPin, Clock, Save, Edit2 } from 'lucide-react';
+import { Calendar, Users, MapPin, Clock } from 'lucide-react';
 
 interface CleaningObject {
     id: string;
@@ -91,7 +90,7 @@ export default function ShiftPlanningPanel() {
                 if (dayObjects.length > 0) {
                     calendar.push({
                         date: date,
-                        title: `${ date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) } (${ DAYS[dayIndex] })`,
+                        title: `${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} (${DAYS[dayIndex]})`,
                         objects: mapWorkersToObjects(dayObjects, processedAssignments),
                         isToday: i === 0
                     });
@@ -143,21 +142,19 @@ export default function ShiftPlanningPanel() {
                 <div className="flex bg-gray-800 rounded-lg p-1 border border-gray-700">
                     <button
                         onClick={() => setViewMode('calendar')}
-                        className={`px - 4 py - 2 rounded - md text - sm font - medium transition - all ${
-    viewMode === 'calendar'
-    ? 'bg-primary-600 text-white shadow'
-    : 'text-gray-400 hover:text-white'
-} `}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'calendar'
+                            ? 'bg-primary-600 text-white shadow'
+                            : 'text-gray-400 hover:text-white'
+                            }`}
                     >
                         Календарь
                     </button>
                     <button
                         onClick={() => setViewMode('template')}
-                        className={`px - 4 py - 2 rounded - md text - sm font - medium transition - all ${
-    viewMode === 'template'
-    ? 'bg-primary-600 text-white shadow'
-    : 'text-gray-400 hover:text-white'
-} `}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'template'
+                            ? 'bg-primary-600 text-white shadow'
+                            : 'text-gray-400 hover:text-white'
+                            }`}
                     >
                         Шаблон недели
                     </button>
@@ -166,9 +163,9 @@ export default function ShiftPlanningPanel() {
 
             <div className="grid gap-6">
                 {displayData.map((item, index) => (
-                    <div key={index} className={`card ${ item.isToday ? 'border-primary-500/50 ring-1 ring-primary-500/20' : '' } `}>
+                    <div key={index} className={`card ${item.isToday ? 'border-primary-500/50 ring-1 ring-primary-500/20' : ''}`}>
                         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-gray-700 pb-2">
-                            <Calendar className={`w - 5 h - 5 ${ item.isToday ? 'text-primary-400' : 'text-gray-400' } `} />
+                            <Calendar className={`w-5 h-5 ${item.isToday ? 'text-primary-400' : 'text-gray-400'}`} />
                             {item.title}
                             {item.isToday && <span className="ml-2 text-xs bg-primary-500/20 text-primary-400 px-2 py-0.5 rounded">Сегодня</span>}
                             <span className="text-sm font-normal text-gray-400 ml-auto">
