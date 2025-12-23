@@ -7,14 +7,19 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(
+    supabaseUrl &&
+    supabaseAnonKey &&
+    supabaseUrl.startsWith('https://') &&
+    supabaseUrl.includes('.supabase.co')
+);
 
 if (!isSupabaseConfigured) {
-    console.error('Missing Supabase environment variables. Please check your .env file or Vercel configuration.');
+    console.error('Supabase Invalid Config. URL:', supabaseUrl);
 }
 
-// Fallback to avoid crash, but client will not work if keys are missing
+// Fallback to avoid crash. If invalid, the App won't mount anyway due to main.tsx check.
 export const supabase = createClient(
-    supabaseUrl || 'https://placeholder.supabase.co',
-    supabaseAnonKey || 'placeholder'
+    isSupabaseConfigured ? supabaseUrl : 'https://placeholder.supabase.co',
+    isSupabaseConfigured ? supabaseAnonKey : 'placeholder'
 );
