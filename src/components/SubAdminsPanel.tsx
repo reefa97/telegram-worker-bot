@@ -33,17 +33,31 @@ export default function SubAdminsPanel() {
         telegram_chat_id: '',
         role: 'sub_admin', // 'sub_admin' | 'manager'
         permissions: {
-            workers_read: true,
-            workers_write: false,
-            objects_read: true,
-            objects_write: false,
-            reports_read: true,
-            shifts_read: true,
-            shifts_write: false,
-            tasks_read: true,
-            tasks_write: false,
-            roles_read: true,
-            roles_write: false,
+            // Объекты
+            objects_view: true,
+            objects_create: false,
+            objects_edit: false,
+            objects_delete: false,
+            // Работники
+            workers_view: true,
+            workers_create: false,
+            workers_edit: false,
+            workers_delete: false,
+            // Отчёты
+            reports_view: true,
+            reports_export: false,
+            // Смены
+            shifts_view: true,
+            shifts_plan: false,
+            shifts_edit: false,
+            // Задачи
+            tasks_view: true,
+            tasks_create: false,
+            tasks_edit: false,
+            tasks_delete: false,
+            // Роли
+            roles_view: true,
+            roles_manage: false,
         }
     });
 
@@ -149,21 +163,56 @@ export default function SubAdminsPanel() {
                 telegram_chat_id: '',
                 role: 'sub_admin',
                 permissions: {
-                    workers_read: true,
-                    workers_write: false,
-                    objects_read: true,
-                    objects_write: false,
-                    reports_read: true,
-                    shifts_read: true,
-                    shifts_write: false,
-                    tasks_read: true,
-                    tasks_write: false,
-                    roles_read: true,
-                    roles_write: false,
+                    objects_view: true,
+                    objects_create: false,
+                    objects_edit: false,
+                    objects_delete: false,
+                    workers_view: true,
+                    workers_create: false,
+                    workers_edit: false,
+                    workers_delete: false,
+                    reports_view: true,
+                    reports_export: false,
+                    shifts_view: true,
+                    shifts_plan: false,
+                    shifts_edit: false,
+                    tasks_view: true,
+                    tasks_create: false,
+                    tasks_edit: false,
+                    tasks_delete: false,
+                    roles_view: true,
+                    roles_manage: false,
                 }
             });
         }
         setShowModal(true);
+    };
+
+    const renderPermissionsGroup = (title: string, permissions: Array<{ key: string, label: string }>) => {
+        return (
+            <div key={title} className="mb-3">
+                <div className="text-xs font-semibold text-gray-400 mb-2 uppercase">{title}</div>
+                <div className="space-y-1">
+                    {permissions.map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-700/50 p-1.5 rounded">
+                            <input
+                                type="checkbox"
+                                checked={(formData.permissions as any)[key] || false}
+                                onChange={(e) => setFormData({
+                                    ...formData,
+                                    permissions: {
+                                        ...formData.permissions,
+                                        [key]: e.target.checked
+                                    }
+                                })}
+                                className="rounded border-gray-600 bg-gray-700 text-primary-500"
+                            />
+                            <span className="text-gray-300 text-sm">{label}</span>
+                        </label>
+                    ))}
+                </div>
+            </div>
+        );
     };
 
     const closeModal = () => {
@@ -347,26 +396,38 @@ export default function SubAdminsPanel() {
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">Права доступа</label>
-                                    <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-700 rounded p-2 text-sm">
-                                        {Object.entries(formData.permissions).map(([key, value]) => (
-                                            <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-700/50 p-1 rounded">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={value as boolean}
-                                                    onChange={(e) => setFormData({
-                                                        ...formData,
-                                                        permissions: {
-                                                            ...formData.permissions,
-                                                            [key]: e.target.checked
-                                                        }
-                                                    })}
-                                                    className="rounded border-gray-600 bg-gray-700 text-primary-500"
-                                                />
-                                                <span className="text-gray-300">
-                                                    {key.replace('_', ' ').toUpperCase()}
-                                                </span>
-                                            </label>
-                                        ))}
+                                    <div className="space-y-3 max-h-96 overflow-y-auto border border-gray-700 rounded p-3 text-sm">
+                                        {renderPermissionsGroup('Объекты', [
+                                            { key: 'objects_view', label: 'Просмотр объектов' },
+                                            { key: 'objects_create', label: 'Добавление объектов' },
+                                            { key: 'objects_edit', label: 'Изменение объектов' },
+                                            { key: 'objects_delete', label: 'Удаление объектов' },
+                                        ])}
+                                        {renderPermissionsGroup('Работники', [
+                                            { key: 'workers_view', label: 'Просмотр работников' },
+                                            { key: 'workers_create', label: 'Добавление работников' },
+                                            { key: 'workers_edit', label: 'Изменение работников' },
+                                            { key: 'workers_delete', label: 'Удаление работников' },
+                                        ])}
+                                        {renderPermissionsGroup('Отчёты', [
+                                            { key: 'reports_view', label: 'Просмотр отчётов' },
+                                            { key: 'reports_export', label: 'Экспорт отчётов' },
+                                        ])}
+                                        {renderPermissionsGroup('Смены', [
+                                            { key: 'shifts_view', label: 'Просмотр смен' },
+                                            { key: 'shifts_plan', label: 'Планирование смен' },
+                                            { key: 'shifts_edit', label: 'Изменение смен' },
+                                        ])}
+                                        {renderPermissionsGroup('Задачи', [
+                                            { key: 'tasks_view', label: 'Просмотр задач' },
+                                            { key: 'tasks_create', label: 'Создание задач' },
+                                            { key: 'tasks_edit', label: 'Изменение задач' },
+                                            { key: 'tasks_delete', label: 'Удаление задач' },
+                                        ])}
+                                        {renderPermissionsGroup('Роли', [
+                                            { key: 'roles_view', label: 'Просмотр ролей' },
+                                            { key: 'roles_manage', label: 'Управление ролями' },
+                                        ])}
                                     </div>
                                 </div>
 
