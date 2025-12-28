@@ -119,36 +119,80 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 
-// Helper to get recipients (Managers of object OR all admins if no managers)
-async function getNotificationRecipients(objectId?: string): Promise<string[]> {
-  let recipients: string[] = [];
+// Helper to get recipients (Worker Creator > Object Creator > Fallback)
+async function getNotificationRecipients(objectId?: string, workerId?: string): Promise<string[]> {
+  let recipients: Set<string> = new Set();
 
-  if (objectId) {
-    const { data: managers } = await supabase
-      .from('object_managers')
-      .select('manager_chat_id')
-      .eq('object_id', objectId);
+  // 1. Try to find the Worker's Creator (Sub-Admin)
+  if (workerId) {
+    const { data: worker } = await supabase
+      .from("workers")
+      .select("created_by")
+      .eq("id", workerId)
+      .single();
 
-    if (managers && managers.length > 0) {
-      recipients = managers.map(m => m.manager_chat_id);
-      // Remove duplicates
-      recipients = [...new Set(recipients)];
+    if (worker && worker.created_by) {
+      const { data: admin } = await supabase
+        .from("admin_users")
+        .select("telegram_chat_id")
+        .eq("id", worker.created_by)
+        .single();
+
+      if (admin && admin.telegram_chat_id) {
+        recipients.add(admin.telegram_chat_id);
+      }
     }
   }
 
-  // If no specific managers assigned, fallback to all active admins
-  if (recipients.length === 0) {
+  // 2. Try to find the Object's Creator (if no worker creator found yet, or valid use case?)
+  // User said: "sub-admin creates a worker and he will receive notifications".
+  // Let's also check object creator if we have an objectId, enabling Object Owner notifications too.
+  if (objectId) {
+    const { data: object } = await supabase
+      .from("cleaning_objects")
+      .select("created_by")
+      .eq("id", objectId)
+      .single();
+
+    if (object && object.created_by) {
+      const { data: admin } = await supabase
+        .from("admin_users")
+        .select("telegram_chat_id")
+        .eq("id", object.created_by)
+        .single();
+
+      if (admin && admin.telegram_chat_id) {
+        recipients.add(admin.telegram_chat_id);
+      }
+    }
+  }
+
+  // 3. Fallback: If no recipients found, notify all Super Admins
+  if (recipients.size === 0) {
+    const { data: superAdmins } = await supabase
+      .from("admin_users")
+      .select("telegram_chat_id")
+      .eq("role", "super_admin")
+      .not("telegram_chat_id", "is", null);
+
+    if (superAdmins) {
+      superAdmins.forEach(a => {
+        if (a.telegram_chat_id) recipients.add(a.telegram_chat_id);
+      });
+    }
+
+    // Also check legacy bot_admins as backup
     const { data: botAdmins } = await supabase
       .from("bot_admins")
       .select("telegram_chat_id")
       .eq("is_active", true);
 
     if (botAdmins) {
-      recipients = botAdmins.map(a => a.telegram_chat_id);
+      botAdmins.forEach(a => recipients.add(a.telegram_chat_id));
     }
   }
 
-  return recipients;
+  return Array.from(recipients);
 }
 
 async function notifyGeofenceViolation(
@@ -158,9 +202,10 @@ async function notifyGeofenceViolation(
   distance: number,
   radius: number,
   action: 'start' | 'end',
-  objectId?: string
+  objectId?: string,
+  workerId?: string
 ) {
-  const recipients = await getNotificationRecipients(objectId);
+  const recipients = await getNotificationRecipients(objectId, workerId);
 
   if (recipients.length === 0) return;
 
@@ -192,9 +237,10 @@ async function sendLocationToManagers(
   location: any,
   objectName?: string,
   duration?: number,
-  objectId?: string
+  objectId?: string,
+  workerId?: string
 ) {
-  const recipients = await getNotificationRecipients(objectId);
+  const recipients = await getNotificationRecipients(objectId, workerId);
 
   if (recipients.length === 0) return;
 
@@ -273,14 +319,15 @@ async function handlePhotoUpload(botToken: string, fileId: string, workerId: str
     const { data: sessionData } = await supabase
       .from("work_sessions")
       .select(`
-            worker:workers(first_name, last_name),
-            object:cleaning_objects(id, name)
+            worker_id,
+            object:cleaning_objects(id, name),
+            worker:workers(id, first_name, last_name)
         `)
       .eq("id", sessionId)
       .single();
 
     if (sessionData && sessionData.object) {
-      const recipients = await getNotificationRecipients(sessionData.object.id);
+      const recipients = await getNotificationRecipients(sessionData.object.id, sessionData.worker_id);
       const workerName = sessionData.worker
         ? `${sessionData.worker.first_name} ${sessionData.worker.last_name}`
         : "Unknown Worker";
@@ -430,7 +477,8 @@ serve(async (req) => {
               activeSession.end_location, // Use stored location
               activeSession.cleaning_objects?.name,
               durationMinutes,
-              activeSession.object_id
+              activeSession.object_id,
+              worker.id
             );
           } else {
             await sendTelegramMessage(botToken, chatId, "⚠️ Смена уже завершена.");
@@ -745,7 +793,8 @@ serve(async (req) => {
                 distanceMeters,
                 radius,
                 'end',
-                activeSession.object_id
+                activeSession.object_id,
+                worker.id
               );
             }
           }
@@ -814,7 +863,8 @@ serve(async (req) => {
             { latitude: location.latitude, longitude: location.longitude },
             activeSession.cleaning_objects?.name,
             durationMinutes,
-            activeSession.object_id
+            activeSession.object_id,
+            worker.id
           );
 
           return new Response(JSON.stringify({ ok: true }), {
@@ -856,7 +906,8 @@ serve(async (req) => {
                 distanceMeters,
                 radius,
                 'start',
-                objectFull.id
+                objectFull.id,
+                worker.id
               );
             }
           }
@@ -910,7 +961,8 @@ serve(async (req) => {
               { latitude: location.latitude, longitude: location.longitude },
               objectFull?.name,
               undefined,
-              objectFull?.id
+              objectFull?.id,
+              worker.id
             );
           }
         }

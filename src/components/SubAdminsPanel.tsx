@@ -30,6 +30,7 @@ export default function SubAdminsPanel() {
         password: '',
         name: '',
         phone: '',
+        telegram_chat_id: '',
         role: 'sub_admin', // 'sub_admin' | 'manager'
         permissions: {
             workers_read: true,
@@ -53,7 +54,6 @@ export default function SubAdminsPanel() {
     const loadSubAdmins = async () => {
         setLoading(true);
         // Fetch ALL admin_users except super_admin (or include them?)
-        // User wants to manage "Sub Admins" and "Managers".
         const { data, error } = await supabase
             .from('admin_users')
             .select('*')
@@ -77,7 +77,8 @@ export default function SubAdminsPanel() {
                         password: formData.password || undefined,
                         permissions: formData.permissions,
                         name: formData.name,
-                        phone: formData.phone
+                        phone: formData.phone,
+                        telegram_chat_id: formData.telegram_chat_id || null
                     },
                 });
 
@@ -93,7 +94,8 @@ export default function SubAdminsPanel() {
                         createdBy: adminUser?.id,
                         permissions: formData.permissions,
                         name: formData.name,
-                        phone: formData.phone
+                        phone: formData.phone,
+                        telegram_chat_id: formData.telegram_chat_id || null
                     },
                 });
 
@@ -133,6 +135,7 @@ export default function SubAdminsPanel() {
                 password: '',
                 name: admin.name || '',
                 phone: admin.phone || '',
+                telegram_chat_id: admin.telegram_chat_id || '',
                 role: admin.role,
                 permissions: admin.permissions || formData.permissions
             });
@@ -143,6 +146,7 @@ export default function SubAdminsPanel() {
                 password: '',
                 name: '',
                 phone: '',
+                telegram_chat_id: '',
                 role: 'sub_admin',
                 permissions: {
                     workers_read: true,
@@ -167,8 +171,6 @@ export default function SubAdminsPanel() {
         setEditingAdmin(null);
     };
 
-
-
     if (loading) return <div className="text-white">Загрузка...</div>;
 
     const canManage = adminUser?.role === 'super_admin' || adminUser?.role === 'sub_admin';
@@ -192,6 +194,7 @@ export default function SubAdminsPanel() {
                             <tr className="bg-gray-700/50 text-gray-400 text-sm uppercase">
                                 <th className="p-4">Имя</th>
                                 <th className="p-4">Роль</th>
+                                <th className="p-4">Telegram ID</th>
                                 <th className="p-4">Телефон</th>
                                 <th className="p-4 text-right">Действия</th>
                             </tr>
@@ -213,6 +216,9 @@ export default function SubAdminsPanel() {
                                                 }`}>
                                                 {admin.role === 'manager' ? 'Менеджер' : 'Sub Admin'}
                                             </span>
+                                        </td>
+                                        <td className="p-4 text-gray-300 font-mono text-sm">
+                                            {admin.telegram_chat_id || <span className="text-gray-600">-</span>}
                                         </td>
                                         <td className="p-4 text-gray-300">
                                             {admin.phone || '-'}
@@ -266,7 +272,7 @@ export default function SubAdminsPanel() {
                                         value={formData.role}
                                         onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                         className="input"
-                                        disabled={!!editingAdmin} // Prevent role change on edit for simplicity
+                                        disabled={!!editingAdmin}
                                     >
                                         <option value="sub_admin">Sub Admin (Администратор)</option>
                                         <option value="manager">Manager (Менеджер)</option>
@@ -283,6 +289,21 @@ export default function SubAdminsPanel() {
                                         placeholder="Иван Иванов"
                                         required
                                     />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">Telegram Chat ID</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={formData.telegram_chat_id}
+                                        onChange={(e) => setFormData({ ...formData, telegram_chat_id: e.target.value })}
+                                        className="input"
+                                        placeholder="123456789"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Необязательно. Можно использовать для привязки уведомлений вручную.
+                                    </p>
                                 </div>
 
                                 <div>
@@ -324,8 +345,6 @@ export default function SubAdminsPanel() {
                                     />
                                 </div>
 
-                                {/* Permissions - only strictly relevant for Sub Admins, but managers might need read access? */}
-                                {/* Simplified: Managers usually just need notifications. But we can keep detailed perms. */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">Права доступа</label>
                                     <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-700 rounded p-2 text-sm">
@@ -333,7 +352,7 @@ export default function SubAdminsPanel() {
                                             <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-700/50 p-1 rounded">
                                                 <input
                                                     type="checkbox"
-                                                    checked={value}
+                                                    checked={value as boolean}
                                                     onChange={(e) => setFormData({
                                                         ...formData,
                                                         permissions: {

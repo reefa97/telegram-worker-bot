@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, ListTodo, Clock, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, ListTodo, Clock } from 'lucide-react';
 import TaskManagementModal from './TaskManagementModal';
 
 interface CleaningObject {
@@ -23,55 +23,16 @@ interface CleaningObject {
     schedule_time_end?: string;
     created_at: string;
     created_by?: string;
-    object_managers?: { manager_chat_id: string; manager_name: string }[];
 }
 
 export default function ObjectsPanel() {
     const { adminUser } = useAuth();
     const [objects, setObjects] = useState<CleaningObject[]>([]);
-    const [botAdmins, setBotAdmins] = useState<{ telegram_chat_id: string; name: string; role: string }[]>([]);
     const [creators, setCreators] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingObject, setEditingObject] = useState<CleaningObject | null>(null);
     const [managingTasksFor, setManagingTasksFor] = useState<CleaningObject | null>(null);
-
-    useEffect(() => {
-        loadObjects();
-        loadBotAdmins();
-        loadCreators();
-    }, []);
-
-    const loadCreators = async () => {
-        const { data } = await supabase.from('admin_users').select('id, name');
-        if (data) {
-            const lookup: Record<string, string> = {};
-            data.forEach((user: any) => {
-                if (user.id && user.name) {
-                    lookup[user.id] = user.name;
-                }
-            });
-            setCreators(lookup);
-        }
-    };
-
-    const loadBotAdmins = async () => {
-        const { data, error } = await supabase
-            .from('bot_admins')
-            .select('telegram_chat_id, name')
-            .eq('is_active', true)
-            .order('name');
-
-        if (error) {
-            console.error('Error loading bot admins:', error);
-        } else if (data) {
-            setBotAdmins(data.map((admin: any) => ({
-                telegram_chat_id: admin.telegram_chat_id,
-                name: admin.name,
-                role: 'manager' // Default role for legacy bot admins
-            })));
-        }
-    };
 
     const [formData, setFormData] = useState({
         name: '',
@@ -88,18 +49,31 @@ export default function ObjectsPanel() {
         schedule_days: [] as number[],
         schedule_time_start: '09:00',
         schedule_time_end: '18:00',
-        manager_chat_ids: [] as string[], // Array of selected manager chat IDs
     });
 
     useEffect(() => {
         loadObjects();
+        loadCreators();
     }, []);
+
+    const loadCreators = async () => {
+        const { data } = await supabase.from('admin_users').select('id, name');
+        if (data) {
+            const lookup: Record<string, string> = {};
+            data.forEach((user: any) => {
+                if (user.id && user.name) {
+                    lookup[user.id] = user.name;
+                }
+            });
+            setCreators(lookup);
+        }
+    };
 
     const loadObjects = async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('cleaning_objects')
-            .select('*, object_managers(manager_chat_id, manager_name)')
+            .select('*')
             .order('created_at', { ascending: false });
 
         if (data) setObjects(data);
@@ -111,9 +85,6 @@ export default function ObjectsPanel() {
         e.preventDefault();
 
         try {
-            let objectId = editingObject?.id;
-
-            // 1. Save Object
             const objectData = {
                 name: formData.name,
                 address: formData.address,
@@ -139,32 +110,11 @@ export default function ObjectsPanel() {
                     .eq('id', editingObject.id);
                 if (error) throw error;
             } else {
-                const { data, error } = await supabase
+                const { error } = await supabase
                     .from('cleaning_objects')
                     .insert(objectData)
-                    .select()
                     .single();
                 if (error) throw error;
-                objectId = data.id;
-            }
-
-            // 2. Save Managers (Sync: Delete all, then insert new)
-            if (objectId) {
-                // Delete existing
-                await supabase.from('object_managers').delete().eq('object_id', objectId);
-
-                // Insert new
-                if (formData.manager_chat_ids.length > 0) {
-                    const managersToInsert = formData.manager_chat_ids.map(chatId => {
-                        const admin = botAdmins.find(a => a.telegram_chat_id === chatId);
-                        return {
-                            object_id: objectId,
-                            manager_chat_id: chatId,
-                            manager_name: admin ? admin.name : 'Unknown',
-                        };
-                    });
-                    await supabase.from('object_managers').insert(managersToInsert);
-                }
             }
 
             loadObjects();
@@ -220,7 +170,6 @@ export default function ObjectsPanel() {
                 schedule_days: object.schedule_days || [],
                 schedule_time_start: object.schedule_time_start || '09:00',
                 schedule_time_end: object.schedule_time_end || '18:00',
-                manager_chat_ids: object.object_managers?.map(m => m.manager_chat_id) || [],
             });
         } else {
             setEditingObject(null);
@@ -239,7 +188,6 @@ export default function ObjectsPanel() {
                 schedule_days: [],
                 schedule_time_start: '09:00',
                 schedule_time_end: '18:00',
-                manager_chat_ids: [],
             });
         }
         setShowModal(true);
@@ -305,11 +253,6 @@ export default function ObjectsPanel() {
                                 <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded flex items-center gap-1">
                                     <DollarSign className="w-3 h-3" />
                                     {object.salary_type === 'hourly' ? `${object.hourly_rate} zł/ч` : `${object.monthly_rate} zł/мес`}
-                                </span>
-                            )}
-                            {object.object_managers && object.object_managers.length > 0 && (
-                                <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded flex items-center gap-1">
-                                    <Users className="w-3 h-3" /> {object.object_managers.length > 1 ? `${object.object_managers.length} мен.` : object.object_managers[0].manager_name}
                                 </span>
                             )}
                         </div>
@@ -564,44 +507,6 @@ export default function ObjectsPanel() {
                                                     className="input"
                                                 />
                                             </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Manager Config */}
-                                    <div className="space-y-4 pb-4 border-b border-gray-700">
-                                        <h4 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                                            <Users className="w-4 h-4" /> Ответственные менеджеры
-                                        </h4>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Менеджеры (для отчетов)</label>
-                                            <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
-                                                {botAdmins.length === 0 && <p className="text-gray-500 text-sm">Нет администраторов для уведомлений. Добавьте их в Настройках.</p>}
-                                                {botAdmins.map(admin => (
-                                                    <label key={admin.telegram_chat_id} className="flex items-center gap-2 p-2 rounded hover:bg-gray-700 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={formData.manager_chat_ids.includes(admin.telegram_chat_id)}
-                                                            onChange={(e) => {
-                                                                const checked = e.target.checked;
-                                                                if (checked) {
-                                                                    setFormData({
-                                                                        ...formData,
-                                                                        manager_chat_ids: [...formData.manager_chat_ids, admin.telegram_chat_id]
-                                                                    });
-                                                                } else {
-                                                                    setFormData({
-                                                                        ...formData,
-                                                                        manager_chat_ids: formData.manager_chat_ids.filter(id => id !== admin.telegram_chat_id)
-                                                                    });
-                                                                }
-                                                            }}
-                                                            className="rounded border-gray-600 bg-gray-700 text-blue-500"
-                                                        />
-                                                        <span className="text-sm text-gray-300">{admin.name} ({admin.telegram_chat_id})</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                            <p className="text-xs text-gray-500 mt-1">Выберите менеджеров, которые будут получать фото и отчеты по этому объекту</p>
                                         </div>
                                     </div>
 
