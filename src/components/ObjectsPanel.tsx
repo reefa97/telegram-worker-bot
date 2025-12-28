@@ -29,6 +29,7 @@ export default function ObjectsPanel() {
     const { adminUser } = useAuth();
     const [objects, setObjects] = useState<CleaningObject[]>([]);
     const [creators, setCreators] = useState<Record<string, string>>({});
+    const [adminsList, setAdminsList] = useState<Array<{ id: string, name: string, role: string }>>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingObject, setEditingObject] = useState<CleaningObject | null>(null);
@@ -49,11 +50,13 @@ export default function ObjectsPanel() {
         schedule_days: [] as number[],
         schedule_time_start: '09:00',
         schedule_time_end: '18:00',
+        created_by: '',
     });
 
     useEffect(() => {
         loadObjects();
         loadCreators();
+        loadAdmins();
     }, []);
 
     const loadCreators = async () => {
@@ -67,6 +70,14 @@ export default function ObjectsPanel() {
             });
             setCreators(lookup);
         }
+    };
+
+    const loadAdmins = async () => {
+        const { data } = await supabase
+            .from('admin_users')
+            .select('id, name, role')
+            .order('name');
+        if (data) setAdminsList(data);
     };
 
     const loadObjects = async () => {
@@ -170,6 +181,7 @@ export default function ObjectsPanel() {
                 schedule_days: object.schedule_days || [],
                 schedule_time_start: object.schedule_time_start || '09:00',
                 schedule_time_end: object.schedule_time_end || '18:00',
+                created_by: object.created_by || '',
             });
         } else {
             setEditingObject(null);
@@ -188,6 +200,7 @@ export default function ObjectsPanel() {
                 schedule_days: [],
                 schedule_time_start: '09:00',
                 schedule_time_end: '18:00',
+                created_by: adminUser?.id || '',
             });
         }
         setShowModal(true);
@@ -327,6 +340,29 @@ export default function ObjectsPanel() {
                                                 required
                                             />
                                         </div>
+
+                                        {/* Owner Selection */}
+                                        {adminUser?.role === 'super_admin' && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">Владелец объекта</label>
+                                                <select
+                                                    value={formData.created_by}
+                                                    onChange={(e) => setFormData({ ...formData, created_by: e.target.value })}
+                                                    className="input"
+                                                    required={!editingObject}
+                                                >
+                                                    {!editingObject && <option value="">Выберите владельца...</option>}
+                                                    {adminsList.map(admin => (
+                                                        <option key={admin.id} value={admin.id}>
+                                                            {admin.name} ({admin.role === 'super_admin' ? 'Super Admin' : admin.role === 'manager' ? 'Менеджер' : 'Sub Admin'})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Владелец будет получать уведомления от работников на данном объекте
+                                                </p>
+                                            </div>
+                                        )}
 
                                         <div>
                                             <label className="block text-sm font-medium text-gray-300 mb-2">Адрес</label>
