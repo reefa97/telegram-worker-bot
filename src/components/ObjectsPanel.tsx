@@ -96,7 +96,7 @@ export default function ObjectsPanel() {
         e.preventDefault();
 
         try {
-            const objectData = {
+            const objectData: any = {
                 name: formData.name,
                 address: formData.address,
                 latitude: formData.latitude,
@@ -111,8 +111,14 @@ export default function ObjectsPanel() {
                 schedule_days: formData.schedule_days,
                 schedule_time_start: formData.schedule_time_start,
                 schedule_time_end: formData.schedule_time_end,
-                created_by: editingObject ? undefined : adminUser?.id,
             };
+
+            // Super Admin can reassign objects, others create with their own ID
+            if (adminUser?.role === 'super_admin' && formData.created_by) {
+                objectData.created_by = formData.created_by;
+            } else if (!editingObject) {
+                objectData.created_by = adminUser?.id;
+            }
 
             if (editingObject) {
                 const { error } = await supabase
