@@ -288,25 +288,31 @@ export default function ObjectsPanel() {
                             </button>
 
                             <div className="flex gap-2">
-                                <button
-                                    onClick={() => openModal(object)}
-                                    className="flex-1 py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors flex items-center justify-center gap-1"
-                                >
-                                    <Edit2 className="w-3 h-3" />
-                                    Изменить
-                                </button>
-                                <button
-                                    onClick={() => toggleActive(object.id, object.is_active)}
-                                    className="flex-1 py-1.5 px-3 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded transition-colors"
-                                >
-                                    {object.is_active ? 'Деактивировать' : 'Активировать'}
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(object.id)}
-                                    className="py-1.5 px-3 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
-                                >
-                                    <Trash2 className="w-3 h-3" />
-                                </button>
+                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
+                                    <button
+                                        onClick={() => openModal(object)}
+                                        className="flex-1 py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        <Edit2 className="w-3 h-3" />
+                                        Изменить
+                                    </button>
+                                )}
+                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
+                                    <button
+                                        onClick={() => toggleActive(object.id, object.is_active)}
+                                        className="flex-1 py-1.5 px-3 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded transition-colors"
+                                    >
+                                        {object.is_active ? 'Деактивировать' : 'Активировать'}
+                                    </button>
+                                )}
+                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
+                                    <button
+                                        onClick={() => handleDelete(object.id)}
+                                        className="py-1.5 px-3 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
+                                    >
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

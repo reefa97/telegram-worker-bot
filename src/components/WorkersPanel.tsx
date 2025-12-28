@@ -402,20 +402,24 @@ export default function WorkersPanel() {
                                             </button>
                                             {canWrite && (
                                                 <>
-                                                    <button
-                                                        onClick={() => openModal(worker)}
-                                                        className="p-1 hover:bg-gray-600 rounded"
-                                                        title="Редактировать"
-                                                    >
-                                                        <Edit2 className="w-4 h-4 text-blue-400" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(worker.id)}
-                                                        className="p-1 hover:bg-gray-600 rounded"
-                                                        title="Удалить"
-                                                    >
-                                                        <Trash2 className="w-4 h-4 text-red-400" />
-                                                    </button>
+                                                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_edit) && (
+                                                        <button
+                                                            onClick={() => openModal(worker)}
+                                                            className="p-1 hover:bg-gray-600 rounded"
+                                                            title="Редактировать"
+                                                        >
+                                                            <Edit2 className="w-4 h-4 text-blue-400" />
+                                                        </button>
+                                                    )}
+                                                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_delete) && (
+                                                        <button
+                                                            onClick={() => handleDelete(worker.id)}
+                                                            className="p-1 hover:bg-gray-600 rounded"
+                                                            title="Удалить"
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-400" />
+                                                        </button>
+                                                    )}
                                                     {!worker.telegram_user_id && (
                                                         <button
                                                             onClick={() => copyInvitationLink(worker.invitation_token)}
