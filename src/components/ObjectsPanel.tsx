@@ -225,10 +225,12 @@ export default function ObjectsPanel() {
         <div>
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-white">Объекты работы</h2>
-                <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    Добавить объект
-                </button>
+                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_create) && (
+                    <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" />
+                        Добавить объект
+                    </button>
+                )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
