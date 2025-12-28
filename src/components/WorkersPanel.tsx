@@ -330,7 +330,7 @@ export default function WorkersPanel() {
                         </button>
                     )}
                 </div>
-                {canWrite && (
+                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_create) && (
                     <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
                         <Plus className="w-4 h-4" />
                         Добавить работника
