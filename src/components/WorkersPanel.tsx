@@ -161,7 +161,8 @@ export default function WorkersPanel() {
             closeModal();
         } catch (error) {
             console.error('Error saving worker:', error);
-            alert('Ошибка при сохранении работника');
+            const errorMessage = error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error ? (error as any).message : JSON.stringify(error));
+            alert(`Ошибка при сохранении работника: ${errorMessage}`);
         }
     };
 
