@@ -22,6 +22,7 @@ interface CleaningObject {
     schedule_time_start?: string;
     schedule_time_end?: string;
     created_at: string;
+    created_by?: string;
     object_managers?: { manager_chat_id: string; manager_name: string }[];
 }
 
@@ -29,6 +30,7 @@ export default function ObjectsPanel() {
     const { adminUser } = useAuth();
     const [objects, setObjects] = useState<CleaningObject[]>([]);
     const [botAdmins, setBotAdmins] = useState<{ telegram_chat_id: string; name: string; role: string }[]>([]);
+    const [creators, setCreators] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingObject, setEditingObject] = useState<CleaningObject | null>(null);
@@ -37,7 +39,21 @@ export default function ObjectsPanel() {
     useEffect(() => {
         loadObjects();
         loadBotAdmins();
+        loadCreators();
     }, []);
+
+    const loadCreators = async () => {
+        const { data } = await supabase.from('admin_users').select('id, name');
+        if (data) {
+            const lookup: Record<string, string> = {};
+            data.forEach((user: any) => {
+                if (user.id && user.name) {
+                    lookup[user.id] = user.name;
+                }
+            });
+            setCreators(lookup);
+        }
+    };
 
     const loadBotAdmins = async () => {
         const { data, error } = await supabase
@@ -155,7 +171,8 @@ export default function ObjectsPanel() {
             closeModal();
         } catch (error) {
             console.error('Error saving object:', error);
-            alert('Ошибка при сохранении объекта');
+            const errorMessage = error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error ? (error as any).message : JSON.stringify(error));
+            alert(`Ошибка при сохранении объекта: ${errorMessage}`);
         }
     };
 
@@ -263,6 +280,14 @@ export default function ObjectsPanel() {
                                 {object.is_active ? 'Активен' : 'Неактивен'}
                             </span>
                         </div>
+
+                        {/* Creator Info (for Admins) */}
+                        {(object as any).created_by && creators[(object as any).created_by] && (
+                            <div className="mb-2 text-xs text-gray-500 flex items-center gap-1">
+                                <span className="text-gray-600">Создал:</span>
+                                <span className="text-gray-400 font-medium">{creators[(object as any).created_by]}</span>
+                            </div>
+                        )}
 
                         {/* Configuration badges */}
                         <div className="flex flex-wrap gap-1 mb-3">

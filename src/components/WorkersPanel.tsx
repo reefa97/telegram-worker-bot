@@ -18,6 +18,7 @@ interface Worker {
     worker_roles?: { name: string };
     invitation_token: string;
     created_at: string;
+    created_by?: string;
 }
 
 interface WorkerRole {
@@ -36,6 +37,7 @@ export default function WorkersPanel() {
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [objects, setObjects] = useState<CleaningObject[]>([]);
     const [roles, setRoles] = useState<WorkerRole[]>([]);
+    const [creators, setCreators] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
@@ -65,7 +67,21 @@ export default function WorkersPanel() {
         loadWorkers();
         loadObjects();
         loadRoles();
+        loadCreators();
     }, []);
+
+    const loadCreators = async () => {
+        const { data } = await supabase.from('admin_users').select('id, name');
+        if (data) {
+            const lookup: Record<string, string> = {};
+            data.forEach((user: any) => {
+                if (user.id && user.name) {
+                    lookup[user.id] = user.name;
+                }
+            });
+            setCreators(lookup);
+        }
+    };
 
     const loadRoles = async () => {
         const { data } = await supabase.from('worker_roles').select('*').order('name');
@@ -339,6 +355,7 @@ export default function WorkersPanel() {
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Роль</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Телефон</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Telegram</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Создал</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Статус</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Действия</th>
                             </tr>
@@ -363,6 +380,9 @@ export default function WorkersPanel() {
                                     <td className="px-4 py-3 text-gray-300">{worker.phone_number}</td>
                                     <td className="px-4 py-3 text-gray-300">
                                         {worker.telegram_username || 'Не активирован'}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-500 text-sm">
+                                        {(worker as any).created_by && creators[(worker as any).created_by] ? creators[(worker as any).created_by] : '-'}
                                     </td>
 
                                     <td className="px-4 py-3">
