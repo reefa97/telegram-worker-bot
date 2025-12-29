@@ -253,7 +253,7 @@ export default function ObjectsPanel() {
                         {/* Creator Info (for Admins) */}
                         {(object as any).created_by && creators[(object as any).created_by] && (
                             <div className="mb-2 text-xs text-gray-500 flex items-center gap-1">
-                                <span className="text-gray-600">Создал:</span>
+                                <span className="text-gray-600">Опекун:</span>
                                 <span className="text-gray-400 font-medium">{creators[(object as any).created_by]}</span>
                             </div>
                         )}
