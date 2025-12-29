@@ -192,22 +192,21 @@ async function getNotificationRecipients(objectId?: string, workerId?: string) {
     }
   }
 
-  // 3. Fallback: If absolutely no one found, notify Super Admins
+  // 3. Fallback: If absolutely no one found, notify ALL Admins (not just super)
   if (recipients.size === 0) {
-    console.log(`[getNotificationRecipients] No recipients found, falling back to super admins`);
-    const { data: superAdmins } = await supabase
+    console.log(`[getNotificationRecipients] No recipients found, falling back to ALL admins`);
+    const { data: allAdmins } = await supabase
       .from("admin_users")
       .select("telegram_chat_id")
-      .eq("role", "super_admin")
       .not("telegram_chat_id", "is", null);
 
-    console.log(`[getNotificationRecipients] Super admins:`, superAdmins);
+    console.log(`[getNotificationRecipients] All admins:`, allAdmins);
 
-    if (superAdmins) {
-      superAdmins.forEach(a => {
+    if (allAdmins) {
+      allAdmins.forEach(a => {
         if (a.telegram_chat_id) {
           recipients.add(a.telegram_chat_id);
-          console.log(`[getNotificationRecipients] Added super admin: ${a.telegram_chat_id}`);
+          console.log(`[getNotificationRecipients] Added admin (fallback): ${a.telegram_chat_id}`);
         }
       });
     }
