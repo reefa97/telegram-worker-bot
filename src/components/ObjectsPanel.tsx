@@ -50,7 +50,7 @@ export default function ObjectsPanel() {
         schedule_days: [] as number[],
         schedule_time_start: '09:00',
         schedule_time_end: '18:00',
-        created_by: '',
+        owner_ids: [] as string[],
     });
 
     useEffect(() => {
@@ -114,24 +114,49 @@ export default function ObjectsPanel() {
             };
 
             // Super Admin can reassign objects, others create with their own ID
-            if (adminUser?.role === 'super_admin' && formData.created_by) {
-                objectData.created_by = formData.created_by;
-            } else if (!editingObject) {
+            // For audit, we set created_by to current user if new, but main logic is in object_owners
+            if (!editingObject) {
                 objectData.created_by = adminUser?.id;
             }
 
+            let targetId: string;
+
             if (editingObject) {
+                targetId = editingObject.id;
                 const { error } = await supabase
                     .from('cleaning_objects')
                     .update(objectData)
                     .eq('id', editingObject.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase
+                const { data, error } = await supabase
                     .from('cleaning_objects')
                     .insert(objectData)
+                    .select()
                     .single();
                 if (error) throw error;
+                targetId = data.id;
+            }
+
+            // Sync Owners (Only for Super Admin or on creation)
+            if (adminUser?.role === 'super_admin' || !editingObject) {
+                // Remove all existing
+                await supabase.from('object_owners').delete().eq('object_id', targetId);
+
+                // Add new selection
+                if (formData.owner_ids && formData.owner_ids.length > 0) {
+                    const ownerRows = formData.owner_ids.map(uid => ({
+                        object_id: targetId,
+                        admin_id: uid
+                    }));
+                    await supabase.from('object_owners').insert(ownerRows);
+                } else if (!editingObject) {
+                    // Default to creator if no owners selected during creation
+                    await supabase.from('object_owners').insert({
+                        object_id: targetId,
+                        admin_id: adminUser?.id
+                    });
+                }
             }
 
             loadObjects();
@@ -169,9 +194,21 @@ export default function ObjectsPanel() {
         }
     };
 
-    const openModal = (object?: CleaningObject) => {
+    const openModal = async (object?: CleaningObject) => {
         if (object) {
             setEditingObject(object);
+
+            // Load owners
+            let currentOwners: string[] = [];
+            const { data: ownersData } = await supabase
+                .from('object_owners')
+                .select('admin_id')
+                .eq('object_id', object.id);
+
+            if (ownersData) {
+                currentOwners = ownersData.map(o => o.admin_id);
+            }
+
             setFormData({
                 name: object.name,
                 address: object.address,
@@ -187,7 +224,7 @@ export default function ObjectsPanel() {
                 schedule_days: object.schedule_days || [],
                 schedule_time_start: object.schedule_time_start || '09:00',
                 schedule_time_end: object.schedule_time_end || '18:00',
-                created_by: object.created_by || '',
+                owner_ids: currentOwners,
             });
         } else {
             setEditingObject(null);
@@ -206,7 +243,7 @@ export default function ObjectsPanel() {
                 schedule_days: [],
                 schedule_time_start: '09:00',
                 schedule_time_end: '18:00',
-                created_by: adminUser?.id || '',
+                owner_ids: [adminUser?.id || ''],
             });
         }
         setShowModal(true);
@@ -355,26 +392,47 @@ export default function ObjectsPanel() {
                                             />
                                         </div>
 
-                                        {/* Owner Selection */}
+                                        {/* Owner Selection (Multi-select) */}
                                         {adminUser?.role === 'super_admin' && (
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Владелец объекта</label>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">Опекуны объекта (получают уведомления)</label>
+                                                <div className="flex flex-wrap gap-2 mb-2">
+                                                    {formData.owner_ids.map(ownerId => {
+                                                        const admin = adminsList.find(a => a.id === ownerId);
+                                                        return admin ? (
+                                                            <span key={ownerId} className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-sm flex items-center gap-1">
+                                                                {admin.name}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setFormData(prev => ({ ...prev, owner_ids: prev.owner_ids.filter(id => id !== ownerId) }))}
+                                                                    className="hover:text-white"
+                                                                >
+                                                                    <X className="w-3 h-3" />
+                                                                </button>
+                                                            </span>
+                                                        ) : null;
+                                                    })}
+                                                </div>
+
                                                 <select
-                                                    value={formData.created_by}
-                                                    onChange={(e) => setFormData({ ...formData, created_by: e.target.value })}
+                                                    value=""
+                                                    onChange={(e) => {
+                                                        const newId = e.target.value;
+                                                        if (newId && !formData.owner_ids.includes(newId)) {
+                                                            setFormData(prev => ({ ...prev, owner_ids: [...prev.owner_ids, newId] }));
+                                                        }
+                                                    }}
                                                     className="input"
-                                                    required={!editingObject}
                                                 >
-                                                    {!editingObject && <option value="">Выберите владельца...</option>}
-                                                    {adminsList.map(admin => (
-                                                        <option key={admin.id} value={admin.id}>
-                                                            {admin.name} ({admin.role === 'super_admin' ? 'Super Admin' : admin.role === 'manager' ? 'Менеджер' : 'Sub Admin'})
-                                                        </option>
-                                                    ))}
+                                                    <option value="">+ Добавить опекуна</option>
+                                                    {adminsList
+                                                        .filter(a => !formData.owner_ids.includes(a.id))
+                                                        .map(admin => (
+                                                            <option key={admin.id} value={admin.id}>
+                                                                {admin.name} ({admin.role})
+                                                            </option>
+                                                        ))}
                                                 </select>
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    Владелец будет получать уведомления от работников на данном объекте
-                                                </p>
                                             </div>
                                         )}
 
