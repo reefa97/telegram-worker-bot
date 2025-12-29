@@ -8,9 +8,10 @@ import SettingsPanel from './SettingsPanel';
 import UsersPanel from './UsersPanel';
 import SubAdminsPanel from './SubAdminsPanel';
 import ShiftPlanningPanel from './ShiftPlanningPanel';
+import LogsPanel from './LogsPanel';
 import { Calendar } from 'lucide-react';
 
-type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks';
+type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks' | 'logs';
 
 export default function Dashboard() {
     const { signOut, adminUser } = useAuth();
@@ -31,6 +32,7 @@ export default function Dashboard() {
         { id: 'objects', label: 'Объекты', icon: Briefcase, requiredPermission: 'objects_read' },
         { id: 'shifts', label: 'Смены', icon: Calendar, requiredPermission: 'shifts_read' },
         { id: 'reports', label: 'Отчеты', icon: FileText, requiredPermission: 'reports_read' },
+        { id: 'logs', label: 'Логи', icon: FileText, superAdminOnly: true },
         { id: 'superadmins', label: 'Super Admins', icon: UserCog, superAdminOnly: true },
         { id: 'subadmins', label: 'Sub Admins', icon: UserPlus2, superAdminOnly: true },
         { id: 'settings', label: 'Настройки', icon: Settings, superAdminOnly: true },
@@ -100,6 +102,7 @@ export default function Dashboard() {
                 {activeTab === 'superadmins' && isSuperAdmin && <UsersPanel />}
                 {activeTab === 'subadmins' && <SubAdminsPanel />}
                 {activeTab === 'settings' && <SettingsPanel />}
+                {activeTab === 'logs' && <LogsPanel />}
             </main>
         </div>
     );
