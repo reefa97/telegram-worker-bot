@@ -576,19 +576,6 @@ export default function ObjectsPanel() {
                                                 <span className="text-sm text-gray-300">Требуются фото отчеты</span>
                                             </div>
                                         </label>
-
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.requires_tasks}
-                                                onChange={(e) => setFormData({ ...formData, requires_tasks: e.target.checked })}
-                                                className="rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
-                                            />
-                                            <div className="flex items-center gap-2">
-                                                <CheckSquare className="w-4 h-4 text-purple-400" />
-                                                <span className="text-sm text-gray-300">Требуется чек-лист задач</span>
-                                            </div>
-                                        </label>
                                     </div>
 
                                     <div className="flex gap-2 pt-4">
