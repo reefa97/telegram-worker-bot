@@ -144,21 +144,55 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 // Helper to get recipients (Worker Creator > Object Creator > Fallback)
 async function getNotificationRecipients(objectId?: string, workerId?: string) {
-  // Strategy: Notify ALL admins who have connected their Telegram
-  // This ensures sub-admins and super-admins always get notifications
   const recipients = new Set<string>();
 
-  const { data: admins } = await supabase
-    .from("admin_users")
-    .select("telegram_chat_id")
-    .not("telegram_chat_id", "is", null);
+  // 1. Worker's Creator (Personal Guardian) - Always gets notified
+  if (workerId) {
+    const { data: worker } = await supabase
+      .from("workers")
+      .select("created_by")
+      .eq("id", workerId)
+      .single();
 
-  if (admins) {
-    admins.forEach(a => {
-      if (a.telegram_chat_id) {
-        recipients.add(a.telegram_chat_id);
+    if (worker && worker.created_by) {
+      const { data: admin } = await supabase
+        .from("admin_users")
+        .select("telegram_chat_id")
+        .eq("id", worker.created_by)
+        .single();
+
+      if (admin && admin.telegram_chat_id) {
+        recipients.add(admin.telegram_chat_id);
       }
+    }
+  }
+
+  // 2. Object Owners (Guardians) - Fetch via secure RPC
+  if (objectId) {
+    const { data: owners, error } = await supabase.rpc('get_object_owners_with_chat_ids', {
+      target_object_id: objectId
     });
+
+    if (owners) {
+      owners.forEach((o: any) => recipients.add(o.telegram_chat_id));
+    } else if (error) {
+      console.error("Error fetching object owners:", error);
+    }
+  }
+
+  // 3. Fallback: If absolutely no one found, notify Super Admins
+  if (recipients.size === 0) {
+    const { data: superAdmins } = await supabase
+      .from("admin_users")
+      .select("telegram_chat_id")
+      .eq("role", "super_admin")
+      .not("telegram_chat_id", "is", null);
+
+    if (superAdmins) {
+      superAdmins.forEach(a => {
+        if (a.telegram_chat_id) recipients.add(a.telegram_chat_id);
+      });
+    }
   }
 
   return Array.from(recipients);
