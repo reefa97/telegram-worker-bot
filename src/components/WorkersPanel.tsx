@@ -355,7 +355,7 @@ export default function WorkersPanel() {
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Роль</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Телефон</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Telegram</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Создал</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Опекун</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Статус</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Действия</th>
                             </tr>
