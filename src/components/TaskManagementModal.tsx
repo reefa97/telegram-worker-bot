@@ -114,10 +114,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
 
     const handleDeleteTask = async (id: string) => {
         if (!confirm('Переместить задачу в корзину?')) return;
-        const { error } = await supabase
-            .from('object_tasks')
-            .update({ deleted_at: new Date() })
-            .eq('id', id);
+        const { error } = await supabase.rpc('soft_delete_task', { task_id: id });
         if (error) {
             console.error('Error deleting task:', error);
             alert('Ошибка удаления');

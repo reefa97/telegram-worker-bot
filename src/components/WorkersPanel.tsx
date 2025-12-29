@@ -185,10 +185,7 @@ export default function WorkersPanel() {
     const handleDelete = async (id: string) => {
         if (!confirm('Переместить работника в корзину?')) return;
 
-        const { error } = await supabase
-            .from('workers')
-            .update({ deleted_at: new Date() })
-            .eq('id', id);
+        const { error } = await supabase.rpc('soft_delete_worker', { worker_id: id });
 
         if (error) {
             console.error('Error deleting worker:', error);

@@ -119,7 +119,7 @@ BEGIN
         
     ELSIF item_type = 'workers' THEN
         RETURN QUERY 
-        SELECT w.id, (w.first_name || ' ' || w.last_name) as name, w.phone as info, w.deleted_at 
+        SELECT w.id, (w.first_name || ' ' || w.last_name) as name, w.phone_number as info, w.deleted_at 
         FROM workers w 
         WHERE w.deleted_at IS NOT NULL
         ORDER BY w.deleted_at DESC;
