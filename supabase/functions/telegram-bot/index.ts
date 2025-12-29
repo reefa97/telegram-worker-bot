@@ -262,11 +262,17 @@ async function sendLocationToManagers(
   objectId?: string,
   workerId?: string
 ) {
+  console.log(`[sendLocationToManagers] Called for action: ${action}, objectId: ${objectId}, workerId: ${workerId}`);
   const recipients = await getNotificationRecipients(objectId, workerId);
+  console.log(`[sendLocationToManagers] Recipients count: ${recipients.length}, list:`, recipients);
 
-  if (recipients.length === 0) return;
+  if (recipients.length === 0) {
+    console.error(`[sendLocationToManagers] WARNING: No recipients found! This should not happen.`);
+    return;
+  }
 
   for (const chatId of recipients) {
+    console.log(`[sendLocationToManagers] Sending to chatId: ${chatId}`);
     let message = `👤 <b>${workerName}</b>\n`;
     message += action === "start"
       ? `▶️ Начал работу${objectName ? ` на объекте <b>${objectName}</b>` : ""}`
