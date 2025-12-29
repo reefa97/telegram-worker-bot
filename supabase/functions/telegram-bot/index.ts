@@ -6,6 +6,31 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+// Helper to log system events
+async function logToSystem(
+  level: 'info' | 'warn' | 'error',
+  category: string,
+  message: string,
+  metadata?: any,
+  workerId?: string,
+  objectId?: string,
+  adminId?: string
+) {
+  try {
+    await supabase.from('system_logs').insert({
+      level,
+      category,
+      message,
+      metadata: metadata ? metadata : null,
+      worker_id: workerId || null,
+      object_id: objectId || null,
+      admin_id: adminId || null
+    });
+  } catch (err) {
+    console.error('[logToSystem] Failed to write log:', err);
+  }
+}
+
 interface TelegramUpdate {
   update_id: number;
   message?: {
@@ -219,8 +244,25 @@ async function sendLocationToManagers(
   const recipients = await getNotificationRecipients(objectId, workerId);
   console.log(`[sendLocationToManagers] Recipients count: ${recipients.length}, list:`, recipients);
 
+  await logToSystem(
+    'info',
+    'notification',
+    `Attempting to send ${action} notification for ${workerName}`,
+    { recipients_count: recipients.length, recipients, objectName, action },
+    workerId,
+    objectId
+  );
+
   if (recipients.length === 0) {
     console.error(`[sendLocationToManagers] WARNING: No recipients found! This should not happen.`);
+    await logToSystem(
+      'error',
+      'notification',
+      `No recipients found for ${action} notification`,
+      { workerName, objectName, objectId, workerId },
+      workerId,
+      objectId
+    );
     return;
   }
 
@@ -237,7 +279,27 @@ async function sendLocationToManagers(
       message += `\n⏱ Длительность: ${hours}ч ${minutes}м`;
     }
 
-    await sendTelegramMessage(botToken, parseInt(chatId), message);
+    try {
+      await sendTelegramMessage(botToken, parseInt(chatId), message);
+      await logToSystem(
+        'info',
+        'notification',
+        `Sent ${action} notification to admin`,
+        { chat_id: chatId, workerName, objectName },
+        workerId,
+        objectId
+      );
+    } catch (error) {
+      console.error(`[sendLocationToManagers] Error sending to ${chatId}:`, error);
+      await logToSystem(
+        'error',
+        'notification',
+        `Failed to send ${action} notification`,
+        { chat_id: chatId, error: String(error) },
+        workerId,
+        objectId
+      );
+    }
 
     // Send location
     if (location?.latitude && location?.longitude) {
