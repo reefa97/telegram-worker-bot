@@ -144,6 +144,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 // Helper to get recipients (Worker Creator > Object Creator > Fallback)
 async function getNotificationRecipients(objectId?: string, workerId?: string) {
+  console.log(`[getNotificationRecipients] Called with objectId: ${objectId}, workerId: ${workerId}`);
   const recipients = new Set<string>();
 
   // 1. Worker's Creator (Personal Guardian) - Always gets notified
@@ -154,6 +155,8 @@ async function getNotificationRecipients(objectId?: string, workerId?: string) {
       .eq("id", workerId)
       .single();
 
+    console.log(`[getNotificationRecipients] Worker data:`, worker);
+
     if (worker && worker.created_by) {
       const { data: admin } = await supabase
         .from("admin_users")
@@ -161,41 +164,58 @@ async function getNotificationRecipients(objectId?: string, workerId?: string) {
         .eq("id", worker.created_by)
         .single();
 
+      console.log(`[getNotificationRecipients] Worker creator admin:`, admin);
+
       if (admin && admin.telegram_chat_id) {
         recipients.add(admin.telegram_chat_id);
+        console.log(`[getNotificationRecipients] Added worker creator: ${admin.telegram_chat_id}`);
       }
     }
   }
 
   // 2. Object Owners (Guardians) - Fetch via secure RPC
   if (objectId) {
+    console.log(`[getNotificationRecipients] Fetching object owners via RPC for objectId: ${objectId}`);
     const { data: owners, error } = await supabase.rpc('get_object_owners_with_chat_ids', {
       target_object_id: objectId
     });
 
+    console.log(`[getNotificationRecipients] RPC result - owners:`, owners, 'error:', error);
+
     if (owners) {
-      owners.forEach((o: any) => recipients.add(o.telegram_chat_id));
+      owners.forEach((o: any) => {
+        console.log(`[getNotificationRecipients] Adding object owner: ${o.telegram_chat_id}`);
+        recipients.add(o.telegram_chat_id);
+      });
     } else if (error) {
-      console.error("Error fetching object owners:", error);
+      console.error("[getNotificationRecipients] ERROR fetching object owners:", error);
     }
   }
 
   // 3. Fallback: If absolutely no one found, notify Super Admins
   if (recipients.size === 0) {
+    console.log(`[getNotificationRecipients] No recipients found, falling back to super admins`);
     const { data: superAdmins } = await supabase
       .from("admin_users")
       .select("telegram_chat_id")
       .eq("role", "super_admin")
       .not("telegram_chat_id", "is", null);
 
+    console.log(`[getNotificationRecipients] Super admins:`, superAdmins);
+
     if (superAdmins) {
       superAdmins.forEach(a => {
-        if (a.telegram_chat_id) recipients.add(a.telegram_chat_id);
+        if (a.telegram_chat_id) {
+          recipients.add(a.telegram_chat_id);
+          console.log(`[getNotificationRecipients] Added super admin: ${a.telegram_chat_id}`);
+        }
       });
     }
   }
 
-  return Array.from(recipients);
+  const finalRecipients = Array.from(recipients);
+  console.log(`[getNotificationRecipients] Final recipients (${finalRecipients.length}):`, finalRecipients);
+  return finalRecipients;
 }
 
 async function notifyGeofenceViolation(
