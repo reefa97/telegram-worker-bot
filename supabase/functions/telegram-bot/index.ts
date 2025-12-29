@@ -935,6 +935,11 @@ serve(async (req) => {
             );
 
             // Notify admins
+            console.log(`[START SHIFT] About to call sendLocationToManagers`);
+            console.log(`[START SHIFT] Worker: ${worker.first_name} ${worker.last_name}`);
+            console.log(`[START SHIFT] Object: ${objectFull?.name} (${objectFull?.id})`);
+            console.log(`[START SHIFT] Worker ID: ${worker.id}`);
+
             await sendLocationToManagers(
               botToken,
               `${worker.first_name} ${worker.last_name}`,
@@ -945,6 +950,8 @@ serve(async (req) => {
               objectFull?.id,
               worker.id
             );
+
+            console.log(`[START SHIFT] sendLocationToManagers completed`);
           }
         }
       }
