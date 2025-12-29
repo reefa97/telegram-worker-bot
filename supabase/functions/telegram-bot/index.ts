@@ -143,66 +143,22 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 
 // Helper to get recipients (Worker Creator > Object Creator > Fallback)
-async function getNotificationRecipients(objectId?: string, workerId?: string): Promise<string[]> {
-  let recipients: Set<string> = new Set();
+async function getNotificationRecipients(objectId?: string, workerId?: string) {
+  // Strategy: Notify ALL admins who have connected their Telegram
+  // This ensures sub-admins and super-admins always get notifications
+  const recipients = new Set<string>();
 
-  // 1. Try to find the Worker's Creator (Sub-Admin)
-  if (workerId) {
-    const { data: worker } = await supabase
-      .from("workers")
-      .select("created_by")
-      .eq("id", workerId)
-      .single();
+  const { data: admins } = await supabase
+    .from("admin_users")
+    .select("telegram_chat_id")
+    .not("telegram_chat_id", "is", null);
 
-    if (worker && worker.created_by) {
-      const { data: admin } = await supabase
-        .from("admin_users")
-        .select("telegram_chat_id")
-        .eq("id", worker.created_by)
-        .single();
-
-      if (admin && admin.telegram_chat_id) {
-        recipients.add(admin.telegram_chat_id);
+  if (admins) {
+    admins.forEach(a => {
+      if (a.telegram_chat_id) {
+        recipients.add(a.telegram_chat_id);
       }
-    }
-  }
-
-  // 2. Try to find the Object's Creator (if no worker creator found yet, or valid use case?)
-  // User said: "sub-admin creates a worker and he will receive notifications".
-  // Let's also check object creator if we have an objectId, enabling Object Owner notifications too.
-  if (objectId) {
-    const { data: object } = await supabase
-      .from("cleaning_objects")
-      .select("created_by")
-      .eq("id", objectId)
-      .single();
-
-    if (object && object.created_by) {
-      const { data: admin } = await supabase
-        .from("admin_users")
-        .select("telegram_chat_id")
-        .eq("id", object.created_by)
-        .single();
-
-      if (admin && admin.telegram_chat_id) {
-        recipients.add(admin.telegram_chat_id);
-      }
-    }
-  }
-
-  // 3. Fallback: If no recipients found, notify all Super Admins
-  if (recipients.size === 0) {
-    const { data: superAdmins } = await supabase
-      .from("admin_users")
-      .select("telegram_chat_id")
-      .eq("role", "super_admin")
-      .not("telegram_chat_id", "is", null);
-
-    if (superAdmins) {
-      superAdmins.forEach(a => {
-        if (a.telegram_chat_id) recipients.add(a.telegram_chat_id);
-      });
-    }
+    });
   }
 
   return Array.from(recipients);
