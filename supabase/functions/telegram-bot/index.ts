@@ -75,6 +75,11 @@ async function getDailyTasks(objectId: string) {
 
   // Filter tasks for today
   return tasks.filter(task => {
+    // If task has no schedule, always show it
+    if (!task.scheduled_days && !task.scheduled_dates) {
+      return true;
+    }
+
     if (task.is_recurring) {
       return task.scheduled_days && task.scheduled_days.includes(dayOfWeek);
     } else {
