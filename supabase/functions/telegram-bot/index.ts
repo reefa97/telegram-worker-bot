@@ -169,25 +169,68 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 // Helper to get recipients (Worker Creator > Object Creator > Fallback)
 async function getNotificationRecipients(objectId?: string, workerId?: string) {
-  console.log(`[getNotificationRecipients] TEMPORARY SIMPLIFIED MODE - sending to ALL admins`);
   console.log(`[getNotificationRecipients] Called with objectId: ${objectId}, workerId: ${workerId}`);
   const recipients = new Set<string>();
 
-  // TEMPORARY: Send to ALL admins to guarantee delivery
-  const { data: allAdmins } = await supabase
-    .from("admin_users")
-    .select("telegram_chat_id")
-    .not("telegram_chat_id", "is", null);
+  // 1. Worker's Creator (Personal Guardian) - Always gets notified
+  if (workerId) {
+    const { data: worker } = await supabase
+      .from("workers")
+      .select("created_by")
+      .eq("id", workerId)
+      .single();
 
-  console.log(`[getNotificationRecipients] All admins found:`, allAdmins);
+    if (worker && worker.created_by) {
+      const { data: admin } = await supabase
+        .from("admin_users")
+        .select("telegram_chat_id")
+        .eq("id", worker.created_by)
+        .single();
 
-  if (allAdmins) {
-    allAdmins.forEach(a => {
-      if (a.telegram_chat_id) {
-        recipients.add(a.telegram_chat_id);
-        console.log(`[getNotificationRecipients] Added admin: ${a.telegram_chat_id}`);
+      if (admin && admin.telegram_chat_id) {
+        recipients.add(admin.telegram_chat_id);
+        console.log(`[getNotificationRecipients] Added worker creator: ${admin.telegram_chat_id}`);
       }
+    }
+  }
+
+  // 2. Object Owners (Guardians) - Fetch via secure RPC
+  if (objectId) {
+    console.log(`[getNotificationRecipients] Fetching object owners via RPC for objectId: ${objectId}`);
+    const { data: owners, error } = await supabase.rpc('get_object_owners_with_chat_ids', {
+      target_object_id: objectId
     });
+
+    console.log(`[getNotificationRecipients] RPC result - owners:`, owners, 'error:', error);
+
+    if (owners && owners.length > 0) {
+      owners.forEach((o: any) => {
+        console.log(`[getNotificationRecipients] Adding object owner: ${o.telegram_chat_id}`);
+        recipients.add(o.telegram_chat_id);
+      });
+    } else if (error) {
+      console.error(`[getNotificationRecipients] ERROR fetching object owners:`, error);
+    }
+  }
+
+  // 3. Fallback: If absolutely no one found, notify ALL Admins
+  if (recipients.size === 0) {
+    console.log(`[getNotificationRecipients] No recipients found, falling back to ALL admins`);
+    const { data: allAdmins } = await supabase
+      .from("admin_users")
+      .select("telegram_chat_id")
+      .not("telegram_chat_id", "is", null);
+
+    console.log(`[getNotificationRecipients] All admins:`, allAdmins);
+
+    if (allAdmins) {
+      allAdmins.forEach(a => {
+        if (a.telegram_chat_id) {
+          recipients.add(a.telegram_chat_id);
+          console.log(`[getNotificationRecipients] Added admin (fallback): ${a.telegram_chat_id}`);
+        }
+      });
+    }
   }
 
   const finalRecipients = Array.from(recipients);
