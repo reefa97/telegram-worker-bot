@@ -61,46 +61,23 @@ async function getWorkerKeyboard(workerId: string) {
 }
 
 async function getDailyTasks(objectId: string) {
-  const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 (Sun) to 6 (Sat)
-  const dateString = today.toISOString().split('T')[0];
-
-  console.log(`[getDailyTasks] Fetching tasks for object: ${objectId}, date: ${dateString}, day: ${dayOfWeek}`);
+  console.log(`[getDailyTasks] Fetching ALL tasks for object: ${objectId}`);
 
   const { data: tasks, error } = await supabase
     .from("object_tasks")
-    .select("title, is_special_task, scheduled_days, scheduled_dates, is_recurring")
-    .eq("object_id", objectId)
-    .eq("is_active", true);
+    .select("title, is_special_task, is_active")
+    .eq("object_id", objectId);
 
-  console.log(`[getDailyTasks] Retrieved ${tasks?.length || 0} tasks, error:`, error);
+  console.log(`[getDailyTasks] Query result - tasks: ${tasks?.length || 0}, error:`, error);
   if (tasks) {
-    console.log(`[getDailyTasks] Tasks:`, JSON.stringify(tasks));
+    console.log(`[getDailyTasks] Tasks data:`, JSON.stringify(tasks));
+  }
+  if (error) {
+    console.error(`[getDailyTasks] ERROR:`, error);
   }
 
-  if (!tasks) return [];
-
-  // Filter tasks for today
-  const filtered = tasks.filter(task => {
-    // If task has no schedule, always show it
-    if (!task.scheduled_days && !task.scheduled_dates) {
-      console.log(`[getDailyTasks] Task "${task.title}" has no schedule, showing it`);
-      return true;
-    }
-
-    if (task.is_recurring) {
-      const show = task.scheduled_days && task.scheduled_days.includes(dayOfWeek);
-      console.log(`[getDailyTasks] Recurring task "${task.title}": ${show}`);
-      return show;
-    } else {
-      const show = task.scheduled_dates && task.scheduled_dates.includes(dateString);
-      console.log(`[getDailyTasks] Dated task "${task.title}": ${show}`);
-      return show;
-    }
-  });
-
-  console.log(`[getDailyTasks] Filtered to ${filtered.length} tasks for today`);
-  return filtered;
+  // Temporarily return ALL tasks without filtering
+  return tasks || [];
 }
 
 async function sendTelegramMessage(botToken: string, chatId: number, text: string, keyboard?: any) {
