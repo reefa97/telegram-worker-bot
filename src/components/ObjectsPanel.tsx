@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, ListTodo, Clock } from 'lucide-react';
+import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, ListTodo, Clock, X } from 'lucide-react';
 import TaskManagementModal from './TaskManagementModal';
 
 interface CleaningObject {
