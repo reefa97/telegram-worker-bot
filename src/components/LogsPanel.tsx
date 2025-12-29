@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
 import { AlertCircle, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface SystemLog {
@@ -16,7 +15,6 @@ interface SystemLog {
 }
 
 export default function LogsPanel() {
-    const { adminUser } = useAuth();
     const [logs, setLogs] = useState<SystemLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'info' | 'warn' | 'error'>('all');
