@@ -180,16 +180,6 @@ async function getNotificationRecipients(objectId?: string, workerId?: string): 
         if (a.telegram_chat_id) recipients.add(a.telegram_chat_id);
       });
     }
-
-    // Also check legacy bot_admins as backup
-    const { data: botAdmins } = await supabase
-      .from("bot_admins")
-      .select("telegram_chat_id")
-      .eq("is_active", true);
-
-    if (botAdmins) {
-      botAdmins.forEach(a => recipients.add(a.telegram_chat_id));
-    }
   }
 
   return Array.from(recipients);
