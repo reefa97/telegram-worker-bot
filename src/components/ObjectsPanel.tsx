@@ -169,9 +169,12 @@ export default function ObjectsPanel() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Удалить объект?')) return;
+        if (!confirm('Переместить объект в корзину?')) return;
 
-        const { error } = await supabase.from('cleaning_objects').delete().eq('id', id);
+        const { error } = await supabase
+            .from('cleaning_objects')
+            .update({ deleted_at: new Date() })
+            .eq('id', id);
 
         if (error) {
             console.error('Error deleting object:', error);

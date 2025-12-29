@@ -9,9 +9,10 @@ import UsersPanel from './UsersPanel';
 import SubAdminsPanel from './SubAdminsPanel';
 import ShiftPlanningPanel from './ShiftPlanningPanel';
 import LogsPanel from './LogsPanel';
+import TrashPanel from './TrashPanel';
 import { Calendar } from 'lucide-react';
 
-type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks' | 'logs';
+type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks' | 'logs' | 'trash';
 
 export default function Dashboard() {
     const { signOut, adminUser } = useAuth();
@@ -35,6 +36,7 @@ export default function Dashboard() {
         { id: 'logs', label: 'Логи', icon: FileText, superAdminOnly: true },
         { id: 'superadmins', label: 'Super Admins', icon: UserCog, superAdminOnly: true },
         { id: 'subadmins', label: 'Sub Admins', icon: UserPlus2, superAdminOnly: true },
+        { id: 'trash', label: 'Корзина', icon: Settings, superAdminOnly: true },
         { id: 'settings', label: 'Настройки', icon: Settings, superAdminOnly: true },
     ];
 
@@ -103,6 +105,7 @@ export default function Dashboard() {
                 {activeTab === 'subadmins' && <SubAdminsPanel />}
                 {activeTab === 'settings' && <SettingsPanel />}
                 {activeTab === 'logs' && <LogsPanel />}
+                {activeTab === 'trash' && <TrashPanel />}
             </main>
         </div>
     );
