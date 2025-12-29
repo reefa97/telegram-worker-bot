@@ -61,23 +61,49 @@ async function getWorkerKeyboard(workerId: string) {
 }
 
 async function getDailyTasks(objectId: string) {
-  console.log(`[getDailyTasks] Fetching ALL tasks for object: ${objectId}`);
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 (Sun) to 6 (Sat)
+  const dateString = today.toISOString().split('T')[0];
 
-  const { data: tasks, error } = await supabase
-    .from("object_tasks")
-    .select("title, is_special_task, is_active")
-    .eq("object_id", objectId);
+  console.log(`[getDailyTasks] Fetching tasks via RPC for object: ${objectId}`);
 
-  console.log(`[getDailyTasks] Query result - tasks: ${tasks?.length || 0}, error:`, error);
-  if (tasks) {
-    console.log(`[getDailyTasks] Tasks data:`, JSON.stringify(tasks));
-  }
+  // Use RPC to bypass RLS issues
+  const { data: tasks, error } = await supabase.rpc('get_object_tasks_secure', {
+    target_object_id: objectId
+  });
+
   if (error) {
-    console.error(`[getDailyTasks] ERROR:`, error);
+    console.error(`[getDailyTasks] RPC ERROR:`, error);
+    // Fallback to direct select if RPC not exists (though likely RLS will fail)
+    const { data: fallbackTasks } = await supabase
+      .from("object_tasks")
+      .select("title, is_special_task, scheduled_days, scheduled_dates, is_recurring")
+      .eq("object_id", objectId)
+      .eq("is_active", true);
+
+    if (fallbackTasks) return filterTasks(fallbackTasks, dayOfWeek, dateString);
+    return [];
   }
 
-  // Temporarily return ALL tasks without filtering
-  return tasks || [];
+  console.log(`[getDailyTasks] RPC retrieved ${tasks?.length || 0} tasks`);
+
+  if (!tasks) return [];
+  return filterTasks(tasks, dayOfWeek, dateString);
+}
+
+function filterTasks(tasks: any[], dayOfWeek: number, dateString: string) {
+  return tasks.filter(task => {
+    // If task has no schedule, always show it
+    if (!task.scheduled_days && !task.scheduled_dates) {
+      return true;
+    }
+
+    if (task.is_recurring) {
+      return task.scheduled_days && task.scheduled_days.includes(dayOfWeek);
+    } else {
+      return task.scheduled_dates && task.scheduled_dates.includes(dateString);
+    }
+  });
 }
 
 async function sendTelegramMessage(botToken: string, chatId: number, text: string, keyboard?: any) {
