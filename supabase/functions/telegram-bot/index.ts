@@ -795,6 +795,15 @@ serve(async (req) => {
           });
         }
 
+        // Log that we received location
+        await logToSystem(
+          'info',
+          'shift',
+          `Received location from worker ${worker.first_name} ${worker.last_name}`,
+          { latitude: location.latitude, longitude: location.longitude },
+          worker.id
+        );
+
         const { data: activeSession } = await supabase
           .from("work_sessions")
           .select("*, cleaning_objects(name)")
