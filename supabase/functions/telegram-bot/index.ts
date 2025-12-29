@@ -65,27 +65,42 @@ async function getDailyTasks(objectId: string) {
   const dayOfWeek = today.getDay(); // 0 (Sun) to 6 (Sat)
   const dateString = today.toISOString().split('T')[0];
 
-  const { data: tasks } = await supabase
+  console.log(`[getDailyTasks] Fetching tasks for object: ${objectId}, date: ${dateString}, day: ${dayOfWeek}`);
+
+  const { data: tasks, error } = await supabase
     .from("object_tasks")
     .select("title, is_special_task, scheduled_days, scheduled_dates, is_recurring")
     .eq("object_id", objectId)
     .eq("is_active", true);
 
+  console.log(`[getDailyTasks] Retrieved ${tasks?.length || 0} tasks, error:`, error);
+  if (tasks) {
+    console.log(`[getDailyTasks] Tasks:`, JSON.stringify(tasks));
+  }
+
   if (!tasks) return [];
 
   // Filter tasks for today
-  return tasks.filter(task => {
+  const filtered = tasks.filter(task => {
     // If task has no schedule, always show it
     if (!task.scheduled_days && !task.scheduled_dates) {
+      console.log(`[getDailyTasks] Task "${task.title}" has no schedule, showing it`);
       return true;
     }
 
     if (task.is_recurring) {
-      return task.scheduled_days && task.scheduled_days.includes(dayOfWeek);
+      const show = task.scheduled_days && task.scheduled_days.includes(dayOfWeek);
+      console.log(`[getDailyTasks] Recurring task "${task.title}": ${show}`);
+      return show;
     } else {
-      return task.scheduled_dates && task.scheduled_dates.includes(dateString);
+      const show = task.scheduled_dates && task.scheduled_dates.includes(dateString);
+      console.log(`[getDailyTasks] Dated task "${task.title}": ${show}`);
+      return show;
     }
   });
+
+  console.log(`[getDailyTasks] Filtered to ${filtered.length} tasks for today`);
+  return filtered;
 }
 
 async function sendTelegramMessage(botToken: string, chatId: number, text: string, keyboard?: any) {
