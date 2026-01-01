@@ -380,7 +380,7 @@ export default function WorkersPanel() {
                         </thead>
                         <tbody>
                             {workers.map((worker) => (
-                                <tr key={worker.id} className={selectedWorkers.has(worker.id) ? 'bg-primary-50 dark:bg-primary-900/10' : ''}>
+                                <tr key={worker.id} className={`${selectedWorkers.has(worker.id) ? 'bg-primary-50 dark:bg-primary-900/10' : ''} border-none`}>
                                     <td className="px-4 py-3">
                                         <input
                                             type="checkbox"
@@ -413,52 +413,50 @@ export default function WorkersPanel() {
                                         </span>
                                     </td>
                                     <td>
-                                        <td>
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => setHistoryWorker(worker)}
-                                                    className="btn-icon hover:text-purple-400"
-                                                    title="История работы"
-                                                >
-                                                    <History className="w-4 h-4" />
-                                                </button>
-                                                {canWrite && (
-                                                    <>
-                                                        {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_edit) && (
-                                                            <button
-                                                                onClick={() => openModal(worker)}
-                                                                className="btn-icon hover:text-blue-400"
-                                                                title="Редактировать"
-                                                            >
-                                                                <Edit2 className="w-4 h-4" />
-                                                            </button>
-                                                        )}
-                                                        {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_delete) && (
-                                                            <button
-                                                                onClick={() => handleDelete(worker.id)}
-                                                                className="btn-icon hover:text-red-400"
-                                                                title="Удалить"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        )}
-                                                        {!worker.telegram_user_id && (
-                                                            <button
-                                                                onClick={() => copyInvitationLink(worker.invitation_token)}
-                                                                className="btn-icon hover:text-green-400"
-                                                                title="Скопировать ссылку активации"
-                                                            >
-                                                                {copiedToken === worker.invitation_token ? (
-                                                                    <Check className="w-4 h-4 text-green-500" />
-                                                                ) : (
-                                                                    <Copy className="w-4 h-4" />
-                                                                )}
-                                                            </button>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                onClick={() => setHistoryWorker(worker)}
+                                                className="btn-icon hover:text-purple-400"
+                                                title="История работы"
+                                            >
+                                                <History className="w-4 h-4" />
+                                            </button>
+                                            {canWrite && (
+                                                <>
+                                                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_edit) && (
+                                                        <button
+                                                            onClick={() => openModal(worker)}
+                                                            className="btn-icon hover:text-blue-400"
+                                                            title="Редактировать"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_delete) && (
+                                                        <button
+                                                            onClick={() => handleDelete(worker.id)}
+                                                            className="btn-icon hover:text-red-400"
+                                                            title="Удалить"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {!worker.telegram_user_id && (
+                                                        <button
+                                                            onClick={() => copyInvitationLink(worker.invitation_token)}
+                                                            className="btn-icon hover:text-green-400"
+                                                            title="Скопировать ссылку активации"
+                                                        >
+                                                            {copiedToken === worker.invitation_token ? (
+                                                                <Check className="w-4 h-4 text-green-500" />
+                                                            ) : (
+                                                                <Copy className="w-4 h-4" />
+                                                            )}
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
