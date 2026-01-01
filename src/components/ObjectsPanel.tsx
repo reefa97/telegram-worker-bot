@@ -26,7 +26,7 @@ interface CleaningObject {
 }
 
 export default function ObjectsPanel() {
-    const { adminUser } = useAuth();
+    const { adminUser, user } = useAuth();
     const [objects, setObjects] = useState<CleaningObject[]>([]);
     const [creators, setCreators] = useState<Record<string, string>>({});
     const [adminsList, setAdminsList] = useState<Array<{ id: string, name: string, role: string }>>([]);
@@ -116,7 +116,8 @@ export default function ObjectsPanel() {
             // Super Admin can reassign objects, others create with their own ID
             // For audit, we set created_by to current user if new, but main logic is in object_owners
             if (!editingObject) {
-                objectData.created_by = adminUser?.id;
+                // Explicitly use the session user ID to satisfy RLS policy (created_by = auth.uid())
+                objectData.created_by = user?.id;
             }
 
             let targetId: string;
@@ -129,13 +130,18 @@ export default function ObjectsPanel() {
                     .eq('id', editingObject.id);
                 if (error) throw error;
             } else {
+                // Use RPC to bypass RLS issues
                 const { data, error } = await supabase
-                    .from('cleaning_objects')
-                    .insert(objectData)
-                    .select()
-                    .single();
+                    .rpc('create_object_secure', { payload: objectData });
+
                 if (error) throw error;
-                targetId = data.id;
+                // RPC returns the object structure directly (as JSONB)
+                // We cast it or assume it has the ID. 
+                // data is the JSONB response, e.g. { id: "...", name: "..." }
+                // Supabase TS types for RPC might infer 'any' or defined generic.
+                // Safely accessing id:
+                const createdObj = data as any;
+                targetId = createdObj.id;
             }
 
             // Sync Owners (Only for Super Admin or on creation)
@@ -163,7 +169,7 @@ export default function ObjectsPanel() {
             closeModal();
         } catch (error) {
             console.error('Error saving object:', error);
-            const errorMessage = error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error ? (error as any).message : JSON.stringify(error));
+            const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
             alert(`Ошибка при сохранении объекта: ${errorMessage}`);
         }
     };
@@ -176,19 +182,6 @@ export default function ObjectsPanel() {
         if (error) {
             console.error('Error deleting object:', error);
             alert('Ошибка при удалении');
-        } else {
-            loadObjects();
-        }
-    };
-
-    const toggleActive = async (id: string, currentStatus: boolean) => {
-        const { error } = await supabase
-            .from('cleaning_objects')
-            .update({ is_active: !currentStatus })
-            .eq('id', id);
-
-        if (error) {
-            console.error('Error toggling status:', error);
         } else {
             loadObjects();
         }
@@ -255,13 +248,17 @@ export default function ObjectsPanel() {
     };
 
     if (loading) {
-        return <div className="text-white">Загрузка...</div>;
+        return (
+            <div className="flex justify-center items-center h-64">
+                <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
     }
 
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-white">Объекты работы</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Объекты работы</h2>
                 {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_create) && (
                     <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
                         <Plus className="w-4 h-4" />
@@ -272,82 +269,74 @@ export default function ObjectsPanel() {
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {objects.map((object) => (
-                    <div key={object.id} className="card">
+                    <div key={object.id} className="card hover:shadow-lg transition-shadow">
                         <div className="flex items-start justify-between mb-3">
                             <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-white mb-1">{object.name}</h3>
-                                <div className="flex items-start gap-2 text-sm text-gray-400">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{object.name}</h3>
+                                <div className="flex items-start gap-2 text-sm text-gray-500 dark:text-gray-400">
                                     <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
                                     <span>{object.address}</span>
                                 </div>
                             </div>
-                            <span className={`px-2 py-1 rounded text-xs ${object.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
-                                }`}>
+                            <span className={object.is_active ? 'badge-success' : 'badge-disable'}>
                                 {object.is_active ? 'Активен' : 'Неактивен'}
                             </span>
                         </div>
 
                         {/* Creator Info (for Admins) */}
                         {(object as any).created_by && creators[(object as any).created_by] && (
-                            <div className="mb-2 text-xs text-gray-500 flex items-center gap-1">
-                                <span className="text-gray-600">Опекун:</span>
-                                <span className="text-gray-400 font-medium">{creators[(object as any).created_by]}</span>
+                            <div className="mb-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                <span className="text-gray-600 dark:text-gray-500">Опекун:</span>
+                                <span className="font-medium">{creators[(object as any).created_by]}</span>
                             </div>
                         )}
 
                         {/* Configuration badges */}
                         <div className="flex flex-wrap gap-1 mb-3">
                             {object.requires_photos && (
-                                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded flex items-center gap-1">
+                                <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs rounded-full flex items-center gap-1 border border-blue-200 dark:border-blue-800">
                                     <Camera className="w-3 h-3" /> Фото
                                 </span>
                             )}
                             {object.requires_tasks && (
-                                <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded flex items-center gap-1">
+                                <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs rounded-full flex items-center gap-1 border border-purple-200 dark:border-purple-800">
                                     <CheckSquare className="w-3 h-3" /> Задачи
                                 </span>
                             )}
                             {(object.hourly_rate || object.monthly_rate) && (
-                                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded flex items-center gap-1">
+                                <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs rounded-full flex items-center gap-1 border border-green-200 dark:border-green-800">
                                     <DollarSign className="w-3 h-3" />
                                     {object.salary_type === 'hourly' ? `${object.hourly_rate} zł/ч` : `${object.monthly_rate} zł/мес`}
                                 </span>
                             )}
                         </div>
 
-                        <div className="flex flex-col gap-2 mt-4">
+                        <div className="flex flex-col gap-2 mt-4 pt-3">
                             <button
                                 onClick={() => setManagingTasksFor(object)}
-                                className="w-full py-1.5 px-3 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 hover:text-purple-300 text-sm rounded transition-colors flex items-center justify-center gap-2 mb-1"
+                                className="w-full py-2 px-3 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-medium text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
                             >
                                 <ListTodo className="w-4 h-4" />
                                 Управлять задачами
                             </button>
 
-                            <div className="flex gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                                 {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
                                     <button
                                         onClick={() => openModal(object)}
-                                        className="flex-1 py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors flex items-center justify-center gap-1"
+                                        className="py-2 px-3 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
                                     >
-                                        <Edit2 className="w-3 h-3" />
+                                        <Edit2 className="w-4 h-4" />
                                         Изменить
-                                    </button>
-                                )}
-                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
-                                    <button
-                                        onClick={() => toggleActive(object.id, object.is_active)}
-                                        className="flex-1 py-1.5 px-3 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded transition-colors"
-                                    >
-                                        {object.is_active ? 'Деактивировать' : 'Активировать'}
                                     </button>
                                 )}
                                 {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
                                     <button
                                         onClick={() => handleDelete(object.id)}
-                                        className="py-1.5 px-3 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
+                                        className="py-2 px-3 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 font-medium text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
                                     >
-                                        <Trash2 className="w-3 h-3" />
+                                        <Trash2 className="w-4 h-4" />
+                                        Удалить
                                     </button>
                                 )}
                             </div>
@@ -357,63 +346,68 @@ export default function ObjectsPanel() {
             </div>
 
             {objects.length === 0 && (
-                <div className="card text-center text-gray-400 py-12">
-                    <MapPin className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <div className="text-center text-gray-500 dark:text-gray-400 py-12">
+                    <MapPin className="w-12 h-12 mx-auto mb-4 opacity-30" />
                     <p>Нет объектов. Создайте первый объект.</p>
                 </div>
             )}
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
-                    <div className="flex min-h-full items-center justify-center p-4">
-                        <div className="w-full max-w-2xl rounded-lg bg-gray-800 my-8">
-                            <div className="p-6">
-                                <h3 className="text-xl font-bold text-white mb-4">
-                                    {editingObject ? 'Редактировать объект' : 'Новый объект'}
-                                </h3>
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                {editingObject ? 'Редактировать объект' : 'Новый объект'}
+                            </h3>
+                            <button onClick={closeModal} className="btn-icon">
+                                <span className="text-2xl leading-none">&times;</span>
+                            </button>
+                        </div>
 
-                                <form onSubmit={handleSubmit} className="space-y-4">
-                                    {/* Basic Info */}
-                                    <div className="space-y-4 pb-4 border-b border-gray-700">
-                                        <h4 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                                            <MapPin className="w-4 h-4" /> Основная информация
-                                        </h4>
+                        <form onSubmit={handleSubmit}>
+                            <div className="modal-body space-y-4">
+                                {/* Basic Info */}
+                                <div className="space-y-4 pb-4 border-b border-gray-100 dark:border-gray-800">
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200 flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-primary-500" /> Основная информация
+                                    </h4>
 
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Название</label>
+                                        <input
+                                            type="text"
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            className="input"
+                                            placeholder="Офис, Склад и т.д."
+                                            required
+                                        />
+                                    </div>
+
+                                    {/* Owner Selection (Multi-select) */}
+                                    {adminUser?.role === 'super_admin' && (
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Название</label>
-                                            <input
-                                                type="text"
-                                                value={formData.name}
-                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                className="input"
-                                                placeholder="Офис, Склад и т.д."
-                                                required
-                                            />
-                                        </div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Опекуны объекта (получают уведомления)</label>
+                                            <div className="flex flex-wrap gap-2 mb-2">
+                                                {formData.owner_ids.map(ownerId => {
+                                                    const admin = adminsList.find(a => a.id === ownerId);
+                                                    return admin ? (
+                                                        <span key={ownerId} className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-sm flex items-center gap-1 border border-purple-200 dark:border-purple-800">
+                                                            {admin.name}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setFormData(prev => ({ ...prev, owner_ids: prev.owner_ids.filter(id => id !== ownerId) }))}
+                                                                className="hover:text-purple-900 dark:hover:text-purple-100"
+                                                            >
+                                                                <X className="w-3 h-3" />
+                                                            </button>
+                                                        </span>
+                                                    ) : null;
+                                                })}
+                                            </div>
 
-                                        {/* Owner Selection (Multi-select) */}
-                                        {adminUser?.role === 'super_admin' && (
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Опекуны объекта (получают уведомления)</label>
-                                                <div className="flex flex-wrap gap-2 mb-2">
-                                                    {formData.owner_ids.map(ownerId => {
-                                                        const admin = adminsList.find(a => a.id === ownerId);
-                                                        return admin ? (
-                                                            <span key={ownerId} className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-sm flex items-center gap-1">
-                                                                {admin.name}
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setFormData(prev => ({ ...prev, owner_ids: prev.owner_ids.filter(id => id !== ownerId) }))}
-                                                                    className="hover:text-white"
-                                                                >
-                                                                    <X className="w-3 h-3" />
-                                                                </button>
-                                                            </span>
-                                                        ) : null;
-                                                    })}
-                                                </div>
-
+                                            <div className="relative">
                                                 <select
                                                     value=""
                                                     onChange={(e) => {
@@ -422,7 +416,7 @@ export default function ObjectsPanel() {
                                                             setFormData(prev => ({ ...prev, owner_ids: [...prev.owner_ids, newId] }));
                                                         }
                                                     }}
-                                                    className="input"
+                                                    className="input appearance-none"
                                                 >
                                                     <option value="">+ Добавить опекуна</option>
                                                     {adminsList
@@ -434,219 +428,230 @@ export default function ObjectsPanel() {
                                                         ))}
                                                 </select>
                                             </div>
-                                        )}
-
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Адрес</label>
-                                            <textarea
-                                                value={formData.address}
-                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                                className="input"
-                                                rows={2}
-                                                placeholder="Полный адрес объекта"
-                                                required
-                                            />
                                         </div>
+                                    )}
 
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Широта</label>
-                                                <input
-                                                    type="text"
-                                                    inputMode="decimal"
-                                                    value={formData.latitude}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(',', '.');
-                                                        if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
-                                                            setFormData({ ...formData, latitude: val as any });
-                                                        }
-                                                    }}
-                                                    className="input"
-                                                    placeholder="51.5074"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Долгота</label>
-                                                <input
-                                                    type="text"
-                                                    inputMode="decimal"
-                                                    value={formData.longitude}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(',', '.');
-                                                        if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
-                                                            setFormData({ ...formData, longitude: val as any });
-                                                        }
-                                                    }}
-                                                    className="input"
-                                                    placeholder="-0.1278"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Радиус (м)</label>
-                                                <input
-                                                    type="number"
-                                                    value={formData.geofence_radius}
-                                                    onChange={(e) => setFormData({ ...formData, geofence_radius: parseInt(e.target.value) })}
-                                                    className="input"
-                                                    min="10"
-                                                    max="1000"
-                                                    placeholder="100"
-                                                />
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-gray-500">Получите координаты из Google Maps</p>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Адрес</label>
+                                        <textarea
+                                            value={formData.address}
+                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                            className="input"
+                                            rows={2}
+                                            placeholder="Полный адрес объекта"
+                                            required
+                                        />
                                     </div>
 
-                                    {/* Salary Config */}
-                                    <div className="space-y-4 pb-4 border-b border-gray-700">
-                                        <h4 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                                            <DollarSign className="w-4 h-4" /> Зарплата
-                                        </h4>
-
+                                    <div className="grid grid-cols-3 gap-3">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Тип оплаты</label>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Широта</label>
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={formData.latitude}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(',', '.');
+                                                    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
+                                                        setFormData({ ...formData, latitude: val as any });
+                                                    }
+                                                }}
+                                                className="input"
+                                                placeholder="51.5074"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Долгота</label>
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={formData.longitude}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(',', '.');
+                                                    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
+                                                        setFormData({ ...formData, longitude: val as any });
+                                                    }
+                                                }}
+                                                className="input"
+                                                placeholder="-0.1278"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Радиус (м)</label>
+                                            <input
+                                                type="number"
+                                                value={formData.geofence_radius}
+                                                onChange={(e) => setFormData({ ...formData, geofence_radius: parseInt(e.target.value) })}
+                                                className="input"
+                                                min="10"
+                                                max="1000"
+                                                placeholder="100"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Salary Config */}
+                                <div className="space-y-4 pb-4 border-b border-gray-100 dark:border-gray-800">
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200 flex items-center gap-2">
+                                        <DollarSign className="w-4 h-4 text-green-500" /> Зарплата
+                                    </h4>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Тип оплаты</label>
+                                        <div className="relative">
                                             <select
                                                 value={formData.salary_type}
                                                 onChange={(e) => setFormData({ ...formData, salary_type: e.target.value as 'hourly' | 'monthly_fixed' })}
-                                                className="input"
+                                                className="input appearance-none"
                                             >
                                                 <option value="hourly">Почасовая</option>
                                                 <option value="monthly_fixed">Месячная фиксированная</option>
                                             </select>
                                         </div>
+                                    </div>
 
-                                        {formData.salary_type === 'hourly' ? (
+                                    {formData.salary_type === 'hourly' ? (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ставка в час (zł)</label>
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={formData.hourly_rate}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(',', '.');
+                                                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                                        setFormData({ ...formData, hourly_rate: val as any });
+                                                    }
+                                                }}
+                                                className="input"
+                                                placeholder="15.00"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Ставка в час (zł)</label>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Месячная ставка (zł)</label>
                                                 <input
                                                     type="text"
                                                     inputMode="decimal"
-                                                    value={formData.hourly_rate}
+                                                    value={formData.monthly_rate}
                                                     onChange={(e) => {
                                                         const val = e.target.value.replace(',', '.');
                                                         if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                                            setFormData({ ...formData, hourly_rate: val as any });
+                                                            setFormData({ ...formData, monthly_rate: val as any });
                                                         }
                                                     }}
                                                     className="input"
-                                                    placeholder="15.00"
+                                                    placeholder="2000.00"
                                                 />
                                             </div>
-                                        ) : (
-                                            <>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-300 mb-2">Месячная ставка (zł)</label>
-                                                    <input
-                                                        type="text"
-                                                        inputMode="decimal"
-                                                        value={formData.monthly_rate}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value.replace(',', '.');
-                                                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                                                setFormData({ ...formData, monthly_rate: val as any });
-                                                            }
-                                                        }}
-                                                        className="input"
-                                                        placeholder="2000.00"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-300 mb-2">Ожидаемое кол-во уборок/месяц</label>
-                                                    <input
-                                                        type="number"
-                                                        value={formData.expected_cleanings_per_month}
-                                                        onChange={(e) => setFormData({ ...formData, expected_cleanings_per_month: parseInt(e.target.value) })}
-                                                        className="input"
-                                                        min="1"
-                                                        placeholder="20"
-                                                    />
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ожидаемое кол-во уборок/месяц</label>
+                                                <input
+                                                    type="number"
+                                                    value={formData.expected_cleanings_per_month}
+                                                    onChange={(e) => setFormData({ ...formData, expected_cleanings_per_month: parseInt(e.target.value) })}
+                                                    className="input"
+                                                    min="1"
+                                                    placeholder="20"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
 
-                                    {/* Schedule Config */}
-                                    <div className="space-y-4 pb-4 border-b border-gray-700">
-                                        <h4 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                                            <Clock className="w-4 h-4" /> График уборки
-                                        </h4>
+                                {/* Schedule Config */}
+                                <div className="space-y-4 pb-4 border-b border-gray-100 dark:border-gray-800">
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200 flex items-center gap-2">
+                                        <Clock className="w-4 h-4 text-blue-500" /> График уборки
+                                    </h4>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Дни недели</label>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дни недели</label>
+                                        <div className="flex flex-wrap gap-2">
                                             <div className="flex flex-wrap gap-2">
-                                                {['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'].map((day, index) => (
+                                                {[
+                                                    { val: 1, label: 'Пн' },
+                                                    { val: 2, label: 'Вт' },
+                                                    { val: 3, label: 'Ср' },
+                                                    { val: 4, label: 'Чт' },
+                                                    { val: 5, label: 'Пт' },
+                                                    { val: 6, label: 'Сб' },
+                                                    { val: 0, label: 'Вс' },
+                                                ].map((day) => (
                                                     <button
-                                                        key={index}
+                                                        key={day.val}
                                                         type="button"
                                                         onClick={() => {
                                                             const current = formData.schedule_days;
-                                                            const updated = current.includes(index)
-                                                                ? current.filter(d => d !== index)
-                                                                : [...current, index].sort();
+                                                            const updated = current.includes(day.val)
+                                                                ? current.filter(d => d !== day.val)
+                                                                : [...current, day.val].sort();
                                                             setFormData({ ...formData, schedule_days: updated });
                                                         }}
-                                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${formData.schedule_days.includes(index)
-                                                            ? 'bg-blue-600 text-white'
-                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${formData.schedule_days.includes(day.val)
+                                                            ? 'bg-blue-600 text-white shadow-md transform scale-105'
+                                                            : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
                                                             }`}
                                                     >
-                                                        {day}
+                                                        {day.label}
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
+                                    </div>
 
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Начало</label>
-                                                <input
-                                                    type="time"
-                                                    value={formData.schedule_time_start}
-                                                    onChange={(e) => setFormData({ ...formData, schedule_time_start: e.target.value })}
-                                                    className="input"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-2">Конец</label>
-                                                <input
-                                                    type="time"
-                                                    value={formData.schedule_time_end}
-                                                    onChange={(e) => setFormData({ ...formData, schedule_time_end: e.target.value })}
-                                                    className="input"
-                                                />
-                                            </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Начало</label>
+                                            <input
+                                                type="time"
+                                                value={formData.schedule_time_start}
+                                                onChange={(e) => setFormData({ ...formData, schedule_time_start: e.target.value })}
+                                                className="input"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Конец</label>
+                                            <input
+                                                type="time"
+                                                value={formData.schedule_time_end}
+                                                onChange={(e) => setFormData({ ...formData, schedule_time_end: e.target.value })}
+                                                className="input"
+                                            />
                                         </div>
                                     </div>
+                                </div>
 
-                                    {/* Features */}
-                                    <div className="space-y-4">
-                                        <h4 className="text-sm font-semibold text-gray-300">Требования</h4>
+                                {/* Features */}
+                                <div className="space-y-4">
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200">Требования</h4>
 
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.requires_photos}
-                                                onChange={(e) => setFormData({ ...formData, requires_photos: e.target.checked })}
-                                                className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                                            />
-                                            <div className="flex items-center gap-2">
-                                                <Camera className="w-4 h-4 text-blue-400" />
-                                                <span className="text-sm text-gray-300">Требуются фото отчеты</span>
-                                            </div>
-                                        </label>
-                                    </div>
-
-                                    <div className="flex gap-2 pt-4">
-                                        <button type="submit" className="btn-primary flex-1">
-                                            {editingObject ? 'Сохранить' : 'Создать'}
-                                        </button>
-                                        <button type="button" onClick={closeModal} className="btn-secondary flex-1">
-                                            Отмена
-                                        </button>
-                                    </div>
-                                </form>
+                                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.requires_photos}
+                                            onChange={(e) => setFormData({ ...formData, requires_photos: e.target.checked })}
+                                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <Camera className="w-4 h-4 text-blue-500" />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300">Требуются фото отчеты</span>
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
-                        </div>
+
+                            <div className="modal-footer">
+                                <button type="button" onClick={closeModal} className="btn-secondary flex-1">
+                                    Отмена
+                                </button>
+                                <button type="submit" className="btn-primary flex-1">
+                                    {editingObject ? 'Сохранить' : 'Создать'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
