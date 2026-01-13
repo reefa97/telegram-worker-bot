@@ -488,22 +488,50 @@ serve(async (req) => {
       if (data.startsWith("select_object_")) {
         const objectId = data.replace("select_object_", "");
 
-        // Update worker's selected object
-        await supabase
+        // Find which worker record (profile) has this object assigned
+        const { data: workers } = await supabase
           .from("workers")
-          .update({ selected_object_id: objectId })
+          .select("id, worker_objects(object_id)")
           .eq("telegram_user_id", userId.toString());
 
-        await sendTelegramMessage(
-          botToken,
-          chatId,
-          "📍 Отлично! Теперь отправьте мне ваше местоположение, нажав на кнопку ниже.",
-          {
-            keyboard: [[{ text: "📍 Отправить местоположение", request_location: true }]],
-            resize_keyboard: true,
-            one_time_keyboard: true,
+        let targetWorkerId = null;
+        if (workers) {
+          // Iterate all workers to ensure exclusivity:
+          // 1. Set selected_object_id for the worker who owns this object.
+          // 2. Clear selected_object_id for all other workers.
+          for (const w of workers) {
+            const hasObject = w.worker_objects && w.worker_objects.some((wo: any) => wo.object_id === objectId);
+
+            if (hasObject) {
+              targetWorkerId = w.id;
+              await supabase
+                .from("workers")
+                .update({ selected_object_id: objectId })
+                .eq("id", w.id);
+            } else {
+              // Clear selection for other profiles to prevent ambiguity
+              await supabase
+                .from("workers")
+                .update({ selected_object_id: null })
+                .eq("id", w.id);
+            }
           }
-        );
+        }
+
+        if (targetWorkerId) {
+          await sendTelegramMessage(
+            botToken,
+            chatId,
+            "📍 Отлично! Теперь отправьте мне ваше местоположение, нажав на кнопку ниже.",
+            {
+              keyboard: [[{ text: "📍 Отправить местоположение", request_location: true }]],
+              resize_keyboard: true,
+              one_time_keyboard: true,
+            }
+          );
+        } else {
+          await sendTelegramMessage(botToken, chatId, "❌ Ошибка: У вас нет доступа к этому объекту.");
+        }
       } else if (data === "end_work") {
         await sendTelegramMessage(
           botToken,
@@ -648,19 +676,36 @@ serve(async (req) => {
             }
           }
         } else {
-          // Check if user is already a worker
-          const { data: existingWorker } = await supabase
+          // Check if user is already a worker (possibly multiple times)
+          const { data: existingWorkers } = await supabase
             .from("workers")
             .select("id, first_name")
-            .eq("telegram_user_id", userId.toString())
-            .maybeSingle();
+            .eq("telegram_user_id", userId.toString());
 
-          if (existingWorker) {
-            const keyboard = await getWorkerKeyboard(existingWorker.id);
+          if (existingWorkers && existingWorkers.length > 0) {
+            // Use the first name from the first record (assuming same person)
+            const firstName = existingWorkers[0].first_name;
+
+            // Check for potential active session across all worker profiles
+            const workerIds = existingWorkers.map(w => w.id);
+            const { data: activeSession } = await supabase
+              .from("work_sessions")
+              .select("id")
+              .in("worker_id", workerIds)
+              .is("end_time", null)
+              .maybeSingle();
+
+            let keyboard;
+            if (activeSession) {
+              keyboard = [[{ text: "🛑 Закончить работу" }]];
+            } else {
+              keyboard = [[{ text: "▶️ Начать работу" }]];
+            }
+
             await sendTelegramMessage(
               botToken,
               chatId,
-              `👋 С возвращением, ${existingWorker.first_name}!`,
+              `👋 С возвращением, ${firstName}! (Профилей: ${existingWorkers.length})`,
               {
                 keyboard: keyboard,
                 resize_keyboard: true,
@@ -711,13 +756,12 @@ serve(async (req) => {
       }
       // Handle "Start Work" button
       else if (text === "▶️ Начать работу") {
-        const { data: worker } = await supabase
+        const { data: workers } = await supabase
           .from("workers")
           .select("*, worker_objects(object_id, cleaning_objects(id, name))")
-          .eq("telegram_user_id", userId.toString())
-          .maybeSingle();
+          .eq("telegram_user_id", userId.toString());
 
-        if (!worker) {
+        if (!workers || workers.length === 0) {
           await sendTelegramMessage(botToken, chatId, "❌ Ваш аккаунт не найден. Обратитесь к администратору.");
           return new Response(JSON.stringify({ ok: true }), {
             headers: { "Content-Type": "application/json" },
@@ -725,15 +769,19 @@ serve(async (req) => {
         }
 
         // Check if there's an active session
+        const workerIds = workers.map(w => w.id);
         const { data: activeSession } = await supabase
           .from("work_sessions")
           .select("*")
-          .eq("worker_id", worker.id)
+          .in("worker_id", workerIds)
           .is("end_time", null)
           .maybeSingle();
 
         if (activeSession) {
-          const keyboard = await getWorkerKeyboard(worker.id);
+          // Find which worker has the active session to get the keyboard
+          const sessionWorkerId = activeSession.worker_id;
+          const keyboard = await getWorkerKeyboard(sessionWorkerId);
+
           await sendTelegramMessage(botToken, chatId, "⚠️ У вас уже есть активная рабочая смена. Сначала завершите её.", {
             keyboard: keyboard,
             resize_keyboard: true
@@ -743,21 +791,35 @@ serve(async (req) => {
           });
         }
 
-        const objects = worker.worker_objects || [];
+        // Aggregate objects from all workers
+        let allObjects: any[] = [];
+        workers.forEach(w => {
+          if (w.worker_objects) {
+            w.worker_objects.forEach((wo: any) => {
+              if (wo.cleaning_objects) {
+                allObjects.push({
+                  ...wo,
+                  worker_id: w.id // Keep track of which worker this object belongs to
+                });
+              }
+            });
+          }
+        });
 
-        if (objects.length === 0) {
+        if (allObjects.length === 0) {
           await sendTelegramMessage(botToken, chatId, "❌ У вас нет назначенных объектов. Обратитесь к администратору.");
-        } else if (objects.length === 1) {
+        } else if (allObjects.length === 1) {
           // Auto-select the only object
+          const targetObj = allObjects[0];
           await supabase
             .from("workers")
-            .update({ selected_object_id: objects[0].cleaning_objects.id })
-            .eq("id", worker.id);
+            .update({ selected_object_id: targetObj.cleaning_objects.id })
+            .eq("id", targetObj.worker_id);
 
           await sendTelegramMessage(
             botToken,
             chatId,
-            `📍 Объект: <b>${objects[0].cleaning_objects.name}</b>\n\nОтправьте мне ваше местоположение, нажав на кнопку ниже.`,
+            `📍 Объект: <b>${targetObj.cleaning_objects.name}</b>\n\nОтправьте мне ваше местоположение, нажав на кнопку ниже.`,
             {
               keyboard: [[{ text: "📍 Отправить местоположение", request_location: true }]],
               resize_keyboard: true,
@@ -766,7 +828,9 @@ serve(async (req) => {
           );
         } else {
           // Show object selection
-          const buttons = objects.map((obj: any) => [{
+          // Use a simple map since callback_data length is limited. 
+          // We will find the correct worker in the callback handler.
+          const buttons = allObjects.map((obj: any) => [{
             text: obj.cleaning_objects.name,
             callback_data: `select_object_${obj.cleaning_objects.id}`,
           }]);
@@ -781,28 +845,29 @@ serve(async (req) => {
       }
       // Handle "End Work" button
       else if (text === "🛑 Закончить работу") {
-        const { data: worker } = await supabase
+        const { data: workers } = await supabase
           .from("workers")
-          .select("*")
-          .eq("telegram_user_id", userId.toString())
-          .maybeSingle();
+          .select("id")
+          .eq("telegram_user_id", userId.toString());
 
-        if (!worker) {
+        if (!workers || workers.length === 0) {
           await sendTelegramMessage(botToken, chatId, "❌ Ваш аккаунт не найден.");
           return new Response(JSON.stringify({ ok: true }), {
             headers: { "Content-Type": "application/json" },
           });
         }
 
+        const workerIds = workers.map(w => w.id);
         const { data: activeSession } = await supabase
           .from("work_sessions")
           .select("*")
-          .eq("worker_id", worker.id)
+          .in("worker_id", workerIds)
           .is("end_time", null)
           .maybeSingle();
 
         if (!activeSession) {
-          const keyboard = await getWorkerKeyboard(worker.id);
+          // Provide default keyboard if no session (using first worker)
+          const keyboard = await getWorkerKeyboard(workers[0].id);
           await sendTelegramMessage(botToken, chatId, "⚠️ У вас нет активной рабочей смены.", {
             keyboard: keyboard,
             resize_keyboard: true
@@ -825,46 +890,49 @@ serve(async (req) => {
       }
       // Handle location
       else if (location) {
-        const { data: worker } = await supabase
+        const { data: workers } = await supabase
           .from("workers")
           .select("*")
-          .eq("telegram_user_id", userId.toString())
-          .maybeSingle();
+          .eq("telegram_user_id", userId.toString());
 
-        if (!worker) {
+        if (!workers || workers.length === 0) {
           await sendTelegramMessage(botToken, chatId, "❌ Ваш аккаунт не найден.");
           return new Response(JSON.stringify({ ok: true }), {
             headers: { "Content-Type": "application/json" },
           });
         }
 
-        // Log that we received location
+        // Use first worker for generic logging
+        const logWorker = workers[0];
         await logToSystem(
           'info',
           'shift',
-          `Received location from worker ${worker.first_name} ${worker.last_name}`,
+          `Received location from worker ${logWorker.first_name} ${logWorker.last_name} (Multi-check)`,
           { latitude: location.latitude, longitude: location.longitude },
-          worker.id
+          logWorker.id
         );
 
+        // 1. Check for Active Session (Priority: End Shift)
+        const workerIds = workers.map(w => w.id);
         const { data: activeSession } = await supabase
           .from("work_sessions")
           .select("*, cleaning_objects(name)")
-          .eq("worker_id", worker.id)
+          .in("worker_id", workerIds)
           .is("end_time", null)
           .maybeSingle();
 
         if (activeSession) {
-          // End work session
+          // END SHIFT LOGIC
+          const worker = workers.find(w => w.id === activeSession.worker_id);
+
           const startTime = new Date(activeSession.start_time);
           const endTime = new Date();
           const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / 60000);
 
-          // Get object data for geofence validation and requirements
           const { data: objectData } = await supabase
             .from("cleaning_objects")
             .select("latitude, longitude, geofence_radius, name, requires_photos")
-            .eq("id", activeSession.object_id) // Explicitly use activeSession.object_id
+            .eq("id", activeSession.object_id)
             .single();
 
           let isInGeofence = true;
@@ -894,9 +962,7 @@ serve(async (req) => {
             }
           }
 
-          // Check if photos are required
           if (objectData?.requires_photos) {
-            // Update location but keep session active (no end_time)
             await supabase
               .from("work_sessions")
               .update({
@@ -926,7 +992,6 @@ serve(async (req) => {
             });
           }
 
-          // If no photos required, close the session completely
           await supabase
             .from("work_sessions")
             .update({
@@ -950,7 +1015,6 @@ serve(async (req) => {
             }
           );
 
-          // Notify admins
           await sendLocationToManagers(
             botToken,
             `${worker.first_name} ${worker.last_name}`,
@@ -965,14 +1029,20 @@ serve(async (req) => {
           return new Response(JSON.stringify({ ok: true }), {
             headers: { "Content-Type": "application/json" },
           });
+
         } else {
-          // Start work session
-          if (!worker.selected_object_id) {
-            await sendTelegramMessage(botToken, chatId, "❌ Сначала выберите объект работы.");
+          // 2. START SHIFT LOGIC (if no active session)
+          // Find if any worker has a selected object
+          const workerWithSelection = workers.find(w => w.selected_object_id);
+
+          if (!workerWithSelection) {
+            await sendTelegramMessage(botToken, chatId, "❌ Сначала выберите объект работы (нажмите '▶️ Начать работу').");
             return new Response(JSON.stringify({ ok: true }), {
               headers: { "Content-Type": "application/json" },
             });
           }
+
+          const worker = workerWithSelection;
 
           const { data: objectFull } = await supabase
             .from("cleaning_objects")

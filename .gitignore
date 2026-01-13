@@ -34,3 +34,5 @@ dist-ssr
 
 # Supabase
 .supabase
+.vercel
+.env*.local

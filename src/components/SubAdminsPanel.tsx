@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { UserPlus2, Plus, Trash2, Edit2 } from 'lucide-react';
+import { UserPlus2, Plus, Trash2, Edit2, Shield, User, Smartphone, Layout } from 'lucide-react';
 
 interface AdminUser {
     id: string;
@@ -190,11 +190,11 @@ export default function SubAdminsPanel() {
 
     const renderPermissionsGroup = (title: string, permissions: Array<{ key: string, label: string }>) => {
         return (
-            <div key={title} className="mb-3">
-                <div className="text-xs font-semibold text-gray-400 mb-2 uppercase">{title}</div>
-                <div className="space-y-1">
+            <div key={title} className="mb-4 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg">
+                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">{title}</div>
+                <div className="grid grid-cols-1 gap-2">
                     {permissions.map(({ key, label }) => (
-                        <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-700/50 p-1.5 rounded">
+                        <label key={key} className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 p-1.5 rounded-md transition-colors">
                             <input
                                 type="checkbox"
                                 checked={(formData.permissions as any)[key] || false}
@@ -205,9 +205,9 @@ export default function SubAdminsPanel() {
                                         [key]: e.target.checked
                                     }
                                 })}
-                                className="rounded border-gray-600 bg-gray-700 text-primary-500"
+                                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-primary-600 focus:ring-primary-500"
                             />
-                            <span className="text-gray-300 text-sm">{label}</span>
+                            <span className="text-gray-700 dark:text-gray-300 text-sm">{label}</span>
                         </label>
                     ))}
                 </div>
@@ -220,14 +220,18 @@ export default function SubAdminsPanel() {
         setEditingAdmin(null);
     };
 
-    if (loading) return <div className="text-white">Загрузка...</div>;
+    if (loading) return (
+        <div className="flex justify-center items-center h-64">
+            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+    );
 
     const canManage = adminUser?.role === 'super_admin' || adminUser?.role === 'sub_admin';
 
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-white">Администраторы и Менеджеры</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Администраторы и Менеджеры</h2>
                 {canManage && (
                     <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
                         <Plus className="w-4 h-4" />
@@ -236,54 +240,73 @@ export default function SubAdminsPanel() {
                 )}
             </div>
 
-            <div className="card overflow-hidden">
+            <div className="card overflow-hidden p-0">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="table w-full">
                         <thead>
-                            <tr className="bg-gray-700/50 text-gray-400 text-sm uppercase">
-                                <th className="p-4">Имя</th>
-                                <th className="p-4">Роль</th>
-                                <th className="p-4">Telegram ID</th>
-                                <th className="p-4">Телефон</th>
-                                <th className="p-4 text-right">Действия</th>
+                            <tr>
+                                <th>Имя</th>
+                                <th>Роль</th>
+                                <th>Telegram ID</th>
+                                <th>Телефон</th>
+                                <th className="text-right">Действия</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-700">
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                             {subAdmins.map((admin) => {
                                 const canEditThis = adminUser?.role === 'super_admin' || admin.created_by === adminUser?.id;
 
                                 return (
-                                    <tr key={admin.id} className="hover:bg-gray-700/30 transition-colors">
-                                        <td className="p-4">
-                                            <div className="font-medium text-white">{admin.name || 'Без имени'}</div>
-                                            <div className="text-sm text-gray-500">{admin.email}</div>
+                                    <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                        <td className="font-medium text-gray-900 dark:text-white">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 flex items-center justify-center">
+                                                    <User className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium">{admin.name || 'Без имени'}</div>
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">{admin.email}</div>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td className="p-4">
-                                            <span className={`px-2 py-1 rounded text-xs ${admin.role === 'manager'
-                                                ? 'bg-purple-500/20 text-purple-400'
-                                                : 'bg-blue-500/20 text-blue-400'
+                                        <td>
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${admin.role === 'manager'
+                                                ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800'
+                                                : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
                                                 }`}>
+                                                {admin.role === 'manager' ? (
+                                                    <Layout className="w-3 h-3" />
+                                                ) : (
+                                                    <Shield className="w-3 h-3" />
+                                                )}
                                                 {admin.role === 'manager' ? 'Менеджер' : 'Sub Admin'}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-gray-300 font-mono text-sm">
-                                            {admin.telegram_chat_id || <span className="text-gray-600">-</span>}
+                                        <td className="text-gray-600 dark:text-gray-300 font-mono text-sm">
+                                            {admin.telegram_chat_id || <span className="text-gray-400 dark:text-gray-500">-</span>}
                                         </td>
-                                        <td className="p-4 text-gray-300">
-                                            {admin.phone || '-'}
+                                        <td className="text-gray-600 dark:text-gray-300">
+                                            {admin.phone ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    <Smartphone className="w-3.5 h-3.5 text-gray-400" />
+                                                    {admin.phone}
+                                                </div>
+                                            ) : '-'}
                                         </td>
-                                        <td className="p-4 text-right">
+                                        <td className="text-right">
                                             {canEditThis && (
                                                 <div className="flex justify-end gap-2">
                                                     <button
                                                         onClick={() => openModal(admin)}
-                                                        className="p-2 hover:bg-gray-600 rounded transition-colors text-blue-400"
+                                                        className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg transition-colors"
+                                                        title="Редактировать"
                                                     >
                                                         <Edit2 className="w-4 h-4" />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDelete(admin.id)}
-                                                        className="p-2 hover:bg-gray-600 rounded transition-colors text-red-400"
+                                                        className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg transition-colors"
+                                                        title="Удалить"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
@@ -297,8 +320,8 @@ export default function SubAdminsPanel() {
                     </table>
 
                     {subAdmins.length === 0 && (
-                        <div className="text-center text-gray-400 py-12">
-                            <UserPlus2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <div className="text-center text-gray-500 dark:text-gray-400 py-12">
+                            <UserPlus2 className="w-12 h-12 mx-auto mb-4 opacity-20" />
                             <p>Нет пользователей. Создайте первого.</p>
                         </div>
                     )}
@@ -307,96 +330,110 @@ export default function SubAdminsPanel() {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
                         <div className="p-6">
-                            <h3 className="text-xl font-bold text-white mb-4">
-                                {editingAdmin ? 'Редактировать' : 'Новый пользователь'}
-                            </h3>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                    {editingAdmin ? 'Редактировать' : 'Новый пользователь'}
+                                </h3>
+                                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                    <span className="sr-only">Закрыть</span>
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
 
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Роль</label>
-                                    <select
-                                        value={formData.role}
-                                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                        className="input"
-                                        disabled={!!editingAdmin}
-                                    >
-                                        <option value="sub_admin">Sub Admin (Администратор)</option>
-                                        <option value="manager">Manager (Менеджер)</option>
-                                    </select>
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Роль</label>
+                                            <select
+                                                value={formData.role}
+                                                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                                className="input"
+                                                disabled={!!editingAdmin}
+                                            >
+                                                <option value="sub_admin">Sub Admin (Администратор)</option>
+                                                <option value="manager">Manager (Менеджер)</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Имя</label>
+                                            <input
+                                                type="text"
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                className="input"
+                                                placeholder="Иван Иванов"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email (Логин)</label>
+                                            <input
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                                className="input"
+                                                placeholder="user@example.com"
+                                                required
+                                                disabled={!!editingAdmin}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Telegram Chat ID</label>
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={formData.telegram_chat_id}
+                                                onChange={(e) => setFormData({ ...formData, telegram_chat_id: e.target.value })}
+                                                className="input"
+                                                placeholder="123456789"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Необязательно. Можно использовать для привязки уведомлений вручную.
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Телефон</label>
+                                            <input
+                                                type="tel"
+                                                value={formData.phone}
+                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                className="input"
+                                                placeholder="+7..."
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                                {editingAdmin ? 'Новый пароль (оставьте пустым чтобы не менять)' : 'Пароль'}
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={formData.password}
+                                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                                className="input"
+                                                placeholder={editingAdmin ? "..." : "******"}
+                                                required={!editingAdmin}
+                                                minLength={6}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Имя</label>
-                                    <input
-                                        type="text"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="input"
-                                        placeholder="Иван Иванов"
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Telegram Chat ID</label>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={formData.telegram_chat_id}
-                                        onChange={(e) => setFormData({ ...formData, telegram_chat_id: e.target.value })}
-                                        className="input"
-                                        placeholder="123456789"
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Необязательно. Можно использовать для привязки уведомлений вручную.
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Email (Логин)</label>
-                                    <input
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="input"
-                                        placeholder="user@example.com"
-                                        required
-                                        disabled={!!editingAdmin}
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Телефон</label>
-                                    <input
-                                        type="tel"
-                                        value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        className="input"
-                                        placeholder="+7..."
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        {editingAdmin ? 'Новый пароль (оставьте пустым чтобы не менять)' : 'Пароль'}
-                                    </label>
-                                    <input
-                                        type="password"
-                                        value={formData.password}
-                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                        className="input"
-                                        placeholder={editingAdmin ? "..." : "******"}
-                                        required={!editingAdmin}
-                                        minLength={6}
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Права доступа</label>
-                                    <div className="space-y-3 max-h-96 overflow-y-auto border border-gray-700 rounded p-3 text-sm">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Права доступа</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
                                         {renderPermissionsGroup('Объекты', [
                                             { key: 'objects_view', label: 'Просмотр объектов' },
                                             { key: 'objects_create', label: 'Добавление объектов' },
@@ -431,12 +468,12 @@ export default function SubAdminsPanel() {
                                     </div>
                                 </div>
 
-                                <div className="flex gap-2 pt-4">
+                                <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                    <button type="button" onClick={closeModal} className="btn-ghost flex-1">
+                                        Отмена
+                                    </button>
                                     <button type="submit" className="btn-primary flex-1">
                                         {editingAdmin ? 'Сохранить' : 'Создать'}
-                                    </button>
-                                    <button type="button" onClick={closeModal} className="btn-secondary flex-1">
-                                        Отмена
                                     </button>
                                 </div>
                             </form>

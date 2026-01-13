@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { X, MapPin, Clock, Edit2, Trash2, Save } from 'lucide-react';
+import { X, MapPin, Clock, Edit2, Trash2, Save, History } from 'lucide-react';
 
 interface WorkSession {
     id: string;
@@ -127,7 +127,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
         return new Date(dateString).toLocaleString('ru-RU', {
             day: '2-digit',
             month: '2-digit',
-            year: '2-digit',
+            year: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
         });
@@ -146,123 +146,143 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
-                <div className="p-6 border-b border-gray-700 flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-white">
-                        История работы: {workerName}
-                    </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white">
-                        <X className="w-6 h-6" />
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col animate-scaleIn border border-gray-100 dark:border-gray-700">
+                <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50 rounded-t-2xl">
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <History className="w-5 h-5 text-primary-500" />
+                            История работы
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            Сотрудник: <span className="font-medium text-gray-900 dark:text-white">{workerName}</span>
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-auto p-0 custom-scrollbar">
                     {loading ? (
-                        <div className="text-center text-gray-400">Загрузка...</div>
+                        <div className="flex justify-center items-center h-64">
+                            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
                     ) : sessions.length === 0 ? (
-                        <div className="text-center text-gray-400">История пуста</div>
+                        <div className="flex flex-col items-center justify-center h-64 text-gray-400 dark:text-gray-500">
+                            <History className="w-12 h-12 mb-3 opacity-20" />
+                            <p>История смен пуста</p>
+                        </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead className="text-xs text-gray-400 uppercase bg-gray-700/50">
+                            <table className="table w-full">
+                                <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
                                     <tr>
-                                        <th className="px-4 py-3">Объект</th>
-                                        <th className="px-4 py-3">Начало</th>
-                                        <th className="px-4 py-3">Конец</th>
-                                        <th className="px-4 py-3">Длительность</th>
-                                        <th className="px-4 py-3">Локация (Начало)</th>
-                                        <th className="px-4 py-3">Локация (Конец)</th>
-                                        <th className="px-4 py-3">Действия</th>
+                                        <th className="pl-6 w-64">Объект</th>
+                                        <th className="w-48">Начало</th>
+                                        <th className="w-48">Конец</th>
+                                        <th className="w-24 text-center">Длительность</th>
+                                        <th className="w-32">Локация</th>
+                                        <th className="pr-6 w-24 text-right">Действия</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-700">
+                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                     {sessions.map((session) => (
-                                        <tr key={session.id} className="hover:bg-gray-700/30">
-                                            <td className="px-4 py-3 text-white">
-                                                {session.cleaning_objects?.name || 'Не указан'}
+                                        <tr key={session.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
+                                            <td className="pl-6 py-4">
+                                                <div className="font-medium text-gray-900 dark:text-white">
+                                                    {session.cleaning_objects?.name || 'Не указан'}
+                                                </div>
                                                 {session.cleaning_objects?.address && (
-                                                    <div className="text-xs text-gray-400">
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-[200px]" title={session.cleaning_objects.address}>
                                                         {session.cleaning_objects.address}
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 text-gray-300">
+                                            <td className="py-4">
                                                 {editingSession === session.id ? (
                                                     <input
                                                         type="datetime-local"
                                                         value={editForm.start_time}
                                                         onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })}
-                                                        className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm"
+                                                        className="input py-1 px-2 text-xs w-full"
                                                     />
                                                 ) : (
-                                                    formatDate(session.start_time)
+                                                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                                                        {formatDate(session.start_time)}
+                                                    </div>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 text-gray-300">
+                                            <td className="py-4">
                                                 {editingSession === session.id ? (
                                                     <input
                                                         type="datetime-local"
                                                         value={editForm.end_time}
                                                         onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })}
-                                                        className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-sm"
+                                                        className="input py-1 px-2 text-xs w-full"
                                                     />
                                                 ) : (
-                                                    session.end_time ? formatDate(session.end_time) : 'В процессе'
+                                                    <div className={`text-sm ${session.end_time ? 'text-gray-600 dark:text-gray-300' : 'text-green-600 dark:text-green-400 font-medium'}`}>
+                                                        {session.end_time ? formatDate(session.end_time) : (
+                                                            <span className="flex items-center gap-1.5 text-xs bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full border border-green-100 dark:border-green-900/30">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                                                В процессе
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 text-gray-300">
+                                            <td className="py-4 text-center">
                                                 {session.duration_minutes !== null ? (
-                                                    <div className="flex items-center gap-1">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs font-medium text-gray-700 dark:text-gray-300">
                                                         <Clock className="w-3 h-3" />
                                                         {formatDuration(session.duration_minutes)}
-                                                    </div>
+                                                    </span>
                                                 ) : '-'}
                                             </td>
-                                            <td className="px-4 py-3">
-                                                {session.start_location ? (
-                                                    <a
-                                                        href={getGoogleMapsLink(session.start_location)!}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300"
-                                                    >
-                                                        <MapPin className="w-4 h-4" />
-                                                        Карта
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-gray-500">-</span>
-                                                )}
+                                            <td className="py-4">
+                                                <div className="flex flex-col gap-1">
+                                                    {session.start_location ? (
+                                                        <a
+                                                            href={getGoogleMapsLink(session.start_location)!}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                                                            title="Начало смены"
+                                                        >
+                                                            <MapPin className="w-3 h-3" />
+                                                            Начало
+                                                        </a>
+                                                    ) : <span className="text-xs text-gray-400 pl-4">-</span>}
+
+                                                    {session.end_location ? (
+                                                        <a
+                                                            href={getGoogleMapsLink(session.end_location)!}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                                                            title="Конец смены"
+                                                        >
+                                                            <MapPin className="w-3 h-3" />
+                                                            Конец
+                                                        </a>
+                                                    ) : null}
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-3">
-                                                {session.end_location ? (
-                                                    <a
-                                                        href={getGoogleMapsLink(session.end_location)!}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300"
-                                                    >
-                                                        <MapPin className="w-4 h-4" />
-                                                        Карта
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-gray-500">-</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
+                                            <td className="pr-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     {editingSession === session.id ? (
                                                         <>
                                                             <button
                                                                 onClick={() => handleUpdateSession(session.id)}
-                                                                className="p-1 hover:bg-gray-600 rounded text-green-400"
+                                                                className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg text-green-600 dark:text-green-400 transition-colors"
                                                                 title="Сохранить"
                                                             >
                                                                 <Save className="w-4 h-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => setEditingSession(null)}
-                                                                className="p-1 hover:bg-gray-600 rounded text-gray-400"
+                                                                className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-500 transition-colors"
                                                                 title="Отмена"
                                                             >
                                                                 <X className="w-4 h-4" />
@@ -272,15 +292,15 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                                                         <>
                                                             <button
                                                                 onClick={() => startEditing(session)}
-                                                                className="p-1 hover:bg-gray-600 rounded text-blue-400"
-                                                                title="Редактировать"
+                                                                className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400 transition-colors"
+                                                                title="Редактировать время"
                                                             >
                                                                 <Edit2 className="w-4 h-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDeleteSession(session.id)}
-                                                                className="p-1 hover:bg-gray-600 rounded text-red-400"
-                                                                title="Удалить"
+                                                                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400 transition-colors"
+                                                                title="Удалить запись"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>

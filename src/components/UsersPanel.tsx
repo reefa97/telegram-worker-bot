@@ -98,37 +98,44 @@ export default function UsersPanel() {
 
     if (!isSuperAdmin) {
         return (
-            <div className="card text-center py-12">
-                <UserCog className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-400">Только Super Admin может управлять администраторами</p>
+            <div className="card flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                    <UserCog className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Доступ запрещен</h3>
+                <p className="text-gray-500 dark:text-gray-400 max-w-sm">Только Super Admin может управлять администраторами</p>
             </div>
         );
     }
 
     if (loading) {
-        return <div className="text-white">Загрузка...</div>;
+        return (
+            <div className="flex justify-center items-center h-64">
+                <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
     }
 
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-white">Super Admins</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Super Admins</h2>
                 <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
                     <Plus className="w-4 h-4" />
                     Добавить Super Admin
                 </button>
             </div>
 
-            <div className="card">
-                <div className="space-y-3">
+            <div className="card overflow-hidden p-0">
+                <div className="divide-y divide-gray-100 dark:divide-gray-800">
                     {admins.map((admin) => (
                         <div
                             key={admin.id}
-                            className="flex items-center justify-between p-4 bg-gray-700 rounded-lg"
+                            className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                         >
                             <div>
-                                <div className="text-white font-medium">{admin.email}</div>
-                                <div className="text-sm text-gray-400 mt-1">
+                                <div className="text-gray-900 dark:text-white font-medium">{admin.email}</div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                     Создан: {new Date(admin.created_at).toLocaleDateString('ru-RU')}
                                 </div>
                             </div>
@@ -136,32 +143,37 @@ export default function UsersPanel() {
                             {admin.id !== adminUser?.id && (
                                 <button
                                     onClick={() => handleDelete(admin.id)}
-                                    className="p-2 hover:bg-gray-600 rounded transition-colors"
+                                    className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 dark:hover:text-red-400 rounded-lg transition-colors"
                                     title="Удалить"
                                 >
-                                    <Trash2 className="w-4 h-4 text-red-400" />
+                                    <Trash2 className="w-5 h-5" />
                                 </button>
                             )}
                             {admin.id === adminUser?.id && (
-                                <span className="text-xs text-green-400 px-2 py-1 bg-green-500/20 rounded">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800">
                                     Это вы
                                 </span>
                             )}
                         </div>
                     ))}
+                    {admins.length === 0 && (
+                        <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                            Нет администраторов
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-gray-800 rounded-lg max-w-md w-full">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-scaleIn">
                         <div className="p-6">
-                            <h3 className="text-xl font-bold text-white mb-4">Новый Super Admin</h3>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Новый Super Admin</h3>
 
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
                                     <input
                                         type="email"
                                         value={formData.email}
@@ -173,7 +185,7 @@ export default function UsersPanel() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Пароль</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Пароль</label>
                                     <input
                                         type="password"
                                         value={formData.password}
@@ -185,12 +197,12 @@ export default function UsersPanel() {
                                     />
                                 </div>
 
-                                <div className="flex gap-2 pt-4">
+                                <div className="flex gap-3 pt-4">
+                                    <button type="button" onClick={closeModal} className="btn-ghost flex-1">
+                                        Отмена
+                                    </button>
                                     <button type="submit" className="btn-primary flex-1">
                                         Создать
-                                    </button>
-                                    <button type="button" onClick={closeModal} className="btn-secondary flex-1">
-                                        Отмена
                                     </button>
                                 </div>
                             </form>

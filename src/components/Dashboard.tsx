@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
 import {
     LogOut, Users, Briefcase, FileText, Settings, UserCog, UserPlus2,
-    Calendar, Sun, Moon, Menu, X, Trash2, ScrollText
+    Calendar, Menu, X, Trash2, ScrollText
 } from 'lucide-react';
 import WorkersPanel from './WorkersPanel';
 import ObjectsPanel from './ObjectsPanel';
@@ -19,7 +18,6 @@ type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'se
 
 export default function Dashboard() {
     const { signOut, adminUser } = useAuth();
-    const { theme, toggleTheme } = useTheme();
     const [activeTab, setActiveTab] = useState<Tab>('workers');
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -59,7 +57,7 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+        <div className="min-h-screen bg-[#121212]">
             {/* Header */}
             <header className="sticky top-0 z-40 backdrop-blur-lg bg-white/80 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -86,32 +84,12 @@ export default function Dashboard() {
 
                         {/* Right side actions */}
                         <div className="flex items-center gap-2">
-                            {/* Theme Toggle */}
-                            <button
-                                onClick={toggleTheme}
-                                className="btn-icon text-gray-600 dark:text-gray-300"
-                                title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-                            >
-                                {theme === 'dark' ? (
-                                    <Sun className="w-5 h-5" />
-                                ) : (
-                                    <Moon className="w-5 h-5" />
-                                )}
-                            </button>
-
-                            {/* Sign Out */}
                             <button
                                 onClick={handleSignOut}
-                                className="btn-secondary text-sm hidden sm:flex"
+                                className="btn-secondary text-sm flex items-center gap-2 px-4 py-2"
                             >
                                 <LogOut className="w-4 h-4" />
-                                <span className="hidden md:inline">Выход</span>
-                            </button>
-                            <button
-                                onClick={handleSignOut}
-                                className="btn-icon sm:hidden text-gray-600 dark:text-gray-300"
-                            >
-                                <LogOut className="w-5 h-5" />
+                                <span className="hidden sm:inline">Выход</span>
                             </button>
                         </div>
                     </div>
@@ -119,12 +97,14 @@ export default function Dashboard() {
             </header>
 
             {/* Mobile Navigation Overlay */}
-            {mobileMenuOpen && (
-                <div
-                    className="lg:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
-                    onClick={() => setMobileMenuOpen(false)}
-                />
-            )}
+            {
+                mobileMenuOpen && (
+                    <div
+                        className="lg:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+                        onClick={() => setMobileMenuOpen(false)}
+                    />
+                )
+            }
 
             {/* Mobile Navigation Drawer */}
             <div className={`
@@ -172,7 +152,7 @@ export default function Dashboard() {
             {/* Desktop Tabs */}
             <div className="hidden lg:block bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <nav className="flex gap-1 overflow-x-auto">
+                    <nav className="flex justify-center gap-4 overflow-x-auto py-2">
                         {visibleTabs.map((tab) => {
                             const Icon = tab.icon;
                             const isActive = activeTab === tab.id;
@@ -181,7 +161,7 @@ export default function Dashboard() {
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={isActive ? 'nav-tab-active' : 'nav-tab'}
+                                    className={`nav-tab ${isActive ? 'nav-tab-active' : ''}`}
                                 >
                                     <Icon className="w-4 h-4" />
                                     {tab.label}
@@ -223,6 +203,6 @@ export default function Dashboard() {
                     {activeTab === 'trash' && <TrashPanel />}
                 </div>
             </main>
-        </div>
+        </div >
     );
 }

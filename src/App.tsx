@@ -22,7 +22,7 @@ function AppContent() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900">
+        <div className="min-h-screen bg-[#121212]">
             {user ? <Dashboard /> : <AuthForm />}
         </div>
     );
