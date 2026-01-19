@@ -112,7 +112,8 @@ export default function ShiftPlanningPanel() {
         return objects.map((obj: any) => {
             const assignedWorkers = assignments
                 .filter(a => a.object_id === obj.id)
-                .map(a => a.workers);
+                .map(a => a.workers)
+                .filter(w => w !== null && w !== undefined); // Remove null/undefined workers
 
             return {
                 ...obj,
