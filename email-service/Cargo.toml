@@ -1,0 +1,26 @@
+[package]
+name = "email-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4"
+actix-cors = "0.6"
+tokio = { version = "1", features = ["full"] }
+imap = { version = "2.4" }
+native-tls = "0.2"
+lettre = { version = "0.11", features = ["tokio1", "tokio1-native-tls", "builder"] }
+mail-parser = "0.8"
+sqlx = { version = "0.7", features = ["runtime-tokio", "tls-native-tls", "postgres", "uuid", "chrono"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+dotenv = "0.15"
+env_logger = "0.10"
+log = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.4", features = ["serde", "v4"] }
+futures = "0.3"
+base64 = "0.21"
+scraper = "0.18" # useful for sanitization if needed, but mail-parser handles a lot
+ammonia = "3.3" # for HTML sanitization
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
