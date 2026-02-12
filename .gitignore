@@ -36,3 +36,19 @@ dist-ssr
 .supabase
 .vercel
 .env*.local
+
+# Rust
+email-service/target/
+**/target/
+
+# Databases
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Python
+**/__pycache__/
+**/*.pyc
+python_search/venv/
+python_search/.venv/

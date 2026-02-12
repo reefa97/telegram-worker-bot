@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Calendar, Clock, MapPin, User, Edit2, Trash2, Save, X, FileDown, AlertTriangle, Camera, StopCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Edit2, Trash2, X, FileDown, AlertTriangle, Camera, StopCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import PhotoGalleryModal from './PhotoGalleryModal';
+import ShiftDetailsModal from './ShiftDetailsModal';
 
 
 interface WorkSession {
@@ -19,12 +20,16 @@ interface WorkSession {
     is_end_in_geofence?: boolean;
     start_distance_meters?: number;
     end_distance_meters?: number;
+    tasks_completed?: boolean | null;
     workers: {
         first_name: string;
         last_name: string;
+        phone_number?: string;
     };
     cleaning_objects: {
+        id: string;
         name: string;
+        address: string;
         salary_type: 'hourly' | 'monthly_fixed';
         hourly_rate: number;
         monthly_rate: number;
@@ -38,12 +43,8 @@ export default function ReportsPanel() {
     const [loading, setLoading] = useState(true);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
-    const [editingSession, setEditingSession] = useState<string | null>(null);
-    const [editForm, setEditForm] = useState({
-        start_time: '',
-        end_time: '',
-    });
     const [viewingPhotos, setViewingPhotos] = useState<string | null>(null);
+    const [selectedSessionDetails, setSelectedSessionDetails] = useState<WorkSession | null>(null);
 
     const [workers, setWorkers] = useState<any[]>([]);
     const [objects, setObjects] = useState<any[]>([]);
@@ -77,9 +78,11 @@ export default function ReportsPanel() {
             .from('work_sessions')
             .select(`
                 *,
-                workers (first_name, last_name),
+                workers (first_name, last_name, phone_number),
                 cleaning_objects (
+                    id,
                     name,
+                    address,
                     salary_type,
                     hourly_rate,
                     monthly_rate,
@@ -133,50 +136,6 @@ export default function ReportsPanel() {
         }
     };
 
-    const startEditing = (session: WorkSession) => {
-        setEditingSession(session.id);
-        // Format for datetime-local input: YYYY-MM-DDThh:mm
-        const formatForInput = (dateStr: string) => {
-            const date = new Date(dateStr);
-            return new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
-                .toISOString()
-                .slice(0, 16);
-        };
-
-        setEditForm({
-            start_time: formatForInput(session.start_time),
-            end_time: session.end_time ? formatForInput(session.end_time) : '',
-        });
-    };
-
-    const handleUpdateSession = async (id: string) => {
-        try {
-            const startTime = new Date(editForm.start_time);
-            const endTime = editForm.end_time ? new Date(editForm.end_time) : null;
-
-            let durationMinutes = null;
-            if (endTime) {
-                durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / 60000);
-            }
-
-            const { error } = await supabase
-                .from('work_sessions')
-                .update({
-                    start_time: startTime.toISOString(),
-                    end_time: endTime ? endTime.toISOString() : null,
-                    duration_minutes: durationMinutes,
-                })
-                .eq('id', id);
-
-            if (error) throw error;
-
-            setEditingSession(null);
-            loadSessions();
-        } catch (error) {
-            console.error('Error updating session:', error);
-            alert('Ошибка при обновлении смены');
-        }
-    };
 
     const handleFinishSession = async (id: string, startTimeStr: string) => {
         if (!confirm('Вы уверены, что хотите принудительно завершить эту смену? Будет установлено текущее время окончания.')) return;
@@ -315,14 +274,14 @@ export default function ReportsPanel() {
     }
 
     return (
-        <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Отчеты и статистика</h2>
+        <div className="space-y-8">
+            <h2 className="text-2xl font-bold text-main">Отчеты и статистика</h2>
 
             {/* Filters */}
-            <div className="card mb-6">
-                <div className="flex flex-wrap gap-4 items-end">
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дата от</label>
+            <div className="card p-4 lg:p-6 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Дата от</label>
                         <input
                             type="date"
                             value={dateFrom}
@@ -330,8 +289,8 @@ export default function ReportsPanel() {
                             className="input"
                         />
                     </div>
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дата до</label>
+                    <div>
+                        <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Дата до</label>
                         <input
                             type="date"
                             value={dateTo}
@@ -340,40 +299,36 @@ export default function ReportsPanel() {
                         />
                     </div>
 
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Объект</label>
-                        <div className="relative">
-                            <select
-                                value={selectedObject}
-                                onChange={(e) => setSelectedObject(e.target.value)}
-                                className="input appearance-none"
-                            >
-                                <option value="">Все объекты</option>
-                                {objects.map(obj => (
-                                    <option key={obj.id} value={obj.id}>{obj.name}</option>
-                                ))}
-                            </select>
-                        </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Объект</label>
+                        <select
+                            value={selectedObject}
+                            onChange={(e) => setSelectedObject(e.target.value)}
+                            className="input"
+                        >
+                            <option value="">Все объекты</option>
+                            {objects.map(obj => (
+                                <option key={obj.id} value={obj.id}>{obj.name}</option>
+                            ))}
+                        </select>
                     </div>
 
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Работники</label>
-                        <div className="relative">
-                            <select
-                                value={selectedWorker}
-                                onChange={(e) => setSelectedWorker(e.target.value)}
-                                className="input appearance-none"
-                            >
-                                <option value="">Все работники</option>
-                                {workers.map(w => (
-                                    <option key={w.id} value={w.id}>{w.first_name} {w.last_name}</option>
-                                ))}
-                            </select>
-                        </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Работники</label>
+                        <select
+                            value={selectedWorker}
+                            onChange={(e) => setSelectedWorker(e.target.value)}
+                            className="input"
+                        >
+                            <option value="">Все работники</option>
+                            {workers.map(w => (
+                                <option key={w.id} value={w.id}>{w.first_name} {w.last_name}</option>
+                            ))}
+                        </select>
                     </div>
 
-                    <div className="flex gap-2">
-                        <button onClick={loadSessions} className="btn-primary">
+                    <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap gap-2 pt-2">
+                        <button onClick={loadSessions} className="btn-primary px-6">
                             Применить
                         </button>
                         <button
@@ -385,352 +340,338 @@ export default function ReportsPanel() {
                                 setTimeout(() => loadSessions(), 100);
                             }}
                             className="btn-secondary"
-                            title="Показать за все время"
                         >
                             Сбросить
                         </button>
+                        <button onClick={generatePDF} className="btn-secondary flex items-center gap-2 ml-auto">
+                            <FileDown className="w-4 h-4" />
+                            <span className="hidden sm:inline">Экспорт в PDF</span>
+                            <span className="sm:hidden">PDF</span>
+                        </button>
                     </div>
-                    <button onClick={generatePDF} className="btn-secondary flex items-center gap-2">
-                        <FileDown className="w-4 h-4" />
-                        PDF
-                    </button>
                 </div>
             </div>
 
             {/* Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="card">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="card p-6">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary-100 dark:bg-primary-900/40 rounded-xl text-primary-600 dark:text-primary-400">
+                        <div className="p-3 bg-primary/10 rounded-xl text-primary">
                             <Calendar className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Всего смен</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{sessions.length}</p>
+                            <p className="text-sm font-medium text-muted">Всего смен</p>
+                            <p className="text-2xl font-bold text-main">{sessions.length}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="card">
+                <div className="card p-6">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-green-100 dark:bg-green-900/40 rounded-xl text-green-600 dark:text-green-400">
+                        <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400">
                             <Clock className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Общее время</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatDuration(totalMinutes)}</p>
+                            <p className="text-sm font-medium text-muted">Общее время</p>
+                            <p className="text-2xl font-bold text-main">{formatDuration(totalMinutes)}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="card">
+                <div className="card p-6">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-blue-100 dark:bg-blue-900/40 rounded-xl text-blue-600 dark:text-blue-400">
+                        <div className="p-3 bg-blue-500/10 rounded-xl text-blue-600 dark:text-blue-400">
                             <Clock className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Средняя длительность</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatDuration(Math.round(averageDuration))}</p>
+                            <p className="text-sm font-medium text-muted">Средняя длительность</p>
+                            <p className="text-2xl font-bold text-main">{formatDuration(Math.round(averageDuration))}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Active Shifts Section */}
-            <div className="card mb-6 border-l-4 border-green-500">
-                <div className="flex items-center justify-between mb-4">
+            {sessions.filter(s => !s.end_time).length > 0 && (
+                <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                        <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full text-green-600 dark:text-green-400">
-                            <Clock className="w-5 h-5" />
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Активные смены (сейчас работают)</h3>
+                        <span className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                        </span>
+                        <h3 className="text-lg font-bold text-main">Активные смены</h3>
                     </div>
-                </div>
 
-                {sessions.filter(s => !s.end_time).length > 0 ? (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {sessions.filter(s => !s.end_time).map(session => (
-                            <div key={session.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                                <div className="flex items-start justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm">
-                                            <User className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            <div key={session.id} className="card p-5 border-emerald-500/30 flex flex-col gap-4">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-subtle flex items-center justify-center border border-border">
+                                            <User className="w-5 h-5 text-muted" />
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-gray-900 dark:text-white">
+                                            <p className="font-semibold text-main">
                                                 {session.workers ? `${session.workers.first_name} ${session.workers.last_name}` : 'Unknown'}
                                             </p>
-                                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                                            <div className="flex items-center gap-1.5 text-xs text-muted mt-0.5">
                                                 <MapPin className="w-3 h-3" />
                                                 {session.cleaning_objects?.name}
                                             </div>
                                         </div>
                                     </div>
-                                    <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full animate-pulse border border-green-200 dark:border-green-800">
+                                    <span className="badge-success animate-pulse">
                                         Активен
                                     </span>
                                 </div>
-                                <div className="space-y-1 text-sm">
-                                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                                        <span>Начало:</span>
-                                        <span className="font-medium">{formatTime(session.start_time)}</span>
+
+                                <div className="h-px bg-border w-full" />
+
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div className="space-y-1">
+                                        <span className="text-xs text-muted block">Начало</span>
+                                        <span className="font-medium text-main">{formatTime(session.start_time)}</span>
                                     </div>
-                                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                                        <span>Дата:</span>
-                                        <span className="font-medium">{formatDate(session.start_time)}</span>
+                                    <div className="space-y-1">
+                                        <span className="text-xs text-muted block">Дата</span>
+                                        <span className="font-medium text-main">{formatDate(session.start_time)}</span>
                                     </div>
                                 </div>
-                                <div className="mt-3 flex gap-2">
+
+                                <div className="flex gap-2 mt-2">
                                     <button
                                         onClick={() => handleFinishSession(session.id, session.start_time)}
-                                        className="btn-danger w-full text-xs py-1.5 flex justify-center items-center gap-1"
+                                        className="btn-danger w-full text-xs h-8"
                                         title="Завершить смену сейчас"
                                     >
                                         <StopCircle className="w-3 h-3" />
                                         Завершить
                                     </button>
                                     <button
-                                        onClick={() => startEditing(session)}
-                                        className="btn-secondary w-full text-xs py-1.5"
+                                        onClick={() => setSelectedSessionDetails(session)}
+                                        className="btn-secondary w-full text-xs h-8"
                                     >
-                                        Редактировать
+                                        <Edit2 className="w-3 h-3" />
+                                        Изменить
                                     </button>
                                 </div>
                             </div>
                         ))}
                     </div>
-                ) : (
-                    <p className="text-gray-500 dark:text-gray-400 text-sm italic">Сейчас нет активных смен</p>
-                )}
-            </div>
+                </div>
+            )}
 
             {/* Sessions Table */}
-            <div className="card overflow-hidden p-0">
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Рабочие смены</h3>
+            <div className="table-container">
+                <div className="px-6 py-4 border-b border-border">
+                    <h3 className="text-lg font-semibold text-main">История смен</h3>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="table w-full">
-                        <thead>
-                            <tr>
-                                <th>Работник</th>
-                                <th>Объект</th>
-                                <th>Дата</th>
-                                <th>Начало</th>
-                                <th>Конец</th>
-                                <th>Длительность</th>
-                                <th>Начало (Место)</th>
-                                <th>Конец (Место)</th>
-                                <th>Оплата</th>
-                                <th>Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                            {sessions.map((session) => (
-                                <tr key={session.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                    <td className="font-medium text-gray-900 dark:text-white">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                                                <User className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                            </div>
-                                            {session.workers ? (
-                                                <span className="font-medium">{session.workers.first_name} {session.workers.last_name}</span>
-                                            ) : (
-                                                <span className="text-red-500 italic">Неизвестный работник</span>
-                                            )}
+                <table className="table">
+                    <thead>
+                        <tr>
+                            <th>Работник</th>
+                            <th>Объект</th>
+                            <th>Дата</th>
+                            <th>Начало</th>
+                            <th>Конец</th>
+                            <th>Длительность</th>
+                            <th>Место</th>
+                            <th>Задачи</th>
+                            <th>Оплата</th>
+                            <th className="text-right">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sessions.map((session) => (
+                            <tr
+                                key={session.id}
+                                className="hover:bg-subtle transition-colors group cursor-pointer"
+                                onClick={() => setSelectedSessionDetails(session)}
+                            >
+                                <td className="font-medium text-main">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-subtle flex items-center justify-center border border-border">
+                                            <User className="w-4 h-4 text-muted" />
                                         </div>
-                                    </td>
-                                    <td>
-                                        <div className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
-                                            <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                                            {session.cleaning_objects?.name || 'Не указан'}
-                                        </div>
-                                    </td>
-                                    {editingSession === session.id ? (
-                                        <td colSpan={2}>
-                                            <input
-                                                type="datetime-local"
-                                                value={editForm.start_time}
-                                                onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })}
-                                                className="input py-1 text-sm mb-2"
-                                            />
-                                        </td>
-                                    ) : (
-                                        <>
-                                            <td className="text-gray-600 dark:text-gray-400">
-                                                {formatDate(session.start_time)}
-                                            </td>
-                                            <td className="text-gray-600 dark:text-gray-400">
-                                                {formatTime(session.start_time)}
-                                            </td>
-                                        </>
-                                    )}
-                                    <td>
-                                        {editingSession === session.id ? (
-                                            <input
-                                                type="datetime-local"
-                                                value={editForm.end_time}
-                                                onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })}
-                                                className="input py-1 text-sm"
-                                            />
+                                        {session.workers ? (
+                                            <span className="font-medium">{session.workers.first_name} {session.workers.last_name}</span>
                                         ) : (
-                                            session.end_time ? (
-                                                <span className="text-gray-600 dark:text-gray-400">{formatTime(session.end_time)}</span>
-                                            ) : (
-                                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800 whitespace-nowrap">
-                                                    В процессе
-                                                </span>
-                                            )
+                                            <span className="text-danger italic">Неизвестный</span>
                                         )}
-                                    </td>
-                                    <td className="font-medium text-gray-900 dark:text-white">
-                                        {session.duration_minutes ? formatDuration(session.duration_minutes) : '-'}
-                                    </td>
-                                    <td>
-                                        {session.start_location ? (
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="flex items-center gap-1.5 text-muted">
+                                        <MapPin className="w-3.5 h-3.5" />
+                                        {session.cleaning_objects?.name || 'Не указан'}
+                                    </div>
+                                </td>
+                                <td className="text-muted">
+                                    {formatDate(session.start_time)}
+                                </td>
+                                <td className="text-muted font-mono text-xs">
+                                    {formatTime(session.start_time)}
+                                </td>
+                                <td>
+                                    {session.end_time ? (
+                                        <span className="text-muted font-mono text-xs">{formatTime(session.end_time)}</span>
+                                    ) : (
+                                        <span className="badge-warning">
+                                            В процессе
+                                        </span>
+                                    )}
+                                </td>
+                                <td className="font-medium text-main">
+                                    {session.duration_minutes ? formatDuration(session.duration_minutes) : '-'}
+                                </td>
+                                <td onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex flex-col gap-1">
+                                        {session.start_location && (
                                             <div className="flex items-center gap-2">
                                                 <a
                                                     href={getGoogleMapsLink(session.start_location)!}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                                    className="link text-xs flex items-center gap-1 text-blue-500 hover:text-blue-600"
                                                 >
-                                                    <MapPin className="w-3 h-3" />
-                                                    Карта
+                                                    Start
                                                 </a>
                                                 {session.is_start_in_geofence === false && (
-                                                    <div className="group relative flex items-center">
-                                                        <AlertTriangle className="w-4 h-4 text-amber-500 cursor-help" />
-                                                        <span className="absolute z-10 p-2 bg-black/80 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap -top-8 left-1/2 -translate-x-1/2 pointer-events-none">
-                                                            Вне зоны: {Math.round(session.start_distance_meters || 0)}м
-                                                        </span>
-                                                    </div>
+                                                    <span className="text-xs text-amber-500 flex items-center gap-0.5" title={`Вне зоны: ${Math.round(session.start_distance_meters || 0)}м`}>
+                                                        <AlertTriangle className="w-3 h-3" />
+                                                        {Math.round(session.start_distance_meters || 0)}м
+                                                    </span>
                                                 )}
                                             </div>
-                                        ) : (
-                                            <span className="text-gray-400">-</span>
                                         )}
-                                    </td>
-                                    <td>
-                                        {session.end_location ? (
+                                        {session.end_location && (
                                             <div className="flex items-center gap-2">
                                                 <a
                                                     href={getGoogleMapsLink(session.end_location)!}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                                    className="link text-xs flex items-center gap-1 text-blue-500 hover:text-blue-600"
                                                 >
-                                                    <MapPin className="w-3 h-3" />
-                                                    Карта
+                                                    End
                                                 </a>
                                                 {session.is_end_in_geofence === false && (
-                                                    <div className="group relative flex items-center">
-                                                        <AlertTriangle className="w-4 h-4 text-amber-500 cursor-help" />
-                                                        <span className="absolute z-10 p-2 bg-black/80 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap -top-8 left-1/2 -translate-x-1/2 pointer-events-none">
-                                                            Вне зоны: {Math.round(session.end_distance_meters || 0)}м
-                                                        </span>
-                                                    </div>
+                                                    <span className="text-xs text-amber-500 flex items-center gap-0.5" title={`Вне зоны: ${Math.round(session.end_distance_meters || 0)}м`}>
+                                                        <AlertTriangle className="w-3 h-3" />
+                                                        {Math.round(session.end_distance_meters || 0)}м
+                                                    </span>
                                                 )}
                                             </div>
-                                        ) : (
-                                            <span className="text-gray-400">-</span>
                                         )}
-                                    </td>
-                                    <td>
-                                        {session.cleaning_objects?.salary_type === 'hourly' ? (
-                                            <div>
-                                                <div className="font-medium text-gray-900 dark:text-white">
-                                                    {((session.duration_minutes || 0) / 60 * (session.cleaning_objects.hourly_rate || 0)).toFixed(2)} zł
-                                                </div>
-                                                <div className="text-xs text-gray-500">
-                                                    {session.cleaning_objects.hourly_rate} zł/ч
-                                                </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {session.tasks_completed === true ? (
+                                        <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                                            <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                                                <X className="w-3 h-3 rotate-45" />
                                             </div>
-                                        ) : session.cleaning_objects?.salary_type === 'monthly_fixed' ? (
-                                            <div>
-                                                <div className="font-medium text-gray-900 dark:text-white">Fix</div>
-                                                <div className="text-xs text-gray-500">
-                                                    {session.cleaning_objects.monthly_rate} zł/мес
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <span className="text-gray-400">-</span>
-                                        )}
-                                    </td>
-                                    <td>
-                                        <div className="flex items-center gap-1">
-                                            {session.shift_photos && session.shift_photos[0]?.count > 0 && (
-                                                <button
-                                                    onClick={() => setViewingPhotos(session.id)}
-                                                    className="p-1.5 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400 transition-colors"
-                                                    title="Смотреть фото"
-                                                >
-                                                    <Camera className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                            {editingSession === session.id ? (
-                                                <>
-                                                    <button
-                                                        onClick={() => handleUpdateSession(session.id)}
-                                                        className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400 transition-colors"
-                                                        title="Сохранить"
-                                                    >
-                                                        <Save className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setEditingSession(null)}
-                                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 dark:text-gray-400 transition-colors"
-                                                        title="Отмена"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {!session.end_time && (
-                                                        <button
-                                                            onClick={() => handleFinishSession(session.id, session.start_time)}
-                                                            className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-red-600 dark:text-red-400 transition-colors"
-                                                            title="Завершить смену"
-                                                        >
-                                                            <StopCircle className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => startEditing(session)}
-                                                        className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400 transition-colors"
-                                                        title="Редактировать"
-                                                    >
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteSession(session.id)}
-                                                        className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-red-600 dark:text-red-400 transition-colors"
-                                                        title="Удалить"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </>
-                                            )}
+                                            <span>Выполнено</span>
                                         </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                    ) : session.tasks_completed === false ? (
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-1.5 text-danger font-bold text-xs">
+                                                <AlertTriangle className="w-4 h-4" />
+                                                <span>НЕ ВЫПОЛНЕНО</span>
+                                            </div>
+                                            <div className="text-[10px] leading-tight text-danger opacity-80 max-w-[120px]">
+                                                Требуется контакт с работником
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <span className="text-muted italic">-</span>
+                                    )}
+                                </td>
+                                <td>
+                                    {session.cleaning_objects?.salary_type === 'hourly' ? (
+                                        <div>
+                                            <div className="font-medium text-main">
+                                                {((session.duration_minutes || 0) / 60 * (session.cleaning_objects.hourly_rate || 0)).toFixed(2)} zł
+                                            </div>
+                                            <div className="text-xs text-muted">
+                                                {session.cleaning_objects.hourly_rate} zł/ч
+                                            </div>
+                                        </div>
+                                    ) : session.cleaning_objects?.salary_type === 'monthly_fixed' ? (
+                                        <div>
+                                            <div className="font-medium text-main">Fix</div>
+                                            <div className="text-xs text-muted">
+                                                {session.cleaning_objects.monthly_rate} zł/мес
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <span className="text-muted">-</span>
+                                    )}
+                                </td>
+                                <td className="text-right" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                        {session.shift_photos && session.shift_photos[0]?.count > 0 && (
+                                            <button
+                                                onClick={() => setViewingPhotos(session.id)}
+                                                className="btn-icon text-purple-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                                                title="Смотреть фото"
+                                            >
+                                                <Camera size={16} />
+                                            </button>
+                                        )}
 
-                {sessions.length === 0 && (
-                    <div className="text-center text-gray-500 dark:text-gray-400 py-12">
-                        <Calendar className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                        <p>Нет рабочих смен за выбранный период</p>
-                    </div>
-                )}
+                                        {!session.end_time && (
+                                            <button
+                                                onClick={() => handleFinishSession(session.id, session.start_time)}
+                                                className="btn-icon text-danger hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                title="Завершить смену"
+                                            >
+                                                <StopCircle size={16} />
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => setSelectedSessionDetails(session)}
+                                            className="btn-icon hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500"
+                                            title="Редактировать"
+                                        >
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteSession(session.id)}
+                                            className="btn-icon text-danger hover:bg-red-50 dark:hover:bg-red-900/20"
+                                            title="Удалить"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
+
+            {sessions.length === 0 && (
+                <div className="text-center text-muted py-12 bg-subtle/30 rounded-xl border border-dashed border-border">
+                    <Calendar className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                    <p>Нет рабочих смен за выбранный период</p>
+                </div>
+            )}
+
             {viewingPhotos && (
                 <PhotoGalleryModal
                     sessionId={viewingPhotos}
                     onClose={() => setViewingPhotos(null)}
+                />
+            )}
+
+            {selectedSessionDetails && (
+                <ShiftDetailsModal
+                    session={selectedSessionDetails}
+                    onClose={() => setSelectedSessionDetails(null)}
+                    onUpdate={() => {
+                        setSelectedSessionDetails(null);
+                        loadSessions();
+                    }}
                 />
             )}
         </div>

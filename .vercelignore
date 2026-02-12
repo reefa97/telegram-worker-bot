@@ -1,0 +1,11 @@
+node_modules
+email-service/target
+email-service
+python_search
+dist
+supabase
+.git
+*.db
+*.log
+*.sql
+*.md

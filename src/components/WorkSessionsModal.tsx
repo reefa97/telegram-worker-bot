@@ -15,6 +15,7 @@ interface WorkSession {
         latitude: number;
         longitude: number;
     } | null;
+    tasks_completed?: boolean | null;
     cleaning_objects: {
         name: string;
         address: string;
@@ -182,6 +183,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                                         <th className="w-48">Начало</th>
                                         <th className="w-48">Конец</th>
                                         <th className="w-24 text-center">Длительность</th>
+                                        <th className="w-32">Задачи</th>
                                         <th className="w-32">Локация</th>
                                         <th className="pr-6 w-24 text-right">Действия</th>
                                     </tr>
@@ -239,6 +241,15 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                                                         {formatDuration(session.duration_minutes)}
                                                     </span>
                                                 ) : '-'}
+                                            </td>
+                                            <td className="py-4">
+                                                {session.tasks_completed === true ? (
+                                                    <span className="text-xs text-green-600 font-medium">✅ Выполнено</span>
+                                                ) : session.tasks_completed === false ? (
+                                                    <span className="text-xs text-red-600 font-bold" title="Требуется контакт">⚠️ НЕ ВЫПОЛНЕНО</span>
+                                                ) : (
+                                                    <span className="text-gray-400">-</span>
+                                                )}
                                             </td>
                                             <td className="py-4">
                                                 <div className="flex flex-col gap-1">

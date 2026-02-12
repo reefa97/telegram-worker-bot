@@ -93,45 +93,36 @@ export default function TrashPanel() {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-main flex items-center gap-2">
                     <Trash2 className="w-6 h-6" />
                     Корзина
                 </h2>
                 <button
                     onClick={loadItems}
                     disabled={loading}
-                    className="p-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"
+                    className="btn-secondary p-2 h-auto"
                 >
                     <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex p-1 bg-gray-100 dark:bg-gray-800/50 rounded-xl w-fit">
+            <div className="flex p-1 bg-subtle rounded-xl w-fit gap-1">
                 <button
                     onClick={() => setActiveTab('objects')}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'objects'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                        }`}
+                    className={`nav-tab ${activeTab === 'objects' ? 'bg-card text-main shadow-sm' : ''}`}
                 >
                     Объекты
                 </button>
                 <button
                     onClick={() => setActiveTab('workers')}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'workers'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                        }`}
+                    className={`nav-tab ${activeTab === 'workers' ? 'bg-card text-main shadow-sm' : ''}`}
                 >
                     Работники
                 </button>
                 <button
                     onClick={() => setActiveTab('tasks')}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'tasks'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                        }`}
+                    className={`nav-tab ${activeTab === 'tasks' ? 'bg-card text-main shadow-sm' : ''}`}
                 >
                     Задачи
                 </button>

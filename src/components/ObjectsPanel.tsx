@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, ListTodo, Clock, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, Search, LayoutGrid, List, Map } from 'lucide-react';
+import ObjectsMap from './ObjectsMap';
+import AddressAutocomplete from './AddressAutocomplete';
 import TaskManagementModal from './TaskManagementModal';
 
 interface CleaningObject {
@@ -23,17 +25,39 @@ interface CleaningObject {
     schedule_time_end?: string;
     created_at: string;
     created_by?: string;
+    client_rate?: number;
+    client_phones?: string[];
+    client_emails?: string[];
+    reminder_active?: boolean;
+    reminder_frequency?: 'weekly' | 'monthly' | 'quarterly';
+    reminder_assignee_id?: string;
+    last_reminder_at?: string;
+    owner_ids?: string[];
+    client_contact_names?: string[];
 }
 
 export default function ObjectsPanel() {
-    const { adminUser, user } = useAuth();
+    const { adminUser } = useAuth();
     const [objects, setObjects] = useState<CleaningObject[]>([]);
     const [creators, setCreators] = useState<Record<string, string>>({});
     const [adminsList, setAdminsList] = useState<Array<{ id: string, name: string, role: string }>>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingObject, setEditingObject] = useState<CleaningObject | null>(null);
+    const [viewingObject, setViewingObject] = useState<CleaningObject | null>(null);
     const [managingTasksFor, setManagingTasksFor] = useState<CleaningObject | null>(null);
+
+    // View & Search State
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>(() => {
+        const savedMode = localStorage.getItem('objects_view_mode') as 'grid' | 'list' | 'map';
+        return (savedMode === 'list' || savedMode === 'grid' || savedMode === 'map') ? savedMode : 'grid';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('objects_view_mode', viewMode);
+    }, [viewMode]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [allWorkers, setAllWorkers] = useState<any[]>([]);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -51,12 +75,21 @@ export default function ObjectsPanel() {
         schedule_time_start: '09:00',
         schedule_time_end: '18:00',
         owner_ids: [] as string[],
+        client_rate: 0,
+        worker_ids: [] as string[],
+        client_phones: ['+48'],
+        client_emails: [''],
+        client_contact_names: [''],
+        reminder_active: false,
+        reminder_frequency: 'monthly' as 'weekly' | 'monthly' | 'quarterly',
+        reminder_assignee_id: '',
     });
 
     useEffect(() => {
         loadObjects();
         loadCreators();
         loadAdmins();
+        loadAllWorkers();
     }, []);
 
     const loadCreators = async () => {
@@ -80,14 +113,28 @@ export default function ObjectsPanel() {
         if (data) setAdminsList(data);
     };
 
+    const loadAllWorkers = async () => {
+        const { data } = await supabase
+            .from('workers')
+            .select('id, first_name, last_name')
+            .order('first_name');
+        if (data) setAllWorkers(data);
+    };
+
     const loadObjects = async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('cleaning_objects')
-            .select('*')
+            .select('*, object_owners(admin_id)')
             .order('created_at', { ascending: false });
 
-        if (data) setObjects(data);
+        if (data) {
+            const formatted = data.map((obj: any) => ({
+                ...obj,
+                owner_ids: obj.object_owners?.map((oo: any) => oo.admin_id) || []
+            }));
+            setObjects(formatted);
+        }
         if (error) console.error('Error loading objects:', error);
         setLoading(false);
     };
@@ -96,6 +143,12 @@ export default function ObjectsPanel() {
         e.preventDefault();
 
         try {
+            // Filter out empty phone numbers and their corresponding names together
+            const combinedContacts = formData.client_phones.map((phone, index) => ({
+                phone: phone.trim(),
+                name: (formData.client_contact_names[index] || '').trim()
+            })).filter(contact => contact.phone !== '');
+
             const objectData: any = {
                 name: formData.name,
                 address: formData.address,
@@ -111,13 +164,17 @@ export default function ObjectsPanel() {
                 schedule_days: formData.schedule_days,
                 schedule_time_start: formData.schedule_time_start,
                 schedule_time_end: formData.schedule_time_end,
+                client_rate: formData.client_rate || 0,
+                client_phones: combinedContacts.map(c => c.phone),
+                client_contact_names: combinedContacts.map(c => c.name),
+                client_emails: formData.client_emails.filter(e => e.trim() !== ''),
+                reminder_active: formData.reminder_active,
+                reminder_frequency: formData.reminder_frequency,
+                reminder_assignee_id: formData.reminder_assignee_id || null,
             };
 
-            // Super Admin can reassign objects, others create with their own ID
-            // For audit, we set created_by to current user if new, but main logic is in object_owners
             if (!editingObject) {
-                // Explicitly use the session user ID to satisfy RLS policy (created_by = auth.uid())
-                objectData.created_by = user?.id;
+                objectData.created_by = adminUser?.id; // Use adminUser instead of user from context to match other components
             }
 
             let targetId: string;
@@ -130,26 +187,17 @@ export default function ObjectsPanel() {
                     .eq('id', editingObject.id);
                 if (error) throw error;
             } else {
-                // Use RPC to bypass RLS issues
                 const { data, error } = await supabase
                     .rpc('create_object_secure', { payload: objectData });
 
                 if (error) throw error;
-                // RPC returns the object structure directly (as JSONB)
-                // We cast it or assume it has the ID. 
-                // data is the JSONB response, e.g. { id: "...", name: "..." }
-                // Supabase TS types for RPC might infer 'any' or defined generic.
-                // Safely accessing id:
                 const createdObj = data as any;
                 targetId = createdObj.id;
             }
 
-            // Sync Owners (Only for Super Admin or on creation)
             if (adminUser?.role === 'super_admin' || !editingObject) {
-                // Remove all existing
                 await supabase.from('object_owners').delete().eq('object_id', targetId);
 
-                // Add new selection
                 if (formData.owner_ids && formData.owner_ids.length > 0) {
                     const ownerRows = formData.owner_ids.map(uid => ({
                         object_id: targetId,
@@ -157,12 +205,21 @@ export default function ObjectsPanel() {
                     }));
                     await supabase.from('object_owners').insert(ownerRows);
                 } else if (!editingObject) {
-                    // Default to creator if no owners selected during creation
                     await supabase.from('object_owners').insert({
                         object_id: targetId,
                         admin_id: adminUser?.id
                     });
                 }
+            }
+
+            // Sync Workers
+            await supabase.from('worker_objects').delete().eq('object_id', targetId);
+            if (formData.worker_ids && formData.worker_ids.length > 0) {
+                const workerRows = formData.worker_ids.map(wid => ({
+                    object_id: targetId,
+                    worker_id: wid
+                }));
+                await supabase.from('worker_objects').insert(workerRows);
             }
 
             loadObjects();
@@ -174,7 +231,8 @@ export default function ObjectsPanel() {
         }
     };
 
-    const handleDelete = async (id: string) => {
+    const handleDelete = async (id: string, e?: React.MouseEvent) => {
+        e?.stopPropagation(); // Stop propagation if called from button inside row/card
         if (!confirm('Переместить объект в корзину?')) return;
 
         const { error } = await supabase.rpc('soft_delete_object', { object_id: id });
@@ -191,16 +249,24 @@ export default function ObjectsPanel() {
         if (object) {
             setEditingObject(object);
 
-            // Load owners
-            let currentOwners: string[] = [];
-            const { data: ownersData } = await supabase
-                .from('object_owners')
-                .select('admin_id')
-                .eq('object_id', object.id);
+            // Fetch both owners and workers in parallel for better performance
+            const [ownersRes, workersRes] = await Promise.all([
+                supabase.from('object_owners').select('admin_id').eq('object_id', object.id),
+                supabase.from('worker_objects').select('worker_id').eq('object_id', object.id)
+            ]);
 
-            if (ownersData) {
-                currentOwners = ownersData.map(o => o.admin_id);
+            const ownersData = ownersRes.data;
+            const workersData = workersRes.data;
+
+            let currentOwners = ownersData ? ownersData.map((o: any) => o.admin_id) : [];
+
+            // FALLBACK: If object_owners is empty but object.created_by exists, 
+            // it means this is an old object or the creator hasn't been added to the new system yet.
+            if (currentOwners.length === 0 && object.created_by) {
+                currentOwners = [object.created_by];
             }
+
+            const workerIds = workersData ? workersData.map((w: any) => w.worker_id) : [];
 
             setFormData({
                 name: object.name,
@@ -218,6 +284,22 @@ export default function ObjectsPanel() {
                 schedule_time_start: object.schedule_time_start || '09:00',
                 schedule_time_end: object.schedule_time_end || '18:00',
                 owner_ids: currentOwners,
+                client_rate: object.client_rate || 0,
+                worker_ids: workerIds,
+                client_phones: (object.client_phones && object.client_phones.length > 0) ? object.client_phones : ['+48'],
+                client_contact_names: (() => {
+                    const phonesCount = (object.client_phones && object.client_phones.length > 0) ? object.client_phones.length : 1;
+                    const existingNames = object.client_contact_names || [];
+                    // Pad with empty strings if names are fewer than phones
+                    if (existingNames.length < phonesCount) {
+                        return [...existingNames, ...Array(phonesCount - existingNames.length).fill('')];
+                    }
+                    return existingNames;
+                })(),
+                client_emails: (object.client_emails && object.client_emails.length > 0) ? object.client_emails : [''],
+                reminder_active: object.reminder_active || false,
+                reminder_frequency: object.reminder_frequency || 'monthly',
+                reminder_assignee_id: object.reminder_assignee_id || '',
             });
         } else {
             setEditingObject(null);
@@ -237,6 +319,14 @@ export default function ObjectsPanel() {
                 schedule_time_start: '09:00',
                 schedule_time_end: '18:00',
                 owner_ids: [adminUser?.id || ''],
+                client_rate: 0,
+                worker_ids: [],
+                client_phones: ['+48'],
+                client_contact_names: [''],
+                client_emails: [''],
+                reminder_active: false,
+                reminder_frequency: 'monthly',
+                reminder_assignee_id: adminUser?.id || '',
             });
         }
         setShowModal(true);
@@ -246,6 +336,56 @@ export default function ObjectsPanel() {
         setShowModal(false);
         setEditingObject(null);
     };
+
+    // Filter Logic
+    const filteredObjects = objects.filter(obj => {
+        if (!searchQuery) return true;
+        const lowerQuery = searchQuery.toLowerCase();
+
+        // Search in names, addresses, phones, and contact names
+        return (
+            obj.name.toLowerCase().includes(lowerQuery) ||
+            obj.address.toLowerCase().includes(lowerQuery) ||
+            (obj.client_phones && obj.client_phones.some(p => p.toLowerCase().includes(lowerQuery))) ||
+            (obj.client_contact_names && obj.client_contact_names.some(n => n && n.toLowerCase().includes(lowerQuery)))
+        );
+    });
+
+    // Salary Summary Calculation
+    const calculateSalarySummary = () => {
+        let fixedTotal = 0;
+        let hourlyTotal = 0;
+        let clientRatesTotal = 0;
+
+        filteredObjects.forEach((obj) => {
+            if (!obj.is_active) return; // Skip inactive objects for budget summary
+
+            if (obj.client_rate) {
+                clientRatesTotal += obj.client_rate;
+            }
+
+            if (obj.salary_type === 'monthly_fixed' && obj.monthly_rate) {
+                fixedTotal += obj.monthly_rate;
+            } else if (obj.salary_type === 'hourly' && obj.hourly_rate && obj.schedule_time_start && obj.schedule_time_end) {
+                // Parse times
+                const [startH, startM] = obj.schedule_time_start.split(':').map(Number);
+                const [endH, endM] = obj.schedule_time_end.split(':').map(Number);
+
+                let durationHours = (endH + endM / 60) - (startH + startM / 60);
+                if (durationHours < 0) durationHours += 24; // Handle overnight shifts if any
+
+                const daysPerWeek = obj.schedule_days?.length || 0;
+                const monthlyHours = durationHours * daysPerWeek * 4.33; // 4.33 weeks per month average
+                hourlyTotal += monthlyHours * obj.hourly_rate;
+            }
+        });
+
+        return { fixedTotal, hourlyTotal, clientRatesTotal, total: fixedTotal + hourlyTotal };
+    };
+
+    const salarySummary = calculateSalarySummary();
+    const canSeeClientRates = adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_view_client_rates;
+    const canEditClientRates = adminUser?.role === 'super_admin';
 
     if (loading) {
         return (
@@ -257,122 +397,410 @@ export default function ObjectsPanel() {
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
+            {/* Header with Title, Search, View Toggle, Add Button */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Объекты работы</h2>
-                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_create) && (
-                    <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
-                        <Plus className="w-4 h-4" />
-                        Добавить объект
-                    </button>
-                )}
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {objects.map((object) => (
-                    <div key={object.id} className="card hover:shadow-lg transition-shadow">
-                        <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{object.name}</h3>
-                                <div className="flex items-start gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                    <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                                    <span>{object.address}</span>
-                                </div>
-                            </div>
-                            <span className={object.is_active ? 'badge-success' : 'badge-disable'}>
-                                {object.is_active ? 'Активен' : 'Неактивен'}
-                            </span>
-                        </div>
-
-                        {/* Creator Info (for Admins) */}
-                        {(object as any).created_by && creators[(object as any).created_by] && (
-                            <div className="mb-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                <span className="text-gray-600 dark:text-gray-500">Опекун:</span>
-                                <span className="font-medium">{creators[(object as any).created_by]}</span>
-                            </div>
-                        )}
-
-                        {/* Configuration badges */}
-                        <div className="flex flex-wrap gap-1 mb-3">
-                            {object.requires_photos && (
-                                <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs rounded-full flex items-center gap-1 border border-blue-200 dark:border-blue-800">
-                                    <Camera className="w-3 h-3" /> Фото
-                                </span>
-                            )}
-                            {object.requires_tasks && (
-                                <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs rounded-full flex items-center gap-1 border border-purple-200 dark:border-purple-800">
-                                    <CheckSquare className="w-3 h-3" /> Задачи
-                                </span>
-                            )}
-                            {(object.hourly_rate || object.monthly_rate) && (
-                                <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs rounded-full flex items-center gap-1 border border-green-200 dark:border-green-800">
-                                    <DollarSign className="w-3 h-3" />
-                                    {object.salary_type === 'hourly' ? `${object.hourly_rate} zł/ч` : `${object.monthly_rate} zł/мес`}
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="flex flex-col gap-2 mt-4 pt-3">
-                            <button
-                                onClick={() => setManagingTasksFor(object)}
-                                className="w-full py-2 px-3 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-medium text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
-                            >
-                                <ListTodo className="w-4 h-4" />
-                                Управлять задачами
-                            </button>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
-                                    <button
-                                        onClick={() => openModal(object)}
-                                        className="py-2 px-3 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <Edit2 className="w-4 h-4" />
-                                        Изменить
-                                    </button>
-                                )}
-                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
-                                    <button
-                                        onClick={() => handleDelete(object.id)}
-                                        className="py-2 px-3 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 font-medium text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        Удалить
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    {/* Search Input */}
+                    <div className="relative flex-grow md:flex-grow-0 md:w-64">
+                        <input
+                            type="text"
+                            placeholder="Поиск по названию или адресу..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 transition-all shadow-sm"
+                        />
+                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     </div>
-                ))}
+
+                    {/* View Toggle */}
+                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                            title="Плитка"
+                        >
+                            <LayoutGrid className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                            title="Список"
+                        >
+                            <List className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('map')}
+                            className={`p-1.5 rounded-md transition-all ${viewMode === 'map' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                            title="Карта"
+                        >
+                            <Map className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    {/* Add Button */}
+                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_create) && (
+                        <button onClick={() => openModal()} className="btn-primary flex items-center gap-2 whitespace-nowrap">
+                            <Plus className="w-4 h-4" />
+                            <span className="hidden sm:inline">Добавить объект</span>
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {objects.length === 0 && (
-                <div className="text-center text-gray-500 dark:text-gray-400 py-12">
-                    <MapPin className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                    <p>Нет объектов. Создайте первый объект.</p>
+            {/* List View (Table) */}
+            {viewMode === 'list' && (
+                <div className="table-container animate-fadeIn">
+                    <div className="overflow-x-auto">
+                        <table className="table">
+                            <thead>
+                                <tr>
+                                    <th className="px-6 py-4 font-semibold">Название / Адрес</th>
+                                    <th className="px-6 py-4 font-semibold">Оплата (работнику)</th>
+                                    {canSeeClientRates && <th className="px-6 py-4 font-semibold">Оплата (клиент)</th>}
+                                    <th className="px-6 py-4 font-semibold">Требования</th>
+                                    <th className="px-6 py-4 font-semibold">Опекун</th>
+                                    <th className="px-6 py-4 font-semibold text-right">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredObjects.map(object => (
+                                    <tr
+                                        key={object.id}
+                                        onClick={() => setViewingObject(object)}
+                                        className="group transition-colors cursor-pointer"
+                                    >
+                                        <td className="px-6 py-4">
+                                            <div className="font-medium text-main mb-0.5">{object.name}</div>
+                                            <div className="text-muted flex items-center gap-1.5 text-xs">
+                                                <MapPin className="w-3 h-3 flex-shrink-0" />
+                                                <span className="line-clamp-1">{object.address}</span>
+                                            </div>
+                                            {(object.client_phones?.length || object.client_emails?.length) ? (
+                                                <div className="mt-1 flex gap-2 overflow-hidden">
+                                                    {object.client_phones?.slice(0, 1).map((p, i) => (
+                                                        <span key={i} className="text-[10px] text-muted font-mono truncate max-w-[120px]">
+                                                            {p}{object.client_contact_names?.[i] ? ` (${object.client_contact_names[i]})` : ''}
+                                                        </span>
+                                                    ))}
+                                                    {object.client_emails?.slice(0, 1).map((e, i) => (
+                                                        <span key={i} className="text-[10px] text-muted font-mono truncate max-w-[120px]">{e}</span>
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                        </td>
+                                        <td className="px-6 py-4 text-main">
+                                            {(object.hourly_rate || object.monthly_rate) ? (
+                                                <span className="font-medium">
+                                                    {object.salary_type === 'hourly' ? `${object.hourly_rate} zł/ч` : `${object.monthly_rate} zł/мес`}
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted italic">-</span>
+                                            )}
+                                        </td>
+                                        {canSeeClientRates && (
+                                            <td className="px-6 py-4 text-main">
+                                                {object.client_rate ? (
+                                                    <span className="font-semibold text-green-600 dark:text-green-400">
+                                                        {object.client_rate} zł/мес
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted italic">-</span>
+                                                )}
+                                            </td>
+                                        )}
+                                        <td className="px-6 py-4">
+                                            <div className="flex gap-2">
+                                                {object.requires_photos && (
+                                                    <span className="p-1.5 rounded-md bg-subtle text-muted" title="Требуются фото">
+                                                        <Camera size={14} />
+                                                    </span>
+                                                )}
+                                                {object.requires_tasks && (
+                                                    <span className="p-1.5 rounded-md bg-subtle text-muted" title="Есть задачи">
+                                                        <CheckSquare size={14} />
+                                                    </span>
+                                                )}
+                                                {!object.requires_photos && !object.requires_tasks && <span className="text-muted text-xs">-</span>}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {object.owner_ids && object.owner_ids.length > 0 ? (
+                                                <div className="text-sm font-medium text-main">
+                                                    {object.owner_ids.map(id => creators[id]).filter(Boolean).join(', ')}
+                                                </div>
+                                            ) : object.created_by && creators[object.created_by] ? (
+                                                <div className="text-sm font-medium text-main">
+                                                    {creators[object.created_by]}
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted text-xs">-</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
+                                                    <>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setManagingTasksFor(object); }}
+                                                            className="p-1.5 text-muted hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
+                                                            title="Задачи"
+                                                        >
+                                                            <CheckSquare size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); openModal(object); }}
+                                                            className="p-1.5 text-muted hover:text-primary hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
+                                                            title="Редактировать"
+                                                        >
+                                                            <Edit2 size={16} />
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDelete(object.id, e); }}
+                                                        className="p-1.5 text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                        title="Удалить"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {filteredObjects.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-12 text-center text-muted italic">
+                                            Объекты не найдены
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
-            {/* Modal */}
-            {showModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                                {editingObject ? 'Редактировать объект' : 'Новый объект'}
-                            </h3>
-                            <button onClick={closeModal} className="btn-icon">
-                                <span className="text-2xl leading-none">&times;</span>
-                            </button>
+            {/* Grid View (Existing) */}
+            {viewMode === 'grid' && (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animate-fadeIn">
+                    {filteredObjects.map((object) => (
+                        <div
+                            key={object.id}
+                            onClick={() => setViewingObject(object)}
+                            className="card-interactive relative group p-5 flex flex-col gap-4"
+                        >
+                            {/* Header: Name & Menu */}
+                            <div className="flex justify-between items-start">
+                                <div className="pr-8">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <h3 className="text-base font-medium text-main group-hover:text-primary transition-colors">
+                                            {object.name}
+                                        </h3>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-sm text-muted">
+                                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                                        <span className="line-clamp-1">{object.address}</span>
+                                    </div>
+                                    {(object.client_phones?.length || object.client_emails?.length) ? (
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {object.client_phones?.slice(0, 2).map((p, i) => (
+                                                <span key={i} className="badge-neutral font-mono">
+                                                    {p}{object.client_contact_names?.[i] ? ` (${object.client_contact_names[i]})` : ''}
+                                                </span>
+                                            ))}
+                                            {(object.client_phones?.length || 0) > 2 && <span className="text-[10px] text-muted">+{object.client_phones!.length - 2}</span>}
+                                        </div>
+                                    ) : null}
+                                </div>
+
+                                {/* Action Menu (Stop Propagation) */}
+                                <div
+                                    className="absolute top-4 right-4"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div className="relative group/menu">
+                                        <button className="btn-icon relative z-10">
+                                            <MoreVertical size={18} />
+                                        </button>
+                                        <div className="absolute right-0 top-full pt-1 w-40 hidden group-hover/menu:block z-50 animate-scaleIn origin-top-right">
+                                            <div className="popover-content py-1 p-0 overflow-hidden">
+                                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
+                                                    <>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setManagingTasksFor(object); }}
+                                                            className="w-full text-left px-4 py-2.5 hover:bg-subtle flex items-center gap-2 text-main transition-colors"
+                                                        >
+                                                            <CheckSquare size={14} className="text-muted" /> Задачи
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openModal(object);
+                                                            }}
+                                                            className="w-full text-left px-4 py-2 text-sm text-main hover:bg-subtle flex items-center gap-2"
+                                                        >
+                                                            <Edit2 size={16} className="text-muted" /> Редактировать
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDelete(object.id, e); }}
+                                                        className="w-full text-left px-4 py-2.5 hover:bg-red-500/10 flex items-center gap-2 text-danger"
+                                                    >
+                                                        <Trash2 size={14} /> Удалить
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footer Row: Status, Badges & Guardian */}
+                            <div className="mt-auto flex items-end justify-between gap-4">
+                                <div className="flex flex-col gap-3">
+                                    <div className="flex items-center gap-3 text-xs">
+                                        {/* Removed: Активен status badge */}
+
+
+                                        {(object.hourly_rate || object.monthly_rate) && (
+                                            <span className="text-muted font-medium bg-subtle px-2 py-1 rounded-md border border-transparent">
+                                                {object.salary_type === 'hourly' ? `${object.hourly_rate} zł/ч` : `${object.monthly_rate} zł/мес`}
+                                            </span>
+                                        )}
+
+                                        {canSeeClientRates && object.client_rate && (
+                                            <span className="text-green-600 dark:text-green-400 font-semibold bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-md border border-green-100 dark:border-green-900/30">
+                                                {object.client_rate} zł (К)
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        {object.requires_photos && (
+                                            <span className="p-1.5 rounded-md bg-subtle text-muted" title="Требуются фото">
+                                                <Camera size={14} />
+                                            </span>
+                                        )}
+                                        {object.requires_tasks && (
+                                            <span className="p-1.5 rounded-md bg-subtle text-muted" title="Есть задачи">
+                                                <CheckSquare size={14} />
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {((object.owner_ids && object.owner_ids.length > 0) || (object.created_by && creators[object.created_by])) && (
+                                    <div className="text-[10px] text-muted flex flex-col items-end gap-0.5 mb-0.5">
+                                        <span className="opacity-50 uppercase tracking-wider font-semibold">Опекун</span>
+                                        <span className="text-[11px] font-medium text-main text-right">
+                                            {object.owner_ids && object.owner_ids.length > 0
+                                                ? object.owner_ids.map(id => creators[id]).filter(Boolean).join(', ')
+                                                : creators[object.created_by!]}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    {filteredObjects.length === 0 && (
+                        <div className="col-span-full py-12 text-center text-muted italic">
+                            Объекты не найдены
+                        </div>
+                    )}
+                </div>
+            )
+            }
+
+
+            {/* Map View */}
+            {
+                viewMode === 'map' && (
+                    <div className="animate-fadeIn">
+                        <ObjectsMap objects={filteredObjects} />
+                    </div>
+                )
+            }
+
+            {/* Salary Summary Footer */}
+            <div className="mt-8 mb-6 p-6 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm animate-fadeIn">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div>
+                        <h3 className="text-lg font-bold text-main mb-1">Итоговый бюджет по объектам</h3>
+                        <p className="text-sm text-muted">Сумма всех активных объектов в текущем списке</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8 w-full md:w-auto">
+                        <div className="bg-subtle/50 p-4 rounded-xl border border-border">
+                            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Фикс. зарплаты</div>
+                            <div className="text-xl font-bold text-main">
+                                {salarySummary.fixedTotal.toLocaleString()} <span className="text-sm font-medium">zł</span>
+                            </div>
                         </div>
 
-                        <form onSubmit={handleSubmit}>
-                            <div className="modal-body space-y-4">
-                                {/* Basic Info */}
-                                <div className="space-y-4 pb-4 border-b border-gray-100 dark:border-gray-800">
-                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200 flex items-center gap-2">
-                                        <MapPin className="w-4 h-4 text-primary-500" /> Основная информация
-                                    </h4>
+                        <div className="bg-subtle/50 p-4 rounded-xl border border-border">
+                            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Почасовые (оценка)</div>
+                            <div className="text-xl font-bold text-main">
+                                {Math.round(salarySummary.hourlyTotal).toLocaleString()} <span className="text-sm font-medium">zł</span>
+                            </div>
+                        </div>
 
+                        <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 ring-1 ring-primary/10">
+                            <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Зарплаты (мес)</div>
+                            <div className="text-2xl font-bold text-primary">
+                                {Math.round(salarySummary.total).toLocaleString()} <span className="text-base font-medium">zł</span>
+                            </div>
+                        </div>
+
+                        {canSeeClientRates && (
+                            <div className="bg-green-500/5 p-4 rounded-xl border border-green-500/20 ring-1 ring-green-500/10">
+                                <div className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Выручка (клиент)</div>
+                                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                    {Math.round(salarySummary.clientRatesTotal).toLocaleString()} <span className="text-base font-medium">zł</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {canSeeClientRates && (
+                            <div className="bg-blue-500/5 p-4 rounded-xl border border-blue-500/20 ring-1 ring-blue-500/10">
+                                <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Прибыль (доход - расход)</div>
+                                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                    {Math.round(salarySummary.clientRatesTotal - salarySummary.total).toLocaleString()} <span className="text-base font-medium">zł</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {salarySummary.hourlyTotal > 0 && (
+                    <div className="mt-4 flex items-center gap-2 text-[11px] text-zinc-400 italic">
+                        <Clock size={12} />
+                        <span>Расчет для почасовой оплаты является примерным (базируется на графике работы и среднем показателе 4.33 недели в месяце)</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Modal */}
+            {
+                showModal && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                    {editingObject ? 'Редактировать объект' : 'Новый объект'}
+                                </h3>
+                                <button onClick={closeModal} className="btn-icon">
+                                    <span className="text-2xl leading-none">&times;</span>
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSubmit}>
+                                <div className="modal-body space-y-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Название</label>
                                         <input
@@ -380,209 +808,314 @@ export default function ObjectsPanel() {
                                             value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                             className="input"
-                                            placeholder="Офис, Склад и т.д."
                                             required
                                         />
                                     </div>
-
-                                    {/* Owner Selection (Multi-select) */}
-                                    {adminUser?.role === 'super_admin' && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Опекуны объекта (получают уведомления)</label>
-                                            <div className="flex flex-wrap gap-2 mb-2">
-                                                {formData.owner_ids.map(ownerId => {
-                                                    const admin = adminsList.find(a => a.id === ownerId);
-                                                    return admin ? (
-                                                        <span key={ownerId} className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-sm flex items-center gap-1 border border-purple-200 dark:border-purple-800">
-                                                            {admin.name}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setFormData(prev => ({ ...prev, owner_ids: prev.owner_ids.filter(id => id !== ownerId) }))}
-                                                                className="hover:text-purple-900 dark:hover:text-purple-100"
-                                                            >
-                                                                <X className="w-3 h-3" />
-                                                            </button>
-                                                        </span>
-                                                    ) : null;
-                                                })}
-                                            </div>
-
-                                            <div className="relative">
-                                                <select
-                                                    value=""
-                                                    onChange={(e) => {
-                                                        const newId = e.target.value;
-                                                        if (newId && !formData.owner_ids.includes(newId)) {
-                                                            setFormData(prev => ({ ...prev, owner_ids: [...prev.owner_ids, newId] }));
-                                                        }
-                                                    }}
-                                                    className="input appearance-none"
-                                                >
-                                                    <option value="">+ Добавить опекуна</option>
-                                                    {adminsList
-                                                        .filter(a => !formData.owner_ids.includes(a.id))
-                                                        .map(admin => (
-                                                            <option key={admin.id} value={admin.id}>
-                                                                {admin.name} ({admin.role})
-                                                            </option>
-                                                        ))}
-                                                </select>
-                                            </div>
-                                        </div>
-                                    )}
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Адрес</label>
-                                        <textarea
+                                        <AddressAutocomplete
                                             value={formData.address}
-                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                            className="input"
-                                            rows={2}
-                                            placeholder="Полный адрес объекта"
-                                            required
+                                            onChange={(val, lat, lon) => {
+                                                const updates: any = { address: val };
+                                                if (lat !== undefined) updates.latitude = lat;
+                                                if (lon !== undefined) updates.longitude = lon;
+                                                setFormData({ ...formData, ...updates });
+                                            }}
+                                            placeholder="Начните вводить адрес (автопоиск)..."
                                         />
+                                        {(formData.latitude !== 0 || formData.longitude !== 0) && (
+                                            <div className="mt-1 text-[10px] text-green-600 flex items-center gap-1">
+                                                <MapPin size={10} />
+                                                Координаты: {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-3">
+                                    {/* Owners Selection (Super Admin Only) */}
+                                    {(adminUser?.role === 'super_admin') && (
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Широта</label>
-                                            <input
-                                                type="text"
-                                                inputMode="decimal"
-                                                value={formData.latitude}
-                                                onChange={(e) => {
-                                                    const val = e.target.value.replace(',', '.');
-                                                    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
-                                                        setFormData({ ...formData, latitude: val as any });
-                                                    }
-                                                }}
-                                                className="input"
-                                                placeholder="51.5074"
-                                            />
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Владельцы (Опекуны)
+                                            </label>
+                                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700">
+                                                {adminsList.map((admin) => (
+                                                    <label key={admin.id} className="flex items-center gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded cursor-pointer transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={formData.owner_ids.includes(admin.id)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        owner_ids: [...formData.owner_ids, admin.id]
+                                                                    });
+                                                                } else {
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        owner_ids: formData.owner_ids.filter(id => id !== admin.id)
+                                                                    });
+                                                                }
+                                                            }}
+                                                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                        />
+                                                        <span className="text-gray-700 dark:text-gray-300">{admin.name} ({admin.role})</span>
+                                                    </label>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Долгота</label>
-                                            <input
-                                                type="text"
-                                                inputMode="decimal"
-                                                value={formData.longitude}
-                                                onChange={(e) => {
-                                                    const val = e.target.value.replace(',', '.');
-                                                    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
-                                                        setFormData({ ...formData, longitude: val as any });
-                                                    }
-                                                }}
-                                                className="input"
-                                                placeholder="-0.1278"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Радиус (м)</label>
-                                            <input
-                                                type="number"
-                                                value={formData.geofence_radius}
-                                                onChange={(e) => setFormData({ ...formData, geofence_radius: parseInt(e.target.value) })}
-                                                className="input"
-                                                min="10"
-                                                max="1000"
-                                                placeholder="100"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
+                                    )}
 
-                                {/* Salary Config */}
-                                <div className="space-y-4 pb-4 border-b border-gray-100 dark:border-gray-800">
-                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200 flex items-center gap-2">
-                                        <DollarSign className="w-4 h-4 text-green-500" /> Зарплата
-                                    </h4>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Тип оплаты</label>
-                                        <div className="relative">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Тип оплаты</label>
                                             <select
                                                 value={formData.salary_type}
-                                                onChange={(e) => setFormData({ ...formData, salary_type: e.target.value as 'hourly' | 'monthly_fixed' })}
+                                                onChange={(e) => setFormData({
+                                                    ...formData,
+                                                    salary_type: e.target.value as any
+                                                })}
                                                 className="input appearance-none"
                                             >
                                                 <option value="hourly">Почасовая</option>
-                                                <option value="monthly_fixed">Месячная фиксированная</option>
+                                                <option value="monthly_fixed">Фиксированная</option>
                                             </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                {formData.salary_type === 'hourly' ? 'Ставка работника (в час)' : 'Зарплата работника (в месяц)'}
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    value={formData.salary_type === 'hourly' ? formData.hourly_rate : formData.monthly_rate}
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value);
+                                                        if (formData.salary_type === 'hourly') {
+                                                            setFormData({ ...formData, hourly_rate: val });
+                                                        } else {
+                                                            setFormData({ ...formData, monthly_rate: val });
+                                                        }
+                                                    }}
+                                                    className="input pl-8"
+                                                />
+                                                <DollarSign className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {formData.salary_type === 'hourly' ? (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ставка в час (zł)</label>
-                                            <input
-                                                type="text"
-                                                inputMode="decimal"
-                                                value={formData.hourly_rate}
-                                                onChange={(e) => {
-                                                    const val = e.target.value.replace(',', '.');
-                                                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                                        setFormData({ ...formData, hourly_rate: val as any });
-                                                    }
-                                                }}
-                                                className="input"
-                                                placeholder="15.00"
-                                            />
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Месячная ставка (zł)</label>
-                                                <input
-                                                    type="text"
-                                                    inputMode="decimal"
-                                                    value={formData.monthly_rate}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(',', '.');
-                                                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                                            setFormData({ ...formData, monthly_rate: val as any });
-                                                        }
-                                                    }}
-                                                    className="input"
-                                                    placeholder="2000.00"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ожидаемое кол-во уборок/месяц</label>
+                                    {canEditClientRates && (
+                                        <div className="pt-2">
+                                            <label className="block text-sm font-medium text-green-700 dark:text-green-400 mb-1">
+                                                Выплата от клиента (в месяц)
+                                            </label>
+                                            <div className="relative">
                                                 <input
                                                     type="number"
-                                                    value={formData.expected_cleanings_per_month}
-                                                    onChange={(e) => setFormData({ ...formData, expected_cleanings_per_month: parseInt(e.target.value) })}
-                                                    className="input"
-                                                    min="1"
-                                                    placeholder="20"
+                                                    value={formData.client_rate}
+                                                    onChange={(e) => setFormData({ ...formData, client_rate: parseFloat(e.target.value) })}
+                                                    className="input pl-8 border-green-200 dark:border-green-900 focus:ring-green-500"
+                                                    placeholder="Сколько платит клиент..."
                                                 />
+                                                <DollarSign className="absolute left-2.5 top-2.5 w-4 h-4 text-green-500" />
                                             </div>
-                                        </>
+                                            <p className="text-[10px] text-muted mt-1 italic">
+                                                Этот параметр виден только супер-админу и доверенным суб-админам.
+                                            </p>
+                                        </div>
                                     )}
-                                </div>
 
-                                {/* Schedule Config */}
-                                <div className="space-y-4 pb-4 border-b border-gray-100 dark:border-gray-800">
-                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200 flex items-center gap-2">
-                                        <Clock className="w-4 h-4 text-blue-500" /> График уборки
-                                    </h4>
+                                    {/* Client Contacts (Phones & Emails) */}
+                                    <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+                                        <div>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Телефоны клиента</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({
+                                                        ...formData,
+                                                        client_phones: [...formData.client_phones, '+48'],
+                                                        client_contact_names: [...formData.client_contact_names, '']
+                                                    })}
+                                                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                                                >
+                                                    <Plus size={12} /> Добавить
+                                                </button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {formData.client_phones.map((phone, index) => (
+                                                    <div key={index} className="flex flex-col gap-2 p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={phone}
+                                                                onChange={(e) => {
+                                                                    const newPhones = [...formData.client_phones];
+                                                                    newPhones[index] = e.target.value;
+                                                                    setFormData({ ...formData, client_phones: newPhones });
+                                                                }}
+                                                                placeholder="Номер телефона"
+                                                                className="input flex-1"
+                                                            />
+                                                            {formData.client_phones.length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newPhones = formData.client_phones.filter((_, i) => i !== index);
+                                                                        const newNames = formData.client_contact_names.filter((_, i) => i !== index);
+                                                                        setFormData({
+                                                                            ...formData,
+                                                                            client_phones: newPhones,
+                                                                            client_contact_names: newNames
+                                                                        });
+                                                                    }}
+                                                                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded h-10 w-10 flex items-center justify-center border border-transparent"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            )}
+                                                        </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дни недели</label>
-                                        <div className="flex flex-wrap gap-2">
+                                                        {/* Show name field always if more than 1 phone, OR if it's not empty */}
+                                                        {(formData.client_phones.length > 1 || (formData.client_contact_names[index] && formData.client_contact_names[index].trim() !== '')) && (
+                                                            <div className="flex items-center gap-2 animate-fadeIn">
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.client_contact_names[index] || ''}
+                                                                    onChange={(e) => {
+                                                                        const newNames = [...formData.client_contact_names];
+                                                                        newNames[index] = e.target.value;
+                                                                        setFormData({ ...formData, client_contact_names: newNames });
+                                                                    }}
+                                                                    placeholder="Имя контакта (напр. Администратор)"
+                                                                    className="input text-xs h-8 flex-1 bg-white dark:bg-zinc-950"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email клиента</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, client_emails: [...formData.client_emails, ''] })}
+                                                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                                                >
+                                                    <Plus size={12} /> Добавить
+                                                </button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {formData.client_emails.map((email, index) => (
+                                                    <div key={index} className="flex gap-2">
+                                                        <input
+                                                            type="email"
+                                                            value={email}
+                                                            onChange={(e) => {
+                                                                const newEmails = [...formData.client_emails];
+                                                                newEmails[index] = e.target.value;
+                                                                setFormData({ ...formData, client_emails: newEmails });
+                                                            }}
+                                                            placeholder="client@example.com"
+                                                            className="input flex-1"
+                                                        />
+                                                        {formData.client_emails.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newEmails = formData.client_emails.filter((_, i) => i !== index);
+                                                                    setFormData({ ...formData, client_emails: newEmails });
+                                                                }}
+                                                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Reminder Settings (Super-Admin Only) */}
+                                    {adminUser?.role === 'super_admin' && (
+                                        <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200">Напоминания о звонке клиенту</h4>
+                                                <span className="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">NEW</span>
+                                            </div>
+
+                                            <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.reminder_active}
+                                                    onChange={(e) => setFormData({ ...formData, reminder_active: e.target.checked })}
+                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                />
+                                                <div className="flex items-center gap-2">
+                                                    <Clock className="w-4 h-4 text-blue-500" />
+                                                    <span className="text-sm text-gray-700 dark:text-gray-300">Активировать напоминания</span>
+                                                </div>
+                                            </label>
+
+                                            {formData.reminder_active && (
+                                                <div className="grid grid-cols-2 gap-4 animate-fadeIn">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Периодичность</label>
+                                                        <select
+                                                            value={formData.reminder_frequency}
+                                                            onChange={(e) => setFormData({
+                                                                ...formData,
+                                                                reminder_frequency: e.target.value as any
+                                                            })}
+                                                            className="input appearance-none"
+                                                        >
+                                                            <option value="weekly">Раз в неделю</option>
+                                                            <option value="monthly">Раз в месяц</option>
+                                                            <option value="quarterly">Раз в 3 месяца</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ответственный</label>
+                                                        <select
+                                                            value={formData.reminder_assignee_id}
+                                                            onChange={(e) => setFormData({
+                                                                ...formData,
+                                                                reminder_assignee_id: e.target.value
+                                                            })}
+                                                            className="input appearance-none"
+                                                            required={formData.reminder_active}
+                                                        >
+                                                            <option value="">Выберите админа...</option>
+                                                            {adminsList.map(admin => (
+                                                                <option key={admin.id} value={admin.id}>
+                                                                    {admin.name} ({admin.role === 'super_admin' ? 'Super' : 'Sub'})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Schedule */}
+                                    <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-800">
+                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200">График работы</h4>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дни недели</label>
                                             <div className="flex flex-wrap gap-2">
                                                 {[
-                                                    { val: 1, label: 'Пн' },
-                                                    { val: 2, label: 'Вт' },
-                                                    { val: 3, label: 'Ср' },
-                                                    { val: 4, label: 'Чт' },
-                                                    { val: 5, label: 'Пт' },
-                                                    { val: 6, label: 'Сб' },
-                                                    { val: 0, label: 'Вс' },
+                                                    { val: 1, label: 'Пн' }, { val: 2, label: 'Вт' }, { val: 3, label: 'Ср' },
+                                                    { val: 4, label: 'Чт' }, { val: 5, label: 'Пт' }, { val: 6, label: 'Сб' }, { val: 7, label: 'Вс' }
                                                 ].map((day) => (
                                                     <button
-                                                        key={day.val}
                                                         type="button"
+                                                        key={day.val}
                                                         onClick={() => {
                                                             const current = formData.schedule_days;
                                                             const updated = current.includes(day.val)
@@ -600,70 +1133,336 @@ export default function ObjectsPanel() {
                                                 ))}
                                             </div>
                                         </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Начало</label>
+                                                <input
+                                                    type="time"
+                                                    value={formData.schedule_time_start}
+                                                    onChange={(e) => setFormData({ ...formData, schedule_time_start: e.target.value })}
+                                                    className="input"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Конец</label>
+                                                <input
+                                                    type="time"
+                                                    value={formData.schedule_time_end}
+                                                    onChange={(e) => setFormData({ ...formData, schedule_time_end: e.target.value })}
+                                                    className="input"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Начало</label>
-                                            <input
-                                                type="time"
-                                                value={formData.schedule_time_start}
-                                                onChange={(e) => setFormData({ ...formData, schedule_time_start: e.target.value })}
-                                                className="input"
-                                            />
+                                    {/* Workers Selection */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Назначенные работники
+                                        </label>
+                                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700">
+                                            {allWorkers.length > 0 ? (
+                                                allWorkers.map((worker) => (
+                                                    <label key={worker.id} className="flex items-center gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded cursor-pointer transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={formData.worker_ids.includes(worker.id)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        worker_ids: [...formData.worker_ids, worker.id]
+                                                                    });
+                                                                } else {
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        worker_ids: formData.worker_ids.filter(id => id !== worker.id)
+                                                                    });
+                                                                }
+                                                            }}
+                                                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                        />
+                                                        <span className="text-gray-700 dark:text-gray-300">
+                                                            {worker.first_name} {worker.last_name}
+                                                        </span>
+                                                    </label>
+                                                ))
+                                            ) : (
+                                                <div className="text-center py-4 text-xs text-muted">Работники не найдены</div>
+                                            )}
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Конец</label>
+                                    </div>
+
+                                    {/* Features */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200">Требования</h4>
+
+                                        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                                             <input
-                                                type="time"
-                                                value={formData.schedule_time_end}
-                                                onChange={(e) => setFormData({ ...formData, schedule_time_end: e.target.value })}
-                                                className="input"
+                                                type="checkbox"
+                                                checked={formData.requires_photos}
+                                                onChange={(e) => setFormData({ ...formData, requires_photos: e.target.checked })}
+                                                className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
                                             />
-                                        </div>
+                                            <div className="flex items-center gap-2">
+                                                <Camera className="w-4 h-4 text-blue-500" />
+                                                <span className="text-sm text-gray-700 dark:text-gray-300">Требуются фото отчеты</span>
+                                            </div>
+                                        </label>
+
+                                        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.requires_tasks}
+                                                onChange={(e) => setFormData({ ...formData, requires_tasks: e.target.checked })}
+                                                className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                            />
+                                            <div className="flex items-center gap-2">
+                                                <CheckSquare className="w-4 h-4 text-purple-500" />
+                                                <span className="text-sm text-gray-700 dark:text-gray-300">Требуется выполнение задач</span>
+                                            </div>
+                                        </label>
                                     </div>
                                 </div>
 
-                                {/* Features */}
-                                <div className="space-y-4">
-                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200">Требования</h4>
-
-                                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                        <input
-                                            type="checkbox"
-                                            checked={formData.requires_photos}
-                                            onChange={(e) => setFormData({ ...formData, requires_photos: e.target.checked })}
-                                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                                        />
-                                        <div className="flex items-center gap-2">
-                                            <Camera className="w-4 h-4 text-blue-500" />
-                                            <span className="text-sm text-gray-700 dark:text-gray-300">Требуются фото отчеты</span>
-                                        </div>
-                                    </label>
+                                <div className="modal-footer">
+                                    <button type="button" onClick={closeModal} className="btn-secondary flex-1">
+                                        Отмена
+                                    </button>
+                                    <button type="submit" className="btn-primary flex-1">
+                                        {editingObject ? 'Сохранить' : 'Создать'}
+                                    </button>
                                 </div>
-                            </div>
-
-                            <div className="modal-footer">
-                                <button type="button" onClick={closeModal} className="btn-secondary flex-1">
-                                    Отмена
-                                </button>
-                                <button type="submit" className="btn-primary flex-1">
-                                    {editingObject ? 'Сохранить' : 'Создать'}
-                                </button>
-                            </div>
-                        </form>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Task Management Modal */}
-            {managingTasksFor && (
-                <TaskManagementModal
-                    objectId={managingTasksFor.id}
-                    objectName={managingTasksFor.name}
-                    onClose={() => setManagingTasksFor(null)}
-                />
-            )}
+            {
+                managingTasksFor && (
+                    <TaskManagementModal
+                        objectId={managingTasksFor.id}
+                        objectName={managingTasksFor.name}
+                        onClose={() => setManagingTasksFor(null)}
+                    />
+                )
+            }
+
+            {/* Object Details Modal */}
+            {
+                viewingObject && (
+                    <ObjectDetailsModal
+                        object={viewingObject}
+                        onClose={() => setViewingObject(null)}
+                        creators={creators}
+                    />
+                )
+            }
+        </div >
+    );
+}
+
+function ObjectDetailsModal({ object, onClose, creators }: { object: CleaningObject, onClose: () => void, creators: Record<string, string> }) {
+    const [workers, setWorkers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchWorkers = async () => {
+            const { data } = await supabase
+                .from('worker_objects')
+                .select('worker:workers(*)')
+                .eq('object_id', object.id);
+
+            if (data) {
+                setWorkers(data.map((item: any) => item.worker).filter(Boolean));
+            }
+            setLoading(false);
+        };
+        fetchWorkers();
+    }, [object.id]);
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content max-w-2xl" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h3 className="text-xl font-bold text-main">{object.name}</h3>
+                    <button onClick={onClose} className="btn-icon">
+                        <X size={24} />
+                    </button>
+                </div>
+                <div className="modal-body space-y-6">
+                    {/* Basic Info */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-1">Адрес</label>
+                                <div className="flex items-start gap-2 text-main">
+                                    <MapPin className="w-4 h-4 mt-0.5 text-primary" />
+                                    <span>{object.address}</span>
+                                </div>
+                                <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(object.address)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-500 hover:underline ml-6 mt-1 block"
+                                >
+                                    Открыть на карте
+                                </a>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-1">Оплата</label>
+                                <div className="flex items-center gap-2 text-main">
+                                    <DollarSign className="w-4 h-4 text-emerald-500" />
+                                    <span className="font-medium">
+                                        {object.salary_type === 'hourly'
+                                            ? `${object.hourly_rate} zł в час`
+                                            : `${object.monthly_rate} zł в месяц (Fix)`}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {(object.client_phones && object.client_phones.length > 0) && (
+                                <div>
+                                    <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-1">Телефоны клиента</label>
+                                    <div className="space-y-1">
+                                        {object.client_phones.map((phone, i) => (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <a href={`tel:${phone}`} className="text-sm text-blue-500 hover:underline font-mono">{phone}</a>
+                                                {object.client_contact_names && object.client_contact_names[i] && (
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 font-medium">
+                                                        {object.client_contact_names[i]}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {(object.client_emails?.length || 0) > 0 && (
+                                <div>
+                                    <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-1">Email клиента</label>
+                                    <div className="space-y-1">
+                                        {object.client_emails?.map((email, i) => (
+                                            <a key={i} href={`mailto:${email}`} className="block text-sm text-blue-500 hover:underline">{email}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-1">Опекун (Supervisor)</label>
+                                <div className="space-y-2">
+                                    {object.owner_ids && object.owner_ids.length > 0 ? (
+                                        object.owner_ids.map(ownerId => (
+                                            <div key={ownerId} className="flex items-center gap-2 text-main p-2 bg-subtle rounded-lg border border-border">
+                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                    {creators[ownerId]?.charAt(0).toUpperCase() || '?'}
+                                                </div>
+                                                <span className="font-medium text-sm">
+                                                    {creators[ownerId] || 'Неизвестный'}
+                                                </span>
+                                            </div>
+                                        ))
+                                    ) : object.created_by && creators[object.created_by] ? (
+                                        <div className="flex items-center gap-2 text-main p-2 bg-subtle rounded-lg border border-border">
+                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                {creators[object.created_by].charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="font-medium text-sm">
+                                                {creators[object.created_by]}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-main p-2 bg-subtle rounded-lg border border-border italic text-muted text-sm">
+                                            Не назначен
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-1">График работы</label>
+                                <div className="p-3 bg-subtle rounded-lg border border-border space-y-2">
+                                    <div className="flex items-center gap-2 text-sm text-main">
+                                        <Clock className="w-4 h-4 text-muted" />
+                                        <span>{object.schedule_time_start} - {object.schedule_time_end}</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day, idx) => (
+                                            <span
+                                                key={idx}
+                                                className={`text-[10px] w-6 h-6 flex items-center justify-center rounded-full ${object.schedule_days?.includes(idx + 1)
+                                                    ? 'bg-primary text-white font-medium'
+                                                    : 'text-muted bg-black/5 dark:bg-white/5'
+                                                    }`}
+                                            >
+                                                {day}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Assigned Workers */}
+                    <div>
+                        <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-3 flex items-center gap-2">
+                            <span className="bg-primary/10 text-primary p-1 rounded">
+                                <Users size={14} />
+                            </span>
+                            Закрепленные работники ({loading ? '...' : workers.length})
+                        </label>
+
+                        {loading ? (
+                            <div className="h-20 flex items-center justify-center text-muted text-sm">
+                                Загрузка...
+                            </div>
+                        ) : workers.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {workers.map(worker => (
+                                    <div key={worker.id} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-subtle transition-colors">
+                                        <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm">
+                                            {worker.first_name[0]}{worker.last_name[0]}
+                                        </div>
+                                        <div>
+                                            <div className="font-medium text-main text-sm">{worker.first_name} {worker.last_name}</div>
+                                            <div className="text-xs text-muted">{worker.phone_number}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-6 bg-subtle rounded-xl border border-dashed border-border text-muted text-sm">
+                                <Users className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                                Нет закрепленных работников
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Settings Badges */}
+                    <div className="flex gap-3">
+                        {object.requires_photos && (
+                            <span className="badge-warning flex items-center gap-1.5 px-3 py-1">
+                                <Camera size={14} /> Требуются фото
+                            </span>
+                        )}
+                        {object.requires_tasks && (
+                            <span className="badge-neutral flex items-center gap-1.5 px-3 py-1 bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800">
+                                <CheckSquare size={14} /> Есть задачи
+                            </span>
+                        )}
+
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

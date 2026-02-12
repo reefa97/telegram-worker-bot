@@ -1,0 +1,12 @@
+playwright
+html2text
+supabase
+requests
+beautifulsoup4
+fake-useragent
+aiohttp
+python-dotenv
+validators
+openai
+pydantic
+dnspython

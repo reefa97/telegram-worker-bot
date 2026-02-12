@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, Send, Copy, Check, Users, History } from 'lucide-react';
+import { Plus, Edit2, Trash2, Send, Copy, Check, Users, History, Search } from 'lucide-react';
 import WorkSessionsModal from './WorkSessionsModal';
+import WorkerDetailsModal from './WorkerDetailsModal';
 
 interface Worker {
     id: string;
@@ -41,6 +42,7 @@ export default function WorkersPanel() {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
+    const [viewingWorker, setViewingWorker] = useState<Worker | null>(null); // State for viewing details
     const [copiedToken, setCopiedToken] = useState<string | null>(null);
     const [historyWorker, setHistoryWorker] = useState<Worker | null>(null);
 
@@ -58,6 +60,11 @@ export default function WorkersPanel() {
         role_id: '',
         selectedObjects: [] as string[],
     });
+
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isAddingRole, setIsAddingRole] = useState(false);
+    const [newRoleName, setNewRoleName] = useState('');
+    const [isSavingRole, setIsSavingRole] = useState(false);
 
     useEffect(() => {
         loadWorkers();
@@ -170,6 +177,32 @@ export default function WorkersPanel() {
             console.error('Error saving worker:', error);
             const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
             alert(`Ошибка при сохранении работника: ${errorMessage}`);
+        }
+    };
+
+    const handleQuickAddRole = async () => {
+        if (!newRoleName.trim()) return;
+        setIsSavingRole(true);
+        try {
+            const { data, error } = await supabase
+                .from('worker_roles')
+                .insert([{ name: newRoleName.trim() }])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                setRoles(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+                setFormData(prev => ({ ...prev, role_id: data.id }));
+                setIsAddingRole(false);
+                setNewRoleName('');
+            }
+        } catch (error) {
+            console.error('Error adding role:', error);
+            alert('Ошибка при создании роли');
+        } finally {
+            setIsSavingRole(false);
         }
     };
 
@@ -323,6 +356,18 @@ export default function WorkersPanel() {
         setSelectedWorkers(newSelected);
     };
 
+    const filteredWorkers = workers.filter(worker => {
+        const query = searchQuery.toLowerCase().trim();
+        if (!query) return true;
+
+        const fullName = `${worker.first_name} ${worker.last_name}`.toLowerCase();
+        const role = (worker.worker_roles?.name || worker.role || '').toLowerCase();
+        const phone = (worker.phone_number || '').toLowerCase();
+        const telegram = (worker.telegram_username || '').toLowerCase();
+
+        return fullName.includes(query) || role.includes(query) || phone.includes(query) || telegram.includes(query);
+    });
+
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -335,9 +380,21 @@ export default function WorkersPanel() {
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Работники</h2>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div className="flex items-center gap-4 flex-1 w-full">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white shrink-0">Работники</h2>
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Поиск по имени, роли, телефону..."
+                            className="input pl-10 h-10 w-full"
+                        />
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 w-full md:w-auto">
                     {selectedWorkers.size > 0 && (
                         <button
                             onClick={() => setShowBulkModal(true)}
@@ -347,122 +404,139 @@ export default function WorkersPanel() {
                             Написать ({selectedWorkers.size})
                         </button>
                     )}
+                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_create) && (
+                        <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Добавить работника
+                        </button>
+                    )}
                 </div>
-                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_create) && (
-                    <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
-                        <Plus className="w-4 h-4" />
-                        Добавить работника
-                    </button>
-                )}
             </div>
 
-            <div className="card overflow-hidden p-0">
-                <div className="overflow-x-auto">
-                    <table className="table w-full">
-                        <thead>
-                            <tr>
-                                <th className="w-10">
+            <div className="table-container">
+                <table className="table">
+                    <thead>
+                        <tr>
+                            <th className="w-10">
+                                <input
+                                    type="checkbox"
+                                    checked={workers.length > 0 && selectedWorkers.size === workers.length}
+                                    onChange={toggleSelectAll}
+                                    className="rounded border-border text-main focus:ring-1 focus:ring-main"
+                                />
+                            </th>
+                            <th>Имя</th>
+                            <th>Роль</th>
+                            <th>Телефон</th>
+                            <th>Telegram</th>
+                            <th>Опекун</th>
+                            <th>Статус</th>
+                            <th className="text-right">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredWorkers.map((worker) => (
+                            <tr
+                                key={worker.id}
+                                className={`group cursor-pointer ${selectedWorkers.has(worker.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : 'hover:bg-subtle'}`}
+                                onClick={() => setViewingWorker(worker)}
+                            >
+                                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                     <input
                                         type="checkbox"
-                                        checked={workers.length > 0 && selectedWorkers.size === workers.length}
-                                        onChange={toggleSelectAll}
-                                        className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                        checked={selectedWorkers.has(worker.id)}
+                                        onChange={() => toggleSelectWorker(worker.id)}
+                                        className="rounded border-border text-main focus:ring-1 focus:ring-main"
                                     />
-                                </th>
-                                <th>Имя</th>
-                                <th>Роль</th>
-                                <th>Телефон</th>
-                                <th>Telegram</th>
-                                <th>Опекун</th>
-                                <th>Статус</th>
-                                <th>Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {workers.map((worker) => (
-                                <tr key={worker.id} className={`${selectedWorkers.has(worker.id) ? 'bg-primary-50 dark:bg-primary-900/10' : ''} border-none`}>
-                                    <td className="px-4 py-3">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedWorkers.has(worker.id)}
-                                            onChange={() => toggleSelectWorker(worker.id)}
-                                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                                        />
-                                    </td>
-                                    <td className="text-gray-900 dark:text-white font-medium">
-                                        {worker.first_name} {worker.last_name}
-                                    </td>
-                                    <td className="text-gray-500 dark:text-gray-400">
-                                        {worker.worker_roles?.name || worker.role || '-'}
-                                    </td>
-                                    <td className="text-gray-500 dark:text-gray-400 font-mono">{worker.phone_number}</td>
-                                    <td className="text-gray-500 dark:text-gray-400">
-                                        {worker.telegram_username ? (
-                                            <span className="text-primary-600 dark:text-primary-400">@{worker.telegram_username}</span>
-                                        ) : (
-                                            <span className="text-gray-400 italic">Не активирован</span>
-                                        )}
-                                    </td>
-                                    <td className="text-gray-500 dark:text-gray-400">
-                                        {(worker as any).created_by && creators[(worker as any).created_by] ? creators[(worker as any).created_by] : '-'}
-                                    </td>
+                                </td>
+                                <td className="font-medium text-main">
+                                    {worker.first_name} {worker.last_name}
+                                </td>
+                                <td className="text-muted">
+                                    {worker.worker_roles?.name || worker.role || '-'}
+                                </td>
+                                <td className="text-muted font-mono text-xs">{worker.phone_number}</td>
+                                <td className="text-muted" onClick={(e) => e.stopPropagation()}>
+                                    {worker.telegram_username ? (
+                                        <a
+                                            href={`https://t.me/${worker.telegram_username}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-500 hover:underline"
+                                        >
+                                            @{worker.telegram_username}
+                                        </a>
+                                    ) : (
+                                        <span className="opacity-50">Не активирован</span>
+                                    )}
+                                </td>
+                                <td className="text-muted">
+                                    {(worker as any).created_by && creators[(worker as any).created_by] ? creators[(worker as any).created_by] : '-'}
+                                </td>
 
-                                    <td>
-                                        <span className={worker.is_active ? 'badge-success' : 'badge-danger'}>
+                                <td>
+                                    {!worker.telegram_user_id ? (
+                                        <span className="badge-danger">
+                                            <span className="badge-dot" />
+                                            Неактивен
+                                        </span>
+                                    ) : (
+                                        <span className={worker.is_active ? 'badge-success' : 'badge-neutral'}>
+                                            <span className="badge-dot" />
                                             {worker.is_active ? 'Активен' : 'Неактивен'}
                                         </span>
-                                    </td>
-                                    <td>
-                                        <div className="flex items-center gap-3">
-                                            <button
-                                                onClick={() => setHistoryWorker(worker)}
-                                                className="btn-icon hover:text-purple-400"
-                                                title="История работы"
-                                            >
-                                                <History className="w-4 h-4" />
-                                            </button>
-                                            {canWrite && (
-                                                <>
-                                                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_edit) && (
-                                                        <button
-                                                            onClick={() => openModal(worker)}
-                                                            className="btn-icon hover:text-blue-400"
-                                                            title="Редактировать"
-                                                        >
-                                                            <Edit2 className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_delete) && (
-                                                        <button
-                                                            onClick={() => handleDelete(worker.id)}
-                                                            className="btn-icon hover:text-red-400"
-                                                            title="Удалить"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                    {!worker.telegram_user_id && (
-                                                        <button
-                                                            onClick={() => copyInvitationLink(worker.invitation_token)}
-                                                            className="btn-icon hover:text-green-400"
-                                                            title="Скопировать ссылку активации"
-                                                        >
-                                                            {copiedToken === worker.invitation_token ? (
-                                                                <Check className="w-4 h-4 text-green-500" />
-                                                            ) : (
-                                                                <Copy className="w-4 h-4" />
-                                                            )}
-                                                        </button>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                    )}
+                                </td>
+                                <td className="text-right" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => setHistoryWorker(worker)}
+                                            className="btn-icon"
+                                            title="История работы"
+                                        >
+                                            <History size={16} />
+                                        </button>
+                                        {canWrite && (
+                                            <>
+                                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_edit) && (
+                                                    <button
+                                                        onClick={() => openModal(worker)}
+                                                        className="btn-icon"
+                                                        title="Редактировать"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                )}
+                                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_delete) && (
+                                                    <button
+                                                        onClick={() => handleDelete(worker.id)}
+                                                        className="btn-icon text-danger hover:text-danger hover:bg-red-50 dark:hover:bg-red-900/10"
+                                                        title="Удалить"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                                {!worker.telegram_user_id && (
+                                                    <button
+                                                        onClick={() => copyInvitationLink(worker.invitation_token)}
+                                                        className="btn-icon text-success hover:text-success hover:bg-green-50 dark:hover:bg-green-900/10"
+                                                        title="Скопировать ссылку активации"
+                                                    >
+                                                        {copiedToken === worker.invitation_token ? (
+                                                            <Check size={16} />
+                                                        ) : (
+                                                            <Copy size={16} />
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
 
             {/* Modal */}
@@ -514,19 +588,59 @@ export default function WorkersPanel() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Роль</label>
-                                    <div className="relative">
-                                        <select
-                                            value={formData.role_id}
-                                            onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
-                                            className="input appearance-none"
-                                        >
-                                            <option value="">Выберите роль</option>
-                                            {roles.map(role => (
-                                                <option key={role.id} value={role.id}>{role.name}</option>
-                                            ))}
-                                        </select>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Роль</label>
+                                        {!isAddingRole && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsAddingRole(true)}
+                                                className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                                            >
+                                                + Добавить новую
+                                            </button>
+                                        )}
                                     </div>
+
+                                    {isAddingRole ? (
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={newRoleName}
+                                                onChange={(e) => setNewRoleName(e.target.value)}
+                                                placeholder="Название роли..."
+                                                className="input flex-1"
+                                                autoFocus
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleQuickAddRole}
+                                                disabled={isSavingRole || !newRoleName.trim()}
+                                                className="btn-primary px-3"
+                                            >
+                                                {isSavingRole ? '...' : <Check size={18} />}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setIsAddingRole(false); setNewRoleName(''); }}
+                                                className="btn-secondary px-3"
+                                            >
+                                                &times;
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="relative">
+                                            <select
+                                                value={formData.role_id}
+                                                onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
+                                                className="input appearance-none"
+                                            >
+                                                <option value="">Выберите роль</option>
+                                                {roles.map(role => (
+                                                    <option key={role.id} value={role.id}>{role.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div>
@@ -624,6 +738,13 @@ export default function WorkersPanel() {
                     workerId={historyWorker.id}
                     workerName={`${historyWorker.first_name} ${historyWorker.last_name}`}
                     onClose={() => setHistoryWorker(null)}
+                />
+            )}
+
+            {viewingWorker && (
+                <WorkerDetailsModal
+                    worker={viewingWorker}
+                    onClose={() => setViewingWorker(null)}
                 />
             )}
         </div>

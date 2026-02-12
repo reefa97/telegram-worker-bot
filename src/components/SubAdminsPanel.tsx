@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { UserPlus2, Plus, Trash2, Edit2, Shield, User, Smartphone, Layout } from 'lucide-react';
+import { UserPlus2, Plus, Trash2, Edit2, Shield, User, Smartphone, Layout, X } from 'lucide-react';
 
 interface AdminUser {
     id: string;
@@ -38,6 +38,7 @@ export default function SubAdminsPanel() {
             objects_create: false,
             objects_edit: false,
             objects_delete: false,
+            objects_view_client_rates: false,
             // Работники
             workers_view: true,
             workers_create: false,
@@ -58,6 +59,8 @@ export default function SubAdminsPanel() {
             // Роли
             roles_view: true,
             roles_manage: false,
+            // Email Search
+            email_search_view: false,
         }
     });
 
@@ -167,6 +170,7 @@ export default function SubAdminsPanel() {
                     objects_create: false,
                     objects_edit: false,
                     objects_delete: false,
+                    objects_view_client_rates: false,
                     workers_view: true,
                     workers_create: false,
                     workers_edit: false,
@@ -182,6 +186,7 @@ export default function SubAdminsPanel() {
                     tasks_delete: false,
                     roles_view: true,
                     roles_manage: false,
+                    email_search_view: false,
                 }
             });
         }
@@ -190,11 +195,11 @@ export default function SubAdminsPanel() {
 
     const renderPermissionsGroup = (title: string, permissions: Array<{ key: string, label: string }>) => {
         return (
-            <div key={title} className="mb-4 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg">
-                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">{title}</div>
+            <div key={title} className="mb-4 bg-zinc-50 dark:bg-zinc-900 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">{title}</div>
                 <div className="grid grid-cols-1 gap-2">
                     {permissions.map(({ key, label }) => (
-                        <label key={key} className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 p-1.5 rounded-md transition-colors">
+                        <label key={key} className="flex items-center gap-3 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 p-1.5 rounded-md transition-colors">
                             <input
                                 type="checkbox"
                                 checked={(formData.permissions as any)[key] || false}
@@ -205,9 +210,9 @@ export default function SubAdminsPanel() {
                                         [key]: e.target.checked
                                     }
                                 })}
-                                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-primary-600 focus:ring-primary-500"
+                                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-zinc-500"
                             />
-                            <span className="text-gray-700 dark:text-gray-300 text-sm">{label}</span>
+                            <span className="text-zinc-700 dark:text-zinc-300 text-sm">{label}</span>
                         </label>
                     ))}
                 </div>
@@ -257,22 +262,22 @@ export default function SubAdminsPanel() {
                                 const canEditThis = adminUser?.role === 'super_admin' || admin.created_by === adminUser?.id;
 
                                 return (
-                                    <tr key={admin.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                        <td className="font-medium text-gray-900 dark:text-white">
+                                    <tr key={admin.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+                                        <td className="font-medium text-zinc-900 dark:text-white">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 flex items-center justify-center">
+                                                <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center">
                                                     <User className="w-4 h-4" />
                                                 </div>
                                                 <div>
                                                     <div className="font-medium">{admin.name || 'Без имени'}</div>
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400">{admin.email}</div>
+                                                    <div className="text-xs text-zinc-500 dark:text-zinc-400">{admin.email}</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td>
                                             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${admin.role === 'manager'
-                                                ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800'
-                                                : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'
                                                 }`}>
                                                 {admin.role === 'manager' ? (
                                                     <Layout className="w-3 h-3" />
@@ -282,13 +287,13 @@ export default function SubAdminsPanel() {
                                                 {admin.role === 'manager' ? 'Менеджер' : 'Sub Admin'}
                                             </span>
                                         </td>
-                                        <td className="text-gray-600 dark:text-gray-300 font-mono text-sm">
-                                            {admin.telegram_chat_id || <span className="text-gray-400 dark:text-gray-500">-</span>}
+                                        <td className="text-zinc-600 dark:text-zinc-300 font-mono text-sm">
+                                            {admin.telegram_chat_id || <span className="text-zinc-400 dark:text-zinc-500">-</span>}
                                         </td>
-                                        <td className="text-gray-600 dark:text-gray-300">
+                                        <td className="text-zinc-600 dark:text-zinc-300">
                                             {admin.phone ? (
                                                 <div className="flex items-center gap-1.5">
-                                                    <Smartphone className="w-3.5 h-3.5 text-gray-400" />
+                                                    <Smartphone className="w-3.5 h-3.5 text-zinc-400" />
                                                     {admin.phone}
                                                 </div>
                                             ) : '-'}
@@ -298,7 +303,7 @@ export default function SubAdminsPanel() {
                                                 <div className="flex justify-end gap-2">
                                                     <button
                                                         onClick={() => openModal(admin)}
-                                                        className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg transition-colors"
+                                                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-lg transition-colors"
                                                         title="Редактировать"
                                                     >
                                                         <Edit2 className="w-4 h-4" />
@@ -330,18 +335,16 @@ export default function SubAdminsPanel() {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+                    <div className="bg-white dark:bg-zinc-950 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
                         <div className="p-6">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
                                     {editingAdmin ? 'Редактировать' : 'Новый пользователь'}
                                 </h3>
-                                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
                                     <span className="sr-only">Закрыть</span>
-                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
+                                    <X className="w-6 h-6" />
                                 </button>
                             </div>
 
@@ -439,6 +442,7 @@ export default function SubAdminsPanel() {
                                             { key: 'objects_create', label: 'Добавление объектов' },
                                             { key: 'objects_edit', label: 'Изменение объектов' },
                                             { key: 'objects_delete', label: 'Удаление объектов' },
+                                            { key: 'objects_view_client_rates', label: 'Просмотр выплат (клиентских)' },
                                         ])}
                                         {renderPermissionsGroup('Работники', [
                                             { key: 'workers_view', label: 'Просмотр работников' },
@@ -465,11 +469,14 @@ export default function SubAdminsPanel() {
                                             { key: 'roles_view', label: 'Просмотр ролей' },
                                             { key: 'roles_manage', label: 'Управление ролями' },
                                         ])}
+                                        {renderPermissionsGroup('Email Search', [
+                                            { key: 'email_search_view', label: 'Доступ к поиску Email' },
+                                        ])}
                                     </div>
                                 </div>
 
-                                <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
-                                    <button type="button" onClick={closeModal} className="btn-ghost flex-1">
+                                <div className="flex gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                                    <button type="button" onClick={closeModal} className="btn-secondary flex-1">
                                         Отмена
                                     </button>
                                     <button type="submit" className="btn-primary flex-1">

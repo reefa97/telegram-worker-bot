@@ -47,6 +47,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
+        // Debug Mode: Simulate Super Admin
+        if (localStorage.getItem('debug_super_admin') === 'true') {
+            setUser({ id: 'debug-user', email: 'admin@debug.com', app_metadata: {}, user_metadata: {}, aud: 'authenticated', created_at: '' });
+            setSession({ access_token: 'debug', refresh_token: 'debug', expires_in: 3600, token_type: 'bearer', user: { id: 'debug-user', email: 'admin@debug.com', app_metadata: {}, user_metadata: {}, aud: 'authenticated', created_at: '' } });
+            setAdminUser({
+                id: 'debug-user',
+                email: 'admin@debug.com',
+                role: 'super_admin',
+                created_by: null,
+                permissions: {}
+            });
+            setLoading(false);
+            return;
+        }
+
         // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);

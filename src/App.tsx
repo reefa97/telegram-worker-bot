@@ -22,7 +22,7 @@ function AppContent() {
     }
 
     return (
-        <div className="min-h-screen bg-[#121212]">
+        <div className="min-h-screen bg-app text-main transition-colors duration-200 overflow-hidden flex flex-col">
             {user ? <Dashboard /> : <AuthForm />}
         </div>
     );

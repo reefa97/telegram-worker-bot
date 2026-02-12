@@ -59,6 +59,7 @@ pub struct Email {
     
     pub snippet: Option<String>,
     pub is_read: bool,
+    pub is_notified: bool,
     pub has_attachments: bool,
     pub size: Option<i32>,
 }

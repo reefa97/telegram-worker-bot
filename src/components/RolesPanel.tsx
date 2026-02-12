@@ -93,13 +93,13 @@ export default function RolesPanel() {
     };
 
     return (
-        <div>
-            <h2 className="text-2xl font-bold text-white mb-6">Управление ролями</h2>
+        <div className="animate-fadeIn">
+            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-6">Управление ролями</h2>
 
             <div className="grid gap-6 md:grid-cols-2">
                 {/* Form */}
-                <div className="card h-fit">
-                    <h3 className="text-lg font-semibold text-white mb-4">
+                <div className="card p-6 h-fit shadow-sm border border-zinc-200 dark:border-zinc-800">
+                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
                         {editingRole ? 'Редактировать роль' : 'Новая роль'}
                     </h3>
                     <form onSubmit={editingRole ? handleUpdateRole : handleAddRole} className="flex gap-2">
@@ -124,23 +124,25 @@ export default function RolesPanel() {
                 {/* List */}
                 <div className="space-y-4">
                     {loading ? (
-                        <div className="text-white">Загрузка...</div>
+                        <div className="text-zinc-500 dark:text-zinc-400">Загрузка...</div>
                     ) : roles.length === 0 ? (
-                        <div className="text-gray-400">Ролей пока нет</div>
+                        <div className="text-zinc-500 dark:text-zinc-400 italic">Ролей пока нет</div>
                     ) : (
                         roles.map(role => (
-                            <div key={role.id} className="card flex justify-between items-center py-3">
-                                <span className="text-white font-medium">{role.name}</span>
+                            <div key={role.id} className="card flex justify-between items-center px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors shadow-sm border border-zinc-200 dark:border-zinc-800">
+                                <span className="text-zinc-900 dark:text-white font-medium">{role.name}</span>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => startEdit(role)}
-                                        className="p-2 text-blue-400 hover:bg-blue-500/10 rounded"
+                                        className="p-2 text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                                        title="Редактировать"
                                     >
                                         <Edit2 className="w-4 h-4" />
                                     </button>
                                     <button
                                         onClick={() => handleDeleteRole(role.id)}
-                                        className="p-2 text-red-400 hover:bg-red-500/10 rounded"
+                                        className="p-2 text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                        title="Удалить"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>

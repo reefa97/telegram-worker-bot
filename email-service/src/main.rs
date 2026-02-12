@@ -14,6 +14,7 @@ mod scheduler;
 #[derive(Clone)]
 pub struct AppState {
     pub pg_pool: sqlx::PgPool,
+    pub active_syncs: std::sync::Arc<tokio::sync::Mutex<std::collections::HashSet<uuid::Uuid>>>,
 }
 
 #[tokio::main]
@@ -111,6 +112,7 @@ async fn main() -> std::io::Result<()> {
 
     let state = AppState {
         pg_pool: pg_pool.clone(),
+        active_syncs: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashSet::new())),
     };
     
     // Start Background Scheduler (Outbound)
@@ -118,6 +120,7 @@ async fn main() -> std::io::Result<()> {
 
     // Start Background Poller (Inbound Sync)
     let poller_pool = pg_pool.clone();
+    let poller_state = state.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(60)); // Sync once a minute
         loop {
@@ -131,9 +134,27 @@ async fn main() -> std::io::Result<()> {
             if let Ok(accounts) = accounts_res {
                 for acc in accounts {
                      let p_pg = poller_pool.clone();
+                     let p_state = poller_state.clone();
                      tokio::spawn(async move {
+                         // Check if already syncing
+                         {
+                             let mut active = p_state.active_syncs.lock().await;
+                             if active.contains(&acc.id) {
+                                 log::debug!("Sync already in progress for {}, skipping", acc.email_address);
+                                 return;
+                             }
+                             active.insert(acc.id);
+                         }
+                         
+                         log::info!("Starting background sync for {}", acc.email_address);
                          if let Err(e) = imap_sync::sync_account(&acc, &p_pg).await {
                              log::error!("Auto-sync failed for {}: {:?}", acc.email_address, e);
+                         }
+
+                         // Release lock
+                         {
+                             let mut active = p_state.active_syncs.lock().await;
+                             active.remove(&acc.id);
                          }
                      });
                 }
