@@ -58,7 +58,7 @@ async function applyMigration(filePath) {
 }
 
 async function main() {
-    const MIGRATION_FILE = path.join(__dirname, 'supabase', 'migrations', '20260207_create_exec_sql.sql');
+    const MIGRATION_FILE = path.join(__dirname, 'supabase', 'migrations', '20260218_corporate_credit_transactions.sql');
     await applyMigration(MIGRATION_FILE);
 }
 

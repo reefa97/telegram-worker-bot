@@ -58,6 +58,7 @@ export default function WorkersPanel() {
         last_name: '',
         phone_number: '',
         role_id: '',
+        created_by: '',
         selectedObjects: [] as string[],
     });
 
@@ -129,6 +130,7 @@ export default function WorkersPanel() {
                         last_name: formData.last_name,
                         phone_number: formData.phone_number,
                         role_id: formData.role_id || null,
+                        created_by: formData.created_by || null,
                     })
                     .eq('id', editingWorker.id);
 
@@ -153,7 +155,7 @@ export default function WorkersPanel() {
                         last_name: formData.last_name,
                         phone_number: formData.phone_number,
                         role_id: formData.role_id || null,
-                        created_by: adminUser?.id,
+                        created_by: formData.created_by || adminUser?.id,
                         invitation_token: token,
                     })
                     .select()
@@ -305,6 +307,7 @@ export default function WorkersPanel() {
                 last_name: worker.last_name,
                 phone_number: worker.phone_number,
                 role_id: worker.role_id || '',
+                created_by: worker.created_by || '',
                 selectedObjects: [],
             });
 
@@ -327,6 +330,7 @@ export default function WorkersPanel() {
                 last_name: '',
                 phone_number: '',
                 role_id: '',
+                created_by: '',
                 selectedObjects: [],
             });
         }
@@ -642,6 +646,24 @@ export default function WorkersPanel() {
                                         </div>
                                     )}
                                 </div>
+
+                                {adminUser?.role === 'super_admin' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Опекун (кто видит работника)</label>
+                                        <div className="relative">
+                                            <select
+                                                value={formData.created_by}
+                                                onChange={(e) => setFormData({ ...formData, created_by: e.target.value })}
+                                                className="input appearance-none"
+                                            >
+                                                <option value="">Без опекуна (Виден всем супер-админам)</option>
+                                                {Object.entries(creators).map(([id, name]) => (
+                                                    <option key={id} value={id}>{name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Объекты работы</label>

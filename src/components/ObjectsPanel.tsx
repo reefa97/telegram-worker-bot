@@ -41,6 +41,7 @@ export default function ObjectsPanel() {
     const [objects, setObjects] = useState<CleaningObject[]>([]);
     const [creators, setCreators] = useState<Record<string, string>>({});
     const [adminsList, setAdminsList] = useState<Array<{ id: string, name: string, role: string }>>([]);
+    const [guardianRates, setGuardianRates] = useState<Record<string, Record<string, number>>>({});
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingObject, setEditingObject] = useState<CleaningObject | null>(null);
@@ -83,6 +84,7 @@ export default function ObjectsPanel() {
         reminder_active: false,
         reminder_frequency: 'monthly' as 'weekly' | 'monthly' | 'quarterly',
         reminder_assignee_id: '',
+        owner_rates: {} as Record<string, number>,
     });
 
     useEffect(() => {
@@ -123,19 +125,29 @@ export default function ObjectsPanel() {
 
     const loadObjects = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from('cleaning_objects')
-            .select('*, object_owners(admin_id)')
-            .order('created_at', { ascending: false });
+        const [objectsRes, ratesRes] = await Promise.all([
+            supabase.from('cleaning_objects').select('*, object_owners(admin_id)').order('created_at', { ascending: false }),
+            supabase.from('admin_object_rates').select('*')
+        ]);
 
-        if (data) {
-            const formatted = data.map((obj: any) => ({
+        if (objectsRes.data) {
+            const formatted = objectsRes.data.map((obj: any) => ({
                 ...obj,
                 owner_ids: obj.object_owners?.map((oo: any) => oo.admin_id) || []
             }));
             setObjects(formatted);
         }
-        if (error) console.error('Error loading objects:', error);
+
+        if (ratesRes.data) {
+            const ratesMap: Record<string, Record<string, number>> = {};
+            ratesRes.data.forEach((r: any) => {
+                if (!ratesMap[r.object_id]) ratesMap[r.object_id] = {};
+                ratesMap[r.object_id][r.admin_id] = r.monthly_rate;
+            });
+            setGuardianRates(ratesMap);
+        }
+
+        if (objectsRes.error) console.error('Error loading objects:', objectsRes.error);
         setLoading(false);
     };
 
@@ -209,6 +221,18 @@ export default function ObjectsPanel() {
                         object_id: targetId,
                         admin_id: adminUser?.id
                     });
+                }
+
+                // Sync Owner Rates
+                const rateRows = formData.owner_ids.map(uid => ({
+                    object_id: targetId,
+                    admin_id: uid,
+                    monthly_rate: formData.owner_rates[uid] || 0
+                }));
+                // Using upsert to handle updates
+                await supabase.from('admin_object_rates').delete().eq('object_id', targetId);
+                if (rateRows.length > 0) {
+                    await supabase.from('admin_object_rates').insert(rateRows);
                 }
             }
 
@@ -300,6 +324,12 @@ export default function ObjectsPanel() {
                 reminder_active: object.reminder_active || false,
                 reminder_frequency: object.reminder_frequency || 'monthly',
                 reminder_assignee_id: object.reminder_assignee_id || '',
+                owner_rates: await (async () => {
+                    const { data } = await supabase.from('admin_object_rates').select('admin_id, monthly_rate').eq('object_id', object.id);
+                    const rates: Record<string, number> = {};
+                    data?.forEach(r => rates[r.admin_id] = r.monthly_rate);
+                    return rates;
+                })(),
             });
         } else {
             setEditingObject(null);
@@ -327,6 +357,7 @@ export default function ObjectsPanel() {
                 reminder_active: false,
                 reminder_frequency: 'monthly',
                 reminder_assignee_id: adminUser?.id || '',
+                owner_rates: {},
             });
         }
         setShowModal(true);
@@ -356,6 +387,7 @@ export default function ObjectsPanel() {
         let fixedTotal = 0;
         let hourlyTotal = 0;
         let clientRatesTotal = 0;
+        let guardiansTotal = 0;
 
         filteredObjects.forEach((obj) => {
             if (!obj.is_active) return; // Skip inactive objects for budget summary
@@ -364,23 +396,43 @@ export default function ObjectsPanel() {
                 clientRatesTotal += obj.client_rate;
             }
 
+            // Worker fixed salary
             if (obj.salary_type === 'monthly_fixed' && obj.monthly_rate) {
                 fixedTotal += obj.monthly_rate;
             } else if (obj.salary_type === 'hourly' && obj.hourly_rate && obj.schedule_time_start && obj.schedule_time_end) {
-                // Parse times
+                // Parse times for worker hourly salary
                 const [startH, startM] = obj.schedule_time_start.split(':').map(Number);
                 const [endH, endM] = obj.schedule_time_end.split(':').map(Number);
 
                 let durationHours = (endH + endM / 60) - (startH + startM / 60);
-                if (durationHours < 0) durationHours += 24; // Handle overnight shifts if any
+                if (durationHours < 0) durationHours += 24;
 
                 const daysPerWeek = obj.schedule_days?.length || 0;
-                const monthlyHours = durationHours * daysPerWeek * 4.33; // 4.33 weeks per month average
+                const monthlyHours = durationHours * daysPerWeek * 4.33;
                 hourlyTotal += monthlyHours * obj.hourly_rate;
+            }
+
+            // Guardian rates (monthly rates for all assigned owners)
+            const rates = guardianRates[obj.id];
+            if (rates) {
+                Object.values(rates).forEach(rate => {
+                    guardiansTotal += rate;
+                });
             }
         });
 
-        return { fixedTotal, hourlyTotal, clientRatesTotal, total: fixedTotal + hourlyTotal };
+        const totalWorkerExpenses = fixedTotal + hourlyTotal;
+        const totalExpenses = totalWorkerExpenses + guardiansTotal;
+
+        return {
+            fixedTotal,
+            hourlyTotal,
+            clientRatesTotal,
+            guardiansTotal,
+            totalWorkerExpenses,
+            totalExpenses,
+            profit: clientRatesTotal - totalExpenses
+        };
     };
 
     const salarySummary = calculateSalarySummary();
@@ -527,12 +579,28 @@ export default function ObjectsPanel() {
                                         </td>
                                         <td className="px-6 py-4">
                                             {object.owner_ids && object.owner_ids.length > 0 ? (
-                                                <div className="text-sm font-medium text-main">
-                                                    {object.owner_ids.map(id => creators[id]).filter(Boolean).join(', ')}
+                                                <div className="flex flex-col gap-1">
+                                                    {object.owner_ids.map(id => (
+                                                        <div key={id} className="text-sm font-medium text-main">
+                                                            {creators[id] || 'Неизвестный'}
+                                                            {(adminUser?.role === 'super_admin' || adminUser?.id === id) && guardianRates[object.id]?.[id] !== undefined && (
+                                                                <span className="ml-2 text-[10px] font-bold text-primary bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10">
+                                                                    {guardianRates[object.id][id]} zł
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             ) : object.created_by && creators[object.created_by] ? (
-                                                <div className="text-sm font-medium text-main">
-                                                    {creators[object.created_by]}
+                                                <div className="flex flex-col gap-1 text-sm font-medium text-main">
+                                                    <div>
+                                                        {creators[object.created_by]}
+                                                        {(adminUser?.role === 'super_admin' || adminUser?.id === object.created_by) && guardianRates[object.id]?.[object.created_by] !== undefined && (
+                                                            <span className="ml-2 text-[10px] font-bold text-primary bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10">
+                                                                {guardianRates[object.id][object.created_by]} zł
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <span className="text-muted text-xs">-</span>
@@ -668,16 +736,35 @@ export default function ObjectsPanel() {
                                         {/* Removed: Активен status badge */}
 
 
-                                        {(object.hourly_rate || object.monthly_rate) && (
-                                            <span className="text-muted font-medium bg-subtle px-2 py-1 rounded-md border border-transparent">
-                                                {object.salary_type === 'hourly' ? `${object.hourly_rate} zł/ч` : `${object.monthly_rate} zł/мес`}
-                                            </span>
-                                        )}
-
                                         {canSeeClientRates && object.client_rate && (
                                             <span className="text-green-600 dark:text-green-400 font-semibold bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-md border border-green-100 dark:border-green-900/30">
                                                 {object.client_rate} zł (К)
                                             </span>
+                                        )}
+
+                                        {/* Guardian Rate (Super-Admin or Own) */}
+                                        {(adminUser?.role === 'super_admin' || (object.owner_ids && object.owner_ids.includes(adminUser?.id || ''))) && (
+                                            (() => {
+                                                const rates = guardianRates[object.id] || {};
+                                                const ownRate = rates[adminUser?.id || ''];
+                                                const allRates = Object.values(rates);
+
+                                                if (adminUser?.role === 'super_admin' && allRates.length > 0) {
+                                                    const total = allRates.reduce((a, b) => a + b, 0);
+                                                    return (
+                                                        <span className="text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-900/30">
+                                                            {total} zł (О)
+                                                        </span>
+                                                    );
+                                                } else if (ownRate !== undefined) {
+                                                    return (
+                                                        <span className="text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-900/30">
+                                                            {ownRate} zł (О)
+                                                        </span>
+                                                    );
+                                                }
+                                                return null;
+                                            })()
                                         )}
                                     </div>
 
@@ -728,62 +815,71 @@ export default function ObjectsPanel() {
             }
 
             {/* Salary Summary Footer */}
-            <div className="mt-8 mb-6 p-6 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm animate-fadeIn">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-main mb-1">Итоговый бюджет по объектам</h3>
-                        <p className="text-sm text-muted">Сумма всех активных объектов в текущем списке</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8 w-full md:w-auto">
-                        <div className="bg-subtle/50 p-4 rounded-xl border border-border">
-                            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Фикс. зарплаты</div>
-                            <div className="text-xl font-bold text-main">
-                                {salarySummary.fixedTotal.toLocaleString()} <span className="text-sm font-medium">zł</span>
-                            </div>
+            {adminUser?.role === 'super_admin' && (
+                <div className="mt-8 mb-6 p-6 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm animate-fadeIn">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        <div>
+                            <h3 className="text-lg font-bold text-main mb-1">Итоговый бюджет по объектам</h3>
+                            <p className="text-sm text-muted">Сумма всех активных объектов в текущем списке</p>
                         </div>
 
-                        <div className="bg-subtle/50 p-4 rounded-xl border border-border">
-                            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Почасовые (оценка)</div>
-                            <div className="text-xl font-bold text-main">
-                                {Math.round(salarySummary.hourlyTotal).toLocaleString()} <span className="text-sm font-medium">zł</span>
-                            </div>
-                        </div>
-
-                        <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 ring-1 ring-primary/10">
-                            <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Зарплаты (мес)</div>
-                            <div className="text-2xl font-bold text-primary">
-                                {Math.round(salarySummary.total).toLocaleString()} <span className="text-base font-medium">zł</span>
-                            </div>
-                        </div>
-
-                        {canSeeClientRates && (
-                            <div className="bg-green-500/5 p-4 rounded-xl border border-green-500/20 ring-1 ring-green-500/10">
-                                <div className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Выручка (клиент)</div>
-                                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                    {Math.round(salarySummary.clientRatesTotal).toLocaleString()} <span className="text-base font-medium">zł</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 w-full">
+                            <div className="bg-subtle/50 p-4 rounded-xl border border-border">
+                                <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Работники (Фикс)</div>
+                                <div className="text-xl font-bold text-main">
+                                    {salarySummary.fixedTotal.toLocaleString()} <span className="text-sm font-medium">zł</span>
                                 </div>
                             </div>
-                        )}
 
-                        {canSeeClientRates && (
+                            <div className="bg-subtle/50 p-4 rounded-xl border border-border">
+                                <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Работники (Час)</div>
+                                <div className="text-xl font-bold text-main">
+                                    {Math.round(salarySummary.hourlyTotal).toLocaleString()} <span className="text-sm font-medium">zł</span>
+                                </div>
+                            </div>
+
                             <div className="bg-blue-500/5 p-4 rounded-xl border border-blue-500/20 ring-1 ring-blue-500/10">
-                                <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Прибыль (доход - расход)</div>
-                                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                                    {Math.round(salarySummary.clientRatesTotal - salarySummary.total).toLocaleString()} <span className="text-base font-medium">zł</span>
+                                <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Опекуны (Мес)</div>
+                                <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                                    {Math.round(salarySummary.guardiansTotal).toLocaleString()} <span className="text-sm font-medium">zł</span>
                                 </div>
                             </div>
-                        )}
-                    </div>
-                </div>
 
-                {salarySummary.hourlyTotal > 0 && (
-                    <div className="mt-4 flex items-center gap-2 text-[11px] text-zinc-400 italic">
-                        <Clock size={12} />
-                        <span>Расчет для почасовой оплаты является примерным (базируется на графике работы и среднем показателе 4.33 недели в месяце)</span>
+                            <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 ring-1 ring-primary/10">
+                                <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Всего расходы</div>
+                                <div className="text-2xl font-bold text-primary">
+                                    {Math.round(salarySummary.totalExpenses).toLocaleString()} <span className="text-base font-medium">zł</span>
+                                </div>
+                            </div>
+
+                            {canSeeClientRates && (
+                                <div className="bg-green-500/5 p-4 rounded-xl border border-green-500/20 ring-1 ring-green-500/10">
+                                    <div className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Выручка (клиент)</div>
+                                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                        {Math.round(salarySummary.clientRatesTotal).toLocaleString()} <span className="text-base font-medium">zł</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {canSeeClientRates && (
+                                <div className="bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/20 ring-1 ring-emerald-500/10">
+                                    <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Прибыль</div>
+                                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                        {Math.round(salarySummary.profit).toLocaleString()} <span className="text-base font-medium">zł</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                )}
-            </div>
+
+                    {salarySummary.hourlyTotal > 0 && (
+                        <div className="mt-4 flex items-center gap-2 text-[11px] text-zinc-400 italic">
+                            <Clock size={12} />
+                            <span>Расчет для почасовой оплаты является примерным (базируется на графике работы и среднем показателе 4.33 недели в месяце)</span>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Modal */}
             {
@@ -836,73 +932,113 @@ export default function ObjectsPanel() {
                                     {(adminUser?.role === 'super_admin') && (
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                Владельцы (Опекуны)
+                                                Владельцы (Опекуны) и их ставки
                                             </label>
-                                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700">
+                                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-56 overflow-y-auto border border-gray-200 dark:border-gray-700 space-y-2">
                                                 {adminsList.map((admin) => (
-                                                    <label key={admin.id} className="flex items-center gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded cursor-pointer transition-colors">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={formData.owner_ids.includes(admin.id)}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) {
-                                                                    setFormData({
-                                                                        ...formData,
-                                                                        owner_ids: [...formData.owner_ids, admin.id]
-                                                                    });
-                                                                } else {
-                                                                    setFormData({
-                                                                        ...formData,
-                                                                        owner_ids: formData.owner_ids.filter(id => id !== admin.id)
-                                                                    });
-                                                                }
-                                                            }}
-                                                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                                                        />
-                                                        <span className="text-gray-700 dark:text-gray-300">{admin.name} ({admin.role})</span>
-                                                    </label>
+                                                    <div key={admin.id} className="flex flex-col gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+                                                        <label className="flex items-center gap-2 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={formData.owner_ids.includes(admin.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setFormData({
+                                                                            ...formData,
+                                                                            owner_ids: [...formData.owner_ids, admin.id]
+                                                                        });
+                                                                    } else {
+                                                                        const newRates = { ...formData.owner_rates };
+                                                                        delete newRates[admin.id];
+                                                                        setFormData({
+                                                                            ...formData,
+                                                                            owner_ids: formData.owner_ids.filter(id => id !== admin.id),
+                                                                            owner_rates: newRates
+                                                                        });
+                                                                    }
+                                                                }}
+                                                                className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                            />
+                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{admin.name} ({admin.role})</span>
+                                                        </label>
+                                                        {formData.owner_ids.includes(admin.id) && (
+                                                            <div className="flex items-center gap-2 pl-6 animate-fadeIn">
+                                                                <span className="text-[10px] text-muted uppercase font-bold">Ставка:</span>
+                                                                <div className="relative flex-1 max-w-[120px]">
+                                                                    <input
+                                                                        type="number"
+                                                                        value={formData.owner_rates[admin.id] || 0}
+                                                                        onChange={(e) => setFormData({
+                                                                            ...formData,
+                                                                            owner_rates: {
+                                                                                ...formData.owner_rates,
+                                                                                [admin.id]: parseFloat(e.target.value)
+                                                                            }
+                                                                        })}
+                                                                        className="input h-7 text-xs pl-6"
+                                                                        placeholder="0"
+                                                                    />
+                                                                    <DollarSign className="absolute left-1.5 top-1.5 w-3 h-3 text-gray-400" />
+                                                                </div>
+                                                                <span className="text-[10px] text-muted">zł/мес</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Тип оплаты</label>
-                                            <select
-                                                value={formData.salary_type}
-                                                onChange={(e) => setFormData({
-                                                    ...formData,
-                                                    salary_type: e.target.value as any
-                                                })}
-                                                className="input appearance-none"
-                                            >
-                                                <option value="hourly">Почасовая</option>
-                                                <option value="monthly_fixed">Фиксированная</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                {formData.salary_type === 'hourly' ? 'Ставка работника (в час)' : 'Зарплата работника (в месяц)'}
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    value={formData.salary_type === 'hourly' ? formData.hourly_rate : formData.monthly_rate}
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value);
-                                                        if (formData.salary_type === 'hourly') {
-                                                            setFormData({ ...formData, hourly_rate: val });
-                                                        } else {
-                                                            setFormData({ ...formData, monthly_rate: val });
-                                                        }
-                                                    }}
-                                                    className="input pl-8"
-                                                />
-                                                <DollarSign className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
+                                    {/* Worker Salary (Super Admin Only) */}
+                                    {adminUser?.role === 'super_admin' ? (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Тип оплаты</label>
+                                                <select
+                                                    value={formData.salary_type}
+                                                    onChange={(e) => setFormData({
+                                                        ...formData,
+                                                        salary_type: e.target.value as any
+                                                    })}
+                                                    className="input appearance-none"
+                                                >
+                                                    <option value="hourly">Почасовая</option>
+                                                    <option value="monthly_fixed">Фиксированная</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    {formData.salary_type === 'hourly' ? 'Ставка работника (в час)' : 'Зарплата работника (в месяц)'}
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        value={formData.salary_type === 'hourly' ? formData.hourly_rate : formData.monthly_rate}
+                                                        onChange={(e) => {
+                                                            const val = parseFloat(e.target.value);
+                                                            if (formData.salary_type === 'hourly') {
+                                                                setFormData({ ...formData, hourly_rate: val });
+                                                            } else {
+                                                                setFormData({ ...formData, monthly_rate: val });
+                                                            }
+                                                        }}
+                                                        className="input pl-8"
+                                                    />
+                                                    <DollarSign className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                                            <div className="text-[10px] text-muted uppercase font-bold mb-2">Оплата работнику</div>
+                                            <div className="text-sm font-medium text-main">
+                                                {formData.salary_type === 'hourly'
+                                                    ? `${formData.hourly_rate} zł/ч (Почасовая)`
+                                                    : `${formData.monthly_rate} zł/мес (Фикс)`}
+                                            </div>
+                                            <div className="text-[10px] text-muted mt-1">Редактирование доступно только супер-админу</div>
+                                        </div>
+                                    )}
 
                                     {canEditClientRates && (
                                         <div className="pt-2">
@@ -1258,6 +1394,7 @@ export default function ObjectsPanel() {
                         object={viewingObject}
                         onClose={() => setViewingObject(null)}
                         creators={creators}
+                        adminUser={adminUser}
                     />
                 )
             }
@@ -1265,23 +1402,30 @@ export default function ObjectsPanel() {
     );
 }
 
-function ObjectDetailsModal({ object, onClose, creators }: { object: CleaningObject, onClose: () => void, creators: Record<string, string> }) {
+function ObjectDetailsModal({ object, onClose, creators, adminUser }: { object: CleaningObject, onClose: () => void, creators: Record<string, string>, adminUser: any }) {
     const [workers, setWorkers] = useState<any[]>([]);
+    const [rates, setRates] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchWorkers = async () => {
-            const { data } = await supabase
-                .from('worker_objects')
-                .select('worker:workers(*)')
-                .eq('object_id', object.id);
+        const fetchData = async () => {
+            setLoading(true);
+            const [workersRes, ratesRes] = await Promise.all([
+                supabase.from('worker_objects').select('worker:workers(*)').eq('object_id', object.id),
+                supabase.from('admin_object_rates').select('admin_id, monthly_rate').eq('object_id', object.id)
+            ]);
 
-            if (data) {
-                setWorkers(data.map((item: any) => item.worker).filter(Boolean));
+            if (workersRes.data) {
+                setWorkers(workersRes.data.map((item: any) => item.worker).filter(Boolean));
+            }
+            if (ratesRes.data) {
+                const ratesObj: Record<string, number> = {};
+                ratesRes.data.forEach(r => ratesObj[r.admin_id] = r.monthly_rate);
+                setRates(ratesObj);
             }
             setLoading(false);
         };
-        fetchWorkers();
+        fetchData();
     }, [object.id]);
 
     return (
@@ -1361,23 +1505,37 @@ function ObjectDetailsModal({ object, onClose, creators }: { object: CleaningObj
                                 <div className="space-y-2">
                                     {object.owner_ids && object.owner_ids.length > 0 ? (
                                         object.owner_ids.map(ownerId => (
-                                            <div key={ownerId} className="flex items-center gap-2 text-main p-2 bg-subtle rounded-lg border border-border">
-                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                                    {creators[ownerId]?.charAt(0).toUpperCase() || '?'}
+                                            <div key={ownerId} className="flex flex-col gap-1 p-2 bg-subtle rounded-lg border border-border">
+                                                <div className="flex items-center gap-2 text-main">
+                                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                        {creators[ownerId]?.charAt(0).toUpperCase() || '?'}
+                                                    </div>
+                                                    <span className="font-medium text-sm">
+                                                        {creators[ownerId] || 'Неизвестный'}
+                                                    </span>
                                                 </div>
-                                                <span className="font-medium text-sm">
-                                                    {creators[ownerId] || 'Неизвестный'}
-                                                </span>
+                                                {(adminUser?.role === 'super_admin' || adminUser?.id === ownerId) && rates[ownerId] !== undefined && (
+                                                    <div className="ml-10 text-xs font-bold text-primary">
+                                                        Ставка: {rates[ownerId]} zł/мес
+                                                    </div>
+                                                )}
                                             </div>
                                         ))
                                     ) : object.created_by && creators[object.created_by] ? (
-                                        <div className="flex items-center gap-2 text-main p-2 bg-subtle rounded-lg border border-border">
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                                {creators[object.created_by].charAt(0).toUpperCase()}
+                                        <div className="flex flex-col gap-1 p-2 bg-subtle rounded-lg border border-border">
+                                            <div className="flex items-center gap-2 text-main">
+                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                    {creators[object.created_by].charAt(0).toUpperCase()}
+                                                </div>
+                                                <span className="font-medium text-sm">
+                                                    {creators[object.created_by]}
+                                                </span>
                                             </div>
-                                            <span className="font-medium text-sm">
-                                                {creators[object.created_by]}
-                                            </span>
+                                            {(adminUser?.role === 'super_admin' || adminUser?.id === object.created_by) && (
+                                                <div className="ml-10 text-xs italic text-muted">
+                                                    {rates[object.created_by!] !== undefined ? `Ставка: ${rates[object.created_by!]} zł/мес` : 'Ставка не установлена'}
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-2 text-main p-2 bg-subtle rounded-lg border border-border italic text-muted text-sm">

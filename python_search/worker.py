@@ -2,7 +2,8 @@ import os
 import time
 import asyncio
 import logging
-from datetime import datetime, timezone
+import aiohttp
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from core.search import SearchManager
@@ -103,7 +104,7 @@ async def process_job(job):
             if not organic_urls and not maps_urls:
                 logger.info("No more results from Serper.")
                 break
-
+            
             msg = f"Batch {page}: Found {len(organic_urls)} Organic, {len(maps_urls)} Maps."
             logger.info(msg + " Crawling...")
             try:
@@ -133,30 +134,29 @@ async def process_job(job):
             unique_emails = valid_emails
             if valid_emails:
                 try:
-                    # Check if emails exist in any job belonging to this admin
-                    # Using Supabase foreign key join filter: email_search_jobs!inner indicates inner join
+                    # Check if emails exist in any OTHER job belonging to this admin
                     response = supabase.table("email_search_results")\
                         .select("""
                             email,
                             email_search_jobs!inner(admin_id)
                         """)\
                         .eq("email_search_jobs.admin_id", admin_id)\
+                        .neq("job_id", job_id)\
                         .in_("email", valid_emails)\
                         .execute()
                     
-                    # response.data contains [{'email': '...', 'email_search_jobs': {'admin_id': ...}}, ...]
                     existing_set = {row['email'] for row in response.data}
                     
                     if existing_set:
-                        logger.info(f"Skipping {len(existing_set)} duplicates found in DB.")
+                        logger.info(f"Skipping {len(existing_set)} duplicates found in other jobs.")
                         unique_emails = [e for e in valid_emails if e not in existing_set]
                         
                 except Exception as e:
                     logger.error(f"Deduplication check failed: {e}")
-                    # Fallback: proceed
                     unique_emails = valid_emails
             
             all_emails = unique_emails
+            best_emails = []
             
             if all_emails:
                 logger.info(f"Enriching {len(all_emails)} emails with AI...")
@@ -170,42 +170,32 @@ async def process_job(job):
                         email, "", query, job_id=job_id, 
                         is_business_email=True
                     )
-                
-                # Remove irrelevant emails from database (Anti-Spam)
-                # Note: We already filtered 'all_emails' for validity/uniqueness.
-                # But AI might still reject some based on context (e.g. news aggregator).
-                # We should delete those that AI rejected from 'best_emails' BUT were in 'all_emails'.
-                # Actually, wait. 'db_manager.save_email' upserts.
-                # If we filtered them out at start (Validator/Deduplication), they were never saved?
-                # CRAWLER SAVES EMAILS IMMEDIATELY! 
-                # See crawler.py: db_manager.save_email is called inside crawl_urls.
-                
-                # This means INVALID and DUPLICATE emails are already in DB by the time we get here.
-                # We need to DELETE them if they failed validation/deduplication.
-                
-                emails_to_remove = list(set(organic_data['emails'] + maps_data['emails']) - set(all_emails))
-                
-                # Add AI-rejected to removal list
-                ai_rejected = list(set(all_emails) - set(best_emails))
+            
+            # Remove invalid/duplicate/irrelevant emails from database
+            # 1. Emails that failed validation or deduplication
+            found_total = list(set(organic_data['emails'] + maps_data['emails']))
+            emails_to_remove = [e for e in found_total if e not in all_emails]
+            
+            # 2. Emails that AI rejected (if AI enrichment ran)
+            if best_emails is None:
+                logger.warning("AI enrichment failed (returned None). Skipping AI filtering (keeping all emails).")
+            elif all_emails:
+                ai_rejected = [e for e in all_emails if e not in best_emails]
                 emails_to_remove.extend(ai_rejected)
-                
-                if emails_to_remove:
-                    logger.info(f"Removing {len(emails_to_remove)} invalid/duplicate/irrelevant emails...")
-                    try:
-                        supabase.table("email_search_results")\
-                            .delete()\
-                            .eq("job_id", job_id)\
-                            .in_("email", emails_to_remove)\
-                            .execute()
-                    except Exception as e:
-                        logger.error(f"Failed to delete rejected emails: {e}")
+            
+            if emails_to_remove:
+                logger.info(f"Removing {len(emails_to_remove)} invalid/duplicate/irrelevant emails...")
+                try:
+                    # Supabase 'in' operator has limits, but for 50-100 emails it's fine.
+                    supabase.table("email_search_results")\
+                        .delete()\
+                        .eq("job_id", job_id)\
+                        .in_("email", emails_to_remove)\
+                        .execute()
+                except Exception as e:
+                    logger.error(f"Failed to delete rejected emails: {e}")
 
             # Social Link Enrichment
-            # We aggregate social links from both sources
-            # Only use social links from approved emails or domains?
-            # For now, let's just process links, but maybe we should filter links too.
-            # But the primary issue was emails.
-            
             combined_social = {}
             for plat in ['facebook', 'instagram', 'twitter', 'linkedin']:
                 combined_social[plat] = list(set(organic_data['social'][plat] + maps_data['social'][plat]))
@@ -265,8 +255,14 @@ async def process_job(job):
             "stopped_at": datetime.utcnow().isoformat()
         }).eq("id", job_id).execute()
 
+from scheduler import scheduler_loop
+
 async def worker_loop():
     logger.info("Email Search Worker started. Polling for jobs...")
+    
+    # Start Scheduler in background
+    asyncio.create_task(scheduler_loop())
+    
     while True:
         try:
             # Fetch pending jobs

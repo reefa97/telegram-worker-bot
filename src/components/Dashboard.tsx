@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import {
     LogOut, Users, Briefcase, FileText, Settings, UserCog, UserPlus2,
-    Calendar, X, Trash2, ScrollText, Search, ChevronLeft, ChevronRight, Sun, Moon, Mail, Menu
+    Calendar, X, Trash2, ScrollText, Search, ChevronLeft, ChevronRight, Sun, Moon, Mail, Menu, User
 } from 'lucide-react';
 import WorkersPanel from './WorkersPanel';
 import ObjectsPanel from './ObjectsPanel';
@@ -18,9 +18,12 @@ import EmailSearchPanel from './EmailSearchPanel';
 import RolesPanel from './RolesPanel';
 import { EmailLayout } from './email/EmailLayout';
 import ProcurementPanel from './ProcurementPanel';
-import { Shield, ShoppingBag } from 'lucide-react';
+import MyFinancesPanel from './MyFinancesPanel';
+import MyCabinetPanel from './MyCabinetPanel';
+import ClientsPanel from './ClientsPanel';
+import { Shield, ShoppingBag, CheckSquare } from 'lucide-react';
 
-type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks' | 'logs' | 'trash' | 'email_search' | 'roles' | 'procurement' | 'emails';
+type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks' | 'logs' | 'trash' | 'email_search' | 'roles' | 'procurement' | 'emails' | 'my_finances' | 'my_cabinet' | 'clients';
 
 export default function Dashboard() {
     const { signOut, adminUser } = useAuth();
@@ -53,12 +56,15 @@ export default function Dashboard() {
     const tabs: { id: Tab; label: string; icon: any; superAdminOnly?: boolean; requiredPermission?: string }[] = [
         { id: 'workers', label: 'Работники', icon: Users, requiredPermission: 'workers_view' },
         { id: 'objects', label: 'Объекты', icon: Briefcase, requiredPermission: 'objects_view' },
+        { id: 'my_finances', label: 'Мои финансы', icon: User, requiredPermission: 'workers_view' },
+        { id: 'my_cabinet', label: 'Мой кабинет', icon: CheckSquare, requiredPermission: 'workers_view' },
         { id: 'shifts', label: 'Смены', icon: Calendar, requiredPermission: 'shifts_view' },
         { id: 'procurement', label: 'Закупки', icon: ShoppingBag, requiredPermission: 'objects_view' }, // Assuming objects_view implies access to object supplies
         { id: 'reports', label: 'Отчеты', icon: FileText, requiredPermission: 'reports_view' },
         { id: 'logs', label: 'Логи', icon: ScrollText, superAdminOnly: true },
         { id: 'superadmins', label: 'Super Admins', icon: UserCog, superAdminOnly: true },
         { id: 'subadmins', label: 'Sub Admins', icon: UserPlus2, superAdminOnly: true },
+        { id: 'clients', label: 'Клиенты', icon: Users, superAdminOnly: true },
         { id: 'email_search', label: 'Поиск Email', icon: Search, requiredPermission: 'email_search_view' },
         { id: 'roles', label: 'Роли', icon: Shield, requiredPermission: 'roles_view' },
         { id: 'trash', label: 'Корзина', icon: Trash2, superAdminOnly: true },
@@ -237,6 +243,8 @@ export default function Dashboard() {
                 <div className="flex-1 overflow-y-auto p-4 lg:p-8">
                     {activeTab === 'workers' && <WorkersPanel />}
                     {activeTab === 'objects' && <ObjectsPanel />}
+                    {activeTab === 'my_finances' && <MyFinancesPanel />}
+                    {activeTab === 'my_cabinet' && <MyCabinetPanel />}
                     {activeTab === 'shifts' && <ShiftPlanningPanel />}
                     {activeTab === 'reports' && <ReportsPanel />}
                     {activeTab === 'procurement' && <ProcurementPanel />}
@@ -248,6 +256,7 @@ export default function Dashboard() {
                     {activeTab === 'emails' && <EmailLayout />}
                     {activeTab === 'roles' && <RolesPanel />}
                     {activeTab === 'trash' && <TrashPanel />}
+                    {activeTab === 'clients' && <ClientsPanel />}
                 </div>
             </main>
         </div>

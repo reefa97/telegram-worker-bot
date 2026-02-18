@@ -22,6 +22,7 @@ interface WorkerDetailsModalProps {
 
 export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsModalProps) {
     const [assignedObjects, setAssignedObjects] = useState<any[]>([]);
+    const [creatorName, setCreatorName] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -45,6 +46,20 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
             if (error) {
                 console.error('Error fetching worker objects:', error);
             }
+
+            // Fetch creator name if created_by is present
+            if (worker.created_by) {
+                const { data: adminData } = await supabase
+                    .from('admin_users')
+                    .select('name')
+                    .eq('id', worker.created_by)
+                    .maybeSingle();
+
+                if (adminData) {
+                    setCreatorName(adminData.name);
+                }
+            }
+
             setLoading(false);
         };
 
@@ -107,6 +122,14 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
                                 <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
                                     <Calendar className="w-4 h-4 text-zinc-400" />
                                     {formatDate(worker.created_at)}
+                                </div>
+                            </div>
+
+                            <div className="p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1 block">Опекун</label>
+                                <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
+                                    <Shield className="w-4 h-4 text-zinc-400" />
+                                    {loading ? 'Загрузка...' : creatorName || 'Без опекуна'}
                                 </div>
                             </div>
 

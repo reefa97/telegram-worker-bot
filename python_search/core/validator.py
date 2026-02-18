@@ -38,21 +38,23 @@ class EmailValidator:
         # User Example: hbvf47e8guergwegfhsugyf@bvdejyrb.pl
         
         # 1. Very long local part without standard separators
-        if len(local) > 20 and not any(char in local for char in ".-_"):
+        # Increased to 45 because legal/medical emails can be very long
+        if len(local) > 45 and not any(char in local for char in ".-_"):
             return True
             
         # 2. High density of numbers in local part
         digits = sum(c.isdigit() for c in local)
-        if len(local) > 10 and digits / len(local) > 0.4:
+        if len(local) > 12 and digits / len(local) > 0.5:
             return True
 
         # 3. Large cluster of consonants (gibberish indicator)
-        consonant_cluster = re.findall(r'[bcdfghjklmnpqrstvwxyz]{6,}', local.lower())
+        # Increased to 8 to avoid blocking long Polish words
+        consonant_cluster = re.findall(r'[bcdfghjklmnpqrstvwxyz]{8,}', local.lower())
         if consonant_cluster:
             return True
             
-        # 4. Too many random-looking characters (entropy)
-        if len(local) > 25:
+        # 4. Total length check - extreme cases only
+        if len(local) > 64:
             return True
             
         return False

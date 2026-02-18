@@ -326,7 +326,7 @@ html:not(.dark) body {
 
   /* --- Modal System (Clean) --- */
   .modal-overlay {
-    @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    @apply fixed inset-0 z-[999] flex items-center justify-center p-4;
     background-color: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(2px);
   }

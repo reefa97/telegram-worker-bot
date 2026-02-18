@@ -4,6 +4,9 @@ import './index.css';
 import { isSupabaseConfigured } from './lib/supabase';
 import { ThemeProvider } from './contexts/ThemeContext';
 
+console.log('Main.tsx is running!');
+// alert('Main.tsx is running!'); 
+
 // Use Lazy loading to prevent App crash from breaking the error screen
 const App = React.lazy(() => import('./App'));
 

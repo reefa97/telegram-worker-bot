@@ -5,7 +5,7 @@ import { User, Session } from '@supabase/supabase-js';
 interface AdminUser {
     id: string;
     email: string;
-    role: 'super_admin' | 'sub_admin';
+    role: 'super_admin' | 'sub_admin' | 'client';
     created_by: string | null;
     permissions?: Record<string, boolean>;
 }
@@ -29,14 +29,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     const fetchAdminUser = async (userId: string) => {
-        const { data } = await supabase
-            .from('admin_users')
-            .select('*')
-            .eq('id', userId)
-            .maybeSingle();
+        try {
+            const { data, error } = await supabase
+                .from('admin_users')
+                .select('*')
+                .eq('id', userId)
+                .maybeSingle();
 
-        if (data) {
-            setAdminUser(data);
+            if (error) {
+                console.error('Error fetching admin user:', error);
+                return;
+            }
+
+            if (data) {
+                console.log('Admin user found:', data.role);
+                setAdminUser(data);
+            } else {
+                console.warn('No admin_users record found for:', userId);
+            }
+        } catch (err) {
+            console.error('Exception in fetchAdminUser:', err);
         }
     };
 
@@ -62,27 +74,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                fetchAdminUser(session.user.id);
-            }
+        // Debug Mode: Simulate Client
+        if (localStorage.getItem('debug_client') === 'true') {
+            setUser({ id: 'debug-client', email: 'client@debug.com', app_metadata: {}, user_metadata: {}, aud: 'authenticated', created_at: '' });
+            setSession({ access_token: 'debug-client', refresh_token: 'debug-client', expires_in: 3600, token_type: 'bearer', user: { id: 'debug-client', email: 'client@debug.com', app_metadata: {}, user_metadata: {}, aud: 'authenticated', created_at: '' } });
+            setAdminUser({
+                id: 'debug-client',
+                email: 'client@debug.com',
+                role: 'client',
+                created_by: null,
+                permissions: {}
+            });
             setLoading(false);
-        });
+            return;
+        }
+
+        // Get initial session
+        const initAuth = async () => {
+            try {
+                console.log('AuthContext: Getting session...');
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) throw error;
+
+                console.log('AuthContext: Session retrieved', session?.user?.email);
+                setSession(session);
+                setUser(session?.user ?? null);
+
+                if (session?.user) {
+                    console.log('AuthContext: Fetching admin user...');
+                    await fetchAdminUser(session.user.id);
+                }
+            } catch (err) {
+                console.error('AuthContext: Error initializing auth', err);
+            } finally {
+                console.log('AuthContext: Setting loading false');
+                setLoading(false);
+            }
+        };
+
+        initAuth();
 
         // Listen for auth changes
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
+        } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            console.log('AuthContext: Auth change', _event, session?.user?.email);
             setSession(session);
             setUser(session?.user ?? null);
+
             if (session?.user) {
-                fetchAdminUser(session.user.id);
+                // If we already have the correct adminUser, skip fetch to avoid loops if needed, 
+                // but usually fine to refetch.
+                await fetchAdminUser(session.user.id);
             } else {
                 setAdminUser(null);
             }
+            // Ensure loading is false if auth change happens (e.g. sign out)
+            setLoading(false);
         });
 
         return () => subscription.unsubscribe();

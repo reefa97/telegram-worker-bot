@@ -230,10 +230,6 @@ async function getNotificationRecipients(objectId?: string, workerId?: string) {
       console.log(`[getNotificationRecipients] Found object owners, returning specific list:`, finalRecipients);
       return finalRecipients;
     }
-
-    if (error) {
-      console.error(`[getNotificationRecipients] ERROR fetching object owners:`, error);
-    }
   }
 
   // 2. Fallback: Worker's Creator (Personal Guardian)
@@ -569,6 +565,9 @@ serve(async (req) => {
     }
 
     const update: TelegramUpdate = body;
+
+    // --- DEBUG LOGGING ---
+    await logToSystem('info', 'update_received', `Received update type: ${update.message ? 'message' : update.callback_query ? 'callback' : 'other'} from ${update.message?.from?.id || update.callback_query?.from?.id}`, { update_id: update.update_id }).catch(() => { });
 
     // --- IDEMPOTENCY CHECK ---
     try {
@@ -943,14 +942,13 @@ serve(async (req) => {
 
       // Helper to get Admin Keyboard
       const getAdminKeyboard = (role: string) => {
-        if (role === 'sub_admin') {
-          // Sub-admin specific menu
+        if (role === 'sub_admin' || role === 'super_admin' || role === 'admin') {
+          // Admin/Super-admin menu
           return [
             [{ text: "📊 Статус объектов" }],
-            [{ text: "🔧 Функции" }] // Placeholder for future functions
+            [{ text: "🔧 Функции" }]
           ];
         } else {
-          // Regular admin menu (if any, currently just text notifications)
           return [];
         }
       };
@@ -1078,128 +1076,13 @@ serve(async (req) => {
       }
       // -------------------------
 
-      // 1. Check if user is an Admin (Prioritize Admin over Worker)
-      const { data: admin } = await supabase
-        .from("admin_users")
-        .select("*")
-        .eq("telegram_chat_id", chatId.toString())
-        .maybeSingle();
-
-      if (admin) {
-        // --- ADMIN LOGIC ---
-        if (text?.startsWith("/start")) {
-          await sendTelegramMessage(
-            botToken,
-            chatId,
-            `👋 Здравствуйте, ${admin.name || "Администратор"}! Вы перешли в панель управления.`,
-            {
-              keyboard: getAdminKeyboard(admin.role),
-              resize_keyboard: true
-            }
-          );
-        } else if (text === "📊 Статус объектов") {
-          if (admin.role === 'sub_admin') {
-            await sendTelegramMessage(botToken, chatId, "ℹ️ Функция просмотра статуса объектов находится в разработке.");
-          } else {
-            await sendTelegramMessage(botToken, chatId, "ℹ️ Эта функция доступна только для суб-администраторов.");
-          }
-        } else if (text === "🔧 Функции") {
-          if (admin.role === 'sub_admin') {
-            await sendTelegramMessage(botToken, chatId, "ℹ️ Здесь будут дополнительные функции для суб-админов.");
-          }
-        } else {
-          // Handle any other text or default to showing menu
-          await sendTelegramMessage(
-            botToken,
-            chatId,
-            `🤖 Вы в панели администратора (${admin.role === 'sub_admin' ? 'Суб-Админ' : 'Админ'}).`,
-            {
-              keyboard: getAdminKeyboard(admin.role),
-              resize_keyboard: true
-            }
-          );
-        }
-
-        // Stop processing for admins (they don't need worker checks)
-        return new Response(JSON.stringify({ ok: true }), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
-
-      // --- WORKER LOGIC (Only if not Admin) ---
-
-      // Handle /start command for activation (logic remains similar but we only check worker/admin activation if NOT already found)
-      if (text?.startsWith("/start")) {
-        const parts = text.split(" ");
-        if (parts.length > 1) {
-          const token = parts[1];
-          // Try to activate as Worker
-          const { data: worker, error } = await supabase
-            .from("workers")
-            .select("*")
-            .eq("invitation_token", token)
-            .maybeSingle();
-
-          if (worker) {
-            await supabase.from("workers").update({
-              telegram_user_id: userId.toString(),
-              telegram_chat_id: chatId,
-              telegram_username: from.username || "",
-              is_active: true,
-            }).eq("id", worker.id);
-
-            const keyboard = await getWorkerKeyboard(worker.id);
-            await sendTelegramMessage(botToken, chatId, `✅ Вы успешно активировали аккаунт работника!`, { keyboard, resize_keyboard: true });
-            return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
-          }
-
-          // Try to activate as Admin
-          const { data: newAdmin } = await supabase.from("admin_users").select("*").eq("invitation_token", token).maybeSingle();
-          if (newAdmin) {
-            await supabase.from("admin_users").update({
-              telegram_chat_id: chatId.toString(),
-              telegram_username: from.username || "",
-              is_active: true
-            }).eq("id", newAdmin.id);
-
-            await sendTelegramMessage(botToken, chatId, `✅ Вы успешно активировали аккаунт администратора!`, {
-              keyboard: getAdminKeyboard(newAdmin.role),
-              resize_keyboard: true
-            });
-            return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
-          }
-
-          await sendTelegramMessage(botToken, chatId, "❌ Неверный код активации.");
-          return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
-        }
-      }
-
-
-
-      // TO AVOID DELETING ALL WORKER LOGIC unintentionally:
-      // I will use a different strategy. I will INSERT the Admin Check at the very top of `if (update.message)` block.
-      // And if it is an admin, I return Response.
-      // If not, I let it proceed to existing logic.
-      // WAIT, existing logic handles /start and everything. 
-      // The ReplaceFileContent tool requires me to replace a block. 
-      // The block I selected (Lines 764-1048) covers /start, status check, and "Start Work".
-
-      // Let's rewrite the logic to be cleaner:
-
-      // 1. /start with token (Activation) - Needs to handle both.
-      // 2. Verified Admin - Show Admin Menu, Return.
-      // 3. Verified Worker - Show Worker Menu, Handle Worker Commands.
-      // 4. Unknown - Show Welcome.
-
-      // Re-implementing the logic for the selected block:
-
-      // Handle /start command (Activation)
+      // 1. Activation Check (/start <token>)
       if (text?.startsWith("/start") && text.split(" ").length > 1) {
         const token = text.split(" ")[1];
+        console.log(`[activation] Checking token: ${token}`);
 
-        // Check Worker Token
-        const { data: worker } = await supabase.from("workers").select("*").eq("invitation_token", token).maybeSingle();
+        // Try Worker Token
+        const { data: worker } = await supabase.from("workers").select("id").eq("invitation_token", token).maybeSingle();
         if (worker) {
           await supabase.from("workers").update({
             telegram_user_id: userId.toString(),
@@ -1208,144 +1091,113 @@ serve(async (req) => {
             is_active: true,
           }).eq("id", worker.id);
           const keyboard = await getWorkerKeyboard(worker.id);
-          await sendTelegramMessage(botToken, chatId, `✅ Работник активирован!`, { keyboard, resize_keyboard: true });
+          await sendTelegramMessage(botToken, chatId, `✅ Вы успешно активировали аккаунт работника!`, { keyboard, resize_keyboard: true });
           return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
         }
 
-        // Check Admin Token
-        const { data: tokenAdmin } = await supabase.from("admin_users").select("*").eq("invitation_token", token).maybeSingle();
+        // Try Admin Token
+        const { data: tokenAdmin } = await supabase.from("admin_users").select("id, role").eq("invitation_token", token).maybeSingle();
         if (tokenAdmin) {
           await supabase.from("admin_users").update({
             telegram_chat_id: chatId.toString(),
             telegram_username: from.username || "",
             is_active: true
           }).eq("id", tokenAdmin.id);
-
-          const kb = (tokenAdmin.role === 'sub_admin') ? [[{ text: "📊 Статус объектов" }], [{ text: "🔧 Функции" }]] : [];
-          await sendTelegramMessage(botToken, chatId, `✅ Администратор активирован!`, { keyboard: kb, resize_keyboard: true });
+          await sendTelegramMessage(botToken, chatId, `✅ Вы успешно активировали аккаунт администратора!`, {
+            keyboard: getAdminKeyboard(tokenAdmin.role),
+            resize_keyboard: true
+          });
           return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
         }
 
-        await sendTelegramMessage(botToken, chatId, "❌ Неверный токен.");
+        await sendTelegramMessage(botToken, chatId, "❌ Неверный или истекший код активации.");
         return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
       }
 
-      // Check if user is an Admin (Existing)
-      const { data: existingAdmin } = await supabase
+      // 2. Identification (Is Admin or Worker?)
+      const { data: admin } = await supabase
         .from("admin_users")
         .select("*")
         .eq("telegram_chat_id", chatId.toString())
         .maybeSingle();
 
-      if (existingAdmin) {
-        const isSubAdmin = existingAdmin.role === 'sub_admin';
-        const adminKeyboard = isSubAdmin ?
-          [[{ text: "📊 Статус объектов" }], [{ text: "🔧 Функции" }]] :
-          []; // Super admins might just use web UI, or add buttons later if needed
-
-        if (text === "📊 Статус объектов" && isSubAdmin) {
+      if (admin) {
+        if (text === "/start") {
+          await sendTelegramMessage(botToken, chatId, `👋 Здравствуйте, ${admin.name || "Администратор"}!`, {
+            keyboard: getAdminKeyboard(admin.role),
+            resize_keyboard: true
+          });
+        } else if (text === "📊 Статус объектов") {
           await sendTelegramMessage(botToken, chatId, "ℹ️ Функция просмотра статуса объектов находится в разработке.");
-        } else if (text === "🔧 Функции" && isSubAdmin) {
+        } else if (text === "🔧 Функции") {
           await sendTelegramMessage(botToken, chatId, "ℹ️ Панель дополнительных функций.");
         } else {
-          // Default response for Admins
-          await sendTelegramMessage(botToken, chatId, `👋 Добро пожаловать, ${existingAdmin.name || "Админ"}!`, { keyboard: adminKeyboard, resize_keyboard: true });
+          await sendTelegramMessage(botToken, chatId, `🤖 Вы в панели администратора.`, {
+            keyboard: getAdminKeyboard(admin.role),
+            resize_keyboard: true
+          });
         }
         return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
       }
 
-      // If NOT Admin, Proceed to Worker Logic
+      // 3. Worker Interaction
       const { data: workers } = await supabase
         .from("workers")
         .select("*, worker_objects(object_id, cleaning_objects(id, name))")
         .eq("telegram_user_id", userId.toString());
 
       if (!workers || workers.length === 0) {
-        // Check Legacy Bot Admins before giving up? (Optional, but let's keep it simple)
         await sendTelegramMessage(botToken, chatId, "❌ Вы не зарегистрированы. Введите код приглашения через /start <код>.");
         return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
       }
 
-      // --- WORKER COMMANDS ---
+      const activeWorker = workers[0]; // Use first profile for generic commands
 
-      if (text === "▶️ Начать работу") {
-        // Reuse existing 'workers' data
-        if (!workers || workers.length === 0) {
-          // Should be unreachable due to check above, but safe to keep
-          return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
-        }
-
+      // Worker Command Handlers
+      if (text === "/start") {
+        const keyboard = await getWorkerKeyboard(activeWorker.id);
+        await sendTelegramMessage(botToken, chatId, `👋 С возвращением, ${activeWorker.first_name}!`, {
+          keyboard,
+          resize_keyboard: true
+        });
+      } else if (text === "▶️ Начать работу") {
         const workerIds = workers.map(w => w.id);
         const { data: activeSession } = await supabase
           .from("work_sessions")
-          .select("*")
+          .select("id, worker_id")
           .in("worker_id", workerIds)
           .is("end_time", null)
           .maybeSingle();
 
         if (activeSession) {
-          const sessionWorkerId = activeSession.worker_id;
-          const keyboard = await getWorkerKeyboard(sessionWorkerId);
-          await sendTelegramMessage(botToken, chatId, "⚠️ У вас уже есть активная рабочая смена. Сначала завершите её.", {
-            keyboard: keyboard,
-            resize_keyboard: true
+          const keyboard = await getWorkerKeyboard(activeSession.worker_id);
+          await sendTelegramMessage(botToken, chatId, "⚠️ У вас уже есть активная смена.", { keyboard, resize_keyboard: true });
+        } else {
+          let allObjects: any[] = [];
+          workers.forEach(w => {
+            if (w.worker_objects) {
+              w.worker_objects.forEach((wo: any) => {
+                if (wo.cleaning_objects) allObjects.push({ ...wo, worker_id: w.id });
+              });
+            }
           });
-          return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
-        }
 
-        let allObjects: any[] = [];
-        workers.forEach(w => {
-          if (w.worker_objects) {
-            w.worker_objects.forEach((wo: any) => {
-              if (wo.cleaning_objects) {
-                allObjects.push({ ...wo, worker_id: w.id });
-              }
+          if (allObjects.length === 0) {
+            await sendTelegramMessage(botToken, chatId, "❌ У вас нет назначенных объектов.");
+          } else if (allObjects.length === 1) {
+            const obj = allObjects[0];
+            await supabase.from("workers").update({ selected_object_id: obj.cleaning_objects.id }).eq("id", obj.worker_id);
+            await sendTelegramMessage(botToken, chatId, `📍 Объект: <b>${obj.cleaning_objects.name}</b>\n\nОтправьте геолокацию для начала.`, {
+              keyboard: [[{ text: "📍 Отправить местоположение", request_location: true }]],
+              resize_keyboard: true,
+              one_time_keyboard: true,
             });
+          } else {
+            const buttons = allObjects.map(obj => [{ text: obj.cleaning_objects.name, callback_data: `select_object_${obj.cleaning_objects.id}` }]);
+            await sendTelegramMessage(botToken, chatId, "📋 Выберите объект:", { inline_keyboard: buttons });
           }
-        });
-
-        if (allObjects.length === 0) {
-          await sendTelegramMessage(botToken, chatId, "❌ У вас нет назначенных объектов. Обратитесь к администратору.");
-        } else if (allObjects.length === 1) {
-          const targetObj = allObjects[0];
-          await supabase.from("workers").update({ selected_object_id: targetObj.cleaning_objects.id }).eq("id", targetObj.worker_id);
-          await sendTelegramMessage(botToken, chatId, `📍 Объект: <b>${targetObj.cleaning_objects.name}</b>\n\nОтправьте мне ваше местоположение, нажав на кнопку ниже.`, {
-            keyboard: [[{ text: "📍 Отправить местоположение", request_location: true }]],
-            resize_keyboard: true,
-            one_time_keyboard: true,
-          }
-          );
-        } else {
-          const buttons = allObjects.map((obj: any) => [{
-            text: obj.cleaning_objects.name,
-            callback_data: `select_object_${obj.cleaning_objects.id}`,
-          }]);
-          await sendTelegramMessage(botToken, chatId, "📋 Выберите объект работы:", { inline_keyboard: buttons });
         }
-      }
-      else if (text === "🛑 Закончить работу") {
-        const workersList = workers;
-
-        const workerIds = workersList.map(w => w.id);
-        const { data: activeSession } = await supabase
-          .from("work_sessions")
-          .select("*")
-          .in("worker_id", workerIds)
-          .is("end_time", null)
-          .maybeSingle();
-
-        if (!activeSession) {
-          const keyboard = await getWorkerKeyboard(workersList[0].id);
-          await sendTelegramMessage(botToken, chatId, "⚠️ У вас нет активной рабочей смены.", { keyboard, resize_keyboard: true });
-        } else {
-          await sendTelegramMessage(botToken, chatId, "📍 Отправьте ваше местоположение для завершения работы.", {
-            keyboard: [[{ text: "📍 Отправить местоположение", request_location: true }]],
-            resize_keyboard: true,
-            one_time_keyboard: true,
-          });
-        }
-      }
-      else if (text) { // Default Worker Message (if not a command)
+      } else if (text === "🛑 Закончить работу") {
         const workerIds = workers.map(w => w.id);
         const { data: activeSession } = await supabase
           .from("work_sessions")
@@ -1354,17 +1206,22 @@ serve(async (req) => {
           .is("end_time", null)
           .maybeSingle();
 
-        const keyboard = await getWorkerKeyboard(workers[0].id);
-
-        await sendTelegramMessage(
-          botToken,
-          chatId,
-          `👋 С возвращением, ${workers[0].first_name}!`,
-          {
-            keyboard: keyboard,
+        if (!activeSession) {
+          const keyboard = await getWorkerKeyboard(activeWorker.id);
+          await sendTelegramMessage(botToken, chatId, "⚠️ Нет активной смены.", { keyboard, resize_keyboard: true });
+        } else {
+          await sendTelegramMessage(botToken, chatId, "📍 Отправьте геолокацию для завершения.", {
+            keyboard: [[{ text: "📍 Отправить местоположение", request_location: true }]],
             resize_keyboard: true,
-          }
-        );
+            one_time_keyboard: true,
+          });
+        }
+      } else if (text && !text.startsWith('/')) {
+        const keyboard = await getWorkerKeyboard(activeWorker.id);
+        await sendTelegramMessage(botToken, chatId, `👋 С возвращением, ${activeWorker.first_name}!`, {
+          keyboard,
+          resize_keyboard: true,
+        });
       }
       // Handle location
       else if (location) {

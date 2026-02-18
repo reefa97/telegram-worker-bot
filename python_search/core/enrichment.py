@@ -51,23 +51,24 @@ class BusinessAnalyzer:
             return []
 
         system_prompt = f"""
-        You are a strict data cleaning assistant. Your goal is to filter a list of emails to find ONLY those belonging to the target business or industry described by the query: "{business_name}".
+        You are a smart lead generation assistant. Your goal is to Identify valid contact emails for the business or industry described by the query: "{business_name}".
 
-        **Rules for Inclusion:**
-        - Include emails that clearly belong to the business (e.g., if query is 'dentist', include 'dr.smith@dentist-name.com').
-        - Prioritize HIGHLY plausible generic contact emails. In order of preference:
-            1. kontakt@, rejestracja@, recepcja@, biuro@ (especially for medical/hospital queries, prioritize 'rejestracja' and 'recepcja').
-            2. info@, office@, office.manager@.
-        - LIMIT GENERIC EMAILS: For many emails with the same domain (e.g., kontakt@enel.pl, biuro@enel.pl, office@enel.pl), keep ONLY the 1 or 2 most plausible ones from the list above.
+        **Guidelines for KEEPING emails:**
+        1. **MUST KEEP** generic contact emails commonly used in Poland/Europe:
+           - kontakt@, biuro@, rejestracja@, recepcja@, sekretariat@, info@, office@, hello@, welcome@, sprzedaz@.
+        2. **MUST KEEP** specific role-based emails relevant to the context (e.g., for "serviced offices", keep lynda@... or manager@...).
+        3. **MUST KEEP** emails that appear to be direct personal contacts (e.g., name.surname@domain.com) IF the domain matches the business.
 
-        **Rules for Exclusion (CRITICAL):**
-        - DISCARD any email containing the '%' character (this is usually a scraping error).
-        - DISCARD "suspicious" emails that look like random hashes (e.g., hbvf47e8guergwegfhsugyf@...).
-        - DISCARD emails from news portals, newspapers, or media aggregators (e.g., @polskapress.pl, @gazetakrakowska.pl, @naszemiasto.pl, redakcja@, news@).
-        - DISCARD unrelated generic emails (e.g., webmaster@, abuse@, privacy@, iod@).
-        - DISCARD marketing/spam emails.
+        **Guidelines for REMOVING emails:**
+        - Remove technical/automated emails: webmaster@, admin@ (unless it looks like a small biz), abuse@, privacy@, noreply@, newsletter@.
+        - Remove obvious scraping errors or hashes (e.g., 234234sfd@...).
+        - Remove media/press emails if the query is for a service provider (e.g., redakcja@, news@) UNLESS the query is looking for media.
 
-        Return ONLY the list of highly relevant, clean emails. If unsure, EXCLUDE it.
+        **Context Check:**
+        - If the query is "{business_name}", ensure the email domain or user seems relevant.
+        - If unsure, **KEEP THE EMAIL**. Do not be over-aggressive.
+        
+        Return the list of valid, relevant emails.
         """
 
         user_message = f"Found potential emails: {list(set(emails))}"
@@ -77,7 +78,7 @@ class BusinessAnalyzer:
             user_message=user_message,
             response_format=EmailsResponse
         )
-        return result.emails if result else []
+        return result.emails if result else None
 
 def json_dumps(d):
     import json
