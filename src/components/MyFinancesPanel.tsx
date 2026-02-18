@@ -3,10 +3,10 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Wallet, Receipt, Plus, Trash2, Clock,
-    Coins, Briefcase, TrendingUp, TrendingDown,
+    Coins, Briefcase, TrendingDown,
     Camera, CheckCircle2, FileText,
     Building2, X, ChevronLeft, ChevronRight, Calendar,
-    CreditCard, Minus
+    Minus
 } from 'lucide-react';
 
 interface ManagedObject {
@@ -213,10 +213,7 @@ export default function MyFinancesPanel() {
         // 1. Get Opening Balance (All transactions + All firm expenses BEFORE start of this month)
 
         // Sum of all PREVIOUS credit transactions
-        const { data: pastCredits } = await supabase.rpc('get_sum_credits', {
-            p_admin_id: adminId,
-            p_date_limit: startStr
-        }); // We can simulate this with client-side filter for now for simplicity or raw SQL RPC later.
+
 
         // Actually, simpler logic: Fetch ALL expenses and ALL credits up to End of Month. Filter locally.
         // Optimization: Fetch previous balance? For now, fetch ALL relevant history is safer but heavier.
