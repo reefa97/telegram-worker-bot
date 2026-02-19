@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Plus, Clock,
-    CheckCircle2, User, Trash2, X, Briefcase
+    CheckCircle2, User, Trash2, X, Briefcase, MessageSquare, Building2, Loader2
 } from 'lucide-react';
 import CrmPipeline from './crm/CrmPipeline';
 
@@ -45,11 +45,13 @@ export default function MyCabinetPanel() {
     const [showModal, setShowModal] = useState(false);
     const [leads, setLeads] = useState<{ id: string; title: string }[]>([]);
     const [selectedLeadId, setSelectedLeadId] = useState('');
+    const [clientRequests, setClientRequests] = useState<any[]>([]);
 
     useEffect(() => {
         if (adminUser) {
             loadTasks();
             loadLeads();
+            loadClientRequests();
             if (adminUser.role === 'super_admin') {
                 loadAdmins();
                 setAssignedTo(adminUser.id);
@@ -68,6 +70,32 @@ export default function MyCabinetPanel() {
     const loadAdmins = async () => {
         const { data } = await supabase.from('admin_users').select('id, name, email');
         if (data) setAdmins(data);
+    };
+
+    const loadClientRequests = async () => {
+        if (!adminUser) return;
+        try {
+            const { data } = await supabase
+                .from('client_requests')
+                .select('*, cleaning_objects(name), client:admin_users!client_id(email)')
+                .order('created_at', { ascending: false });
+            if (data) setClientRequests(data);
+        } catch (err) {
+            console.error('Error loading client requests:', err);
+        }
+    };
+
+    const updateRequestStatus = async (requestId: string, status: string, adminNote?: string) => {
+        try {
+            const updateData: any = { status };
+            if (status === 'done') updateData.resolved_at = new Date().toISOString();
+            if (status === 'done') updateData.resolved_by = adminUser?.id;
+            if (adminNote) updateData.admin_note = adminNote;
+            await supabase.from('client_requests').update(updateData).eq('id', requestId);
+            loadClientRequests();
+        } catch (err) {
+            console.error('Error updating request:', err);
+        }
     };
 
     const loadTasks = async () => {
@@ -186,6 +214,68 @@ export default function MyCabinetPanel() {
             <div className="space-y-4">
                 <CrmPipeline />
             </div>
+
+            <div className="border-t border-border mx-2"></div>
+
+            {/* Client Requests Section */}
+            {clientRequests.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <h3 className="text-xl font-bold text-main flex items-center gap-2">
+                            <MessageSquare className="w-5 h-5 text-primary" />
+                            Просьбы клиентов
+                        </h3>
+                        <span className="badge-warning text-xs">
+                            {clientRequests.filter((r: any) => r.status === 'new').length} новых
+                        </span>
+                    </div>
+
+                    <div className="space-y-2">
+                        {clientRequests.filter((r: any) => r.status !== 'done').map((req: any) => (
+                            <div key={req.id} className="card p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                            <span className="flex items-center gap-1 text-xs text-muted">
+                                                <Building2 size={11} />
+                                                {req.cleaning_objects?.name || 'Объект'}
+                                            </span>
+                                            <span className="text-xs text-muted">•</span>
+                                            <span className="text-xs text-muted">{req.client?.email}</span>
+                                            <span className="text-xs text-muted">•</span>
+                                            <span className="text-xs text-muted">
+                                                {new Date(req.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                            {req.status === 'new' && <span className="badge-warning text-[10px]">Новая</span>}
+                                            {req.status === 'in_progress' && <span className="badge-info text-[10px] flex items-center gap-1"><Loader2 size={10} className="animate-spin" />В работе</span>}
+                                        </div>
+                                        <p className="text-main font-medium text-sm">{req.message}</p>
+                                    </div>
+                                    <div className="flex gap-1 flex-shrink-0">
+                                        {req.status === 'new' && (
+                                            <button
+                                                onClick={() => updateRequestStatus(req.id, 'in_progress')}
+                                                className="btn-secondary text-xs px-2 py-1"
+                                                title="Взять в работу"
+                                            >
+                                                В работу
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => updateRequestStatus(req.id, 'done')}
+                                            className="btn-primary text-xs px-2 py-1"
+                                            title="Выполнено"
+                                        >
+                                            <CheckCircle2 size={12} />
+                                            Готово
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="border-t border-border mx-2"></div>
 
