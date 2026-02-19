@@ -43,6 +43,7 @@ const realSupabase = createClient(
 export const supabase = {
     auth: realSupabase.auth,
     storage: realSupabase.storage,
+    functions: realSupabase.functions,
     channel: realSupabase.channel.bind(realSupabase),
     removeChannel: realSupabase.removeChannel.bind(realSupabase),
     removeAllChannels: realSupabase.removeAllChannels.bind(realSupabase),
