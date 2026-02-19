@@ -141,7 +141,7 @@ export default function MyFinancesPanel() {
 
     const loadAdmins = async () => {
         const { data } = await supabase.from('admin_users').select('id, email, name').order('email');
-        if (data) setAdminsList(data.map(u => ({ id: u.id, email: u.email, name: u.name || u.email })));
+        if (data) setAdminsList(data.map((u: any) => ({ id: u.id, email: u.email, name: u.name || u.email })));
     };
 
     const loadAllData = async (adminId: string) => {
@@ -166,8 +166,8 @@ export default function MyFinancesPanel() {
         const { data: ratesData } = await supabase.from('admin_object_rates').select('object_id, monthly_rate').eq('admin_id', adminId);
 
         if (objectsData && ratesData) {
-            const assignedObjects = ratesData.map(rate => {
-                const obj = objectsData.find(o => o.id === rate.object_id);
+            const assignedObjects = ratesData.map((rate: any) => {
+                const obj = objectsData.find((o: any) => o.id === rate.object_id);
                 return obj ? { ...obj, monthly_rate: rate.monthly_rate } : null;
             }).filter(Boolean) as ManagedObject[];
             setObjects(assignedObjects);
@@ -239,17 +239,17 @@ export default function MyFinancesPanel() {
 
             // Calculate Opening Balance
             const pastCreditSum = allCredits
-                .filter(c => new Date(c.transaction_date) < startStrDate)
-                .reduce((sum, c) => sum + Number(c.amount), 0);
+                .filter((c: any) => new Date(c.transaction_date) < startStrDate)
+                .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
 
             const pastSpentSum = allFirmExpenses
-                .filter(e => new Date(e.expense_date) < startStrDate)
-                .reduce((sum, e) => sum + Number(e.amount), 0);
+                .filter((e: any) => new Date(e.expense_date) < startStrDate)
+                .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
 
             setOpeningBalance(pastCreditSum - pastSpentSum);
 
             // Current Month Transactions
-            const currentMonthCredits = allCredits.filter(c => {
+            const currentMonthCredits = allCredits.filter((c: any) => {
                 const d = new Date(c.transaction_date);
                 return d >= startStrDate && d <= new Date(endStr);
             });

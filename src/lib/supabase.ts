@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { from as restFrom, rpc as restRpc } from './restClient';
 
 console.log('Supabase lib initializing...');
 
@@ -17,53 +18,36 @@ if (!isSupabaseConfigured) {
 }
 
 /**
- * RESILIENT FETCH
- * This custom fetcher wraps native window.fetch but adds a timeout race.
- * If a request hangs (common with SES/lockdown.js), it attempts a retry
- * using a "cleaner" approach or simply fails faster to trigger app-level fallbacks.
+ * Real Supabase client — used ONLY for auth, storage, and realtime.
+ * Data queries (from/rpc) are routed through our REST client to bypass
+ * SES/lockdown.js browser extension issues.
  */
-const resilientFetch = async (url: string | URL | Request, options?: RequestInit): Promise<Response> => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s global timeout
-
-    try {
-        const response = await window.fetch(url, {
-            ...options,
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        return response;
-    } catch (err: any) {
-        clearTimeout(timeoutId);
-
-        // If it was a timeout or a specific SES-related error (like "intrinsic" removal)
-        // and it's a GET request to the REST API, we could try one more "bare" fetch.
-        const isGet = !options?.method || options.method === 'GET';
-        const isRest = typeof url === 'string' && url.includes('/rest/v1/');
-
-        if ((err.name === 'AbortError' || err.message?.includes('intrinsic')) && isGet && isRest) {
-            console.warn('Supabase fetch stalled/failed, retrying with bare fetch:', url);
-            // Bare fetch: Minimal options, no signal, just the essentials
-            return window.fetch(url, {
-                method: 'GET',
-                headers: options?.headers
-            });
-        }
-        throw err;
-    }
-};
-
-export const supabase = createClient(
+const realSupabase = createClient(
     isSupabaseConfigured ? supabaseUrl : 'https://placeholder.supabase.co',
     isSupabaseConfigured ? supabaseAnonKey : 'placeholder',
     {
-        global: {
-            fetch: resilientFetch
-        },
         auth: {
             persistSession: true,
             autoRefreshToken: true,
-            detectSessionInUrl: true
+            detectSessionInUrl: true,
         }
     }
 );
+
+/**
+ * Exported supabase client.
+ * - .auth, .storage, .channel, .removeChannel → real supabase client
+ * - .from() → REST-based query builder (bypasses supabase-js PostgREST)
+ * - .rpc() → REST-based RPC call
+ */
+export const supabase = {
+    auth: realSupabase.auth,
+    storage: realSupabase.storage,
+    channel: realSupabase.channel.bind(realSupabase),
+    removeChannel: realSupabase.removeChannel.bind(realSupabase),
+    removeAllChannels: realSupabase.removeAllChannels.bind(realSupabase),
+    from: restFrom,
+    rpc: restRpc,
+    // Keep realtime access available
+    realtime: realSupabase.realtime,
+} as any; // 'as any' because this is not a full SupabaseClient, but components only use these methods

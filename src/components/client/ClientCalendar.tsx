@@ -52,7 +52,7 @@ export default function ClientCalendar() {
                 return;
             }
 
-            const objectIds = objects.map(o => o.id);
+            const objectIds = objects.map((o: any) => o.id);
 
             // 2. Fetch shifts for these objects
             const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toISOString();
@@ -77,7 +77,7 @@ export default function ClientCalendar() {
                 start_time: s.start_time,
                 end_time: s.end_time,
                 status: s.status,
-                object_name: objects.find(o => o.id === s.object_id)?.name || 'Unknown',
+                object_name: objects.find((o: any) => o.id === s.object_id)?.name || 'Unknown',
                 worker_name: s.workers ? `${s.workers.first_name} ${s.workers.last_name}` : 'Не назначен'
             })) || [];
 

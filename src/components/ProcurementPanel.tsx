@@ -79,7 +79,7 @@ export default function ProcurementPanel() {
                     .eq('admin_id', adminUser?.id);
 
                 if (ownedObjects && ownedObjects.length > 0) {
-                    const objectIds = ownedObjects.map(o => o.object_id);
+                    const objectIds = ownedObjects.map((o: any) => o.object_id);
                     query = query.in('object_id', objectIds);
                 } else {
                     // If admin owns no objects, show nothing

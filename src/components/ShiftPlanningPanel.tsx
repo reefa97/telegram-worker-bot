@@ -50,8 +50,7 @@ export default function ShiftPlanningPanel() {
                 // 2. Fetch Assignments (Worker -> Object)
                 const { data: assignments, error: assignError } = await supabase
                     .from('worker_objects')
-                    .select('worker_id, object_id, workers(id, first_name, last_name)')
-                    .returns<WorkerObject[]>();
+                    .select('worker_id, object_id, workers(id, first_name, last_name)');
 
                 if (assignError) throw assignError;
 
@@ -61,7 +60,7 @@ export default function ShiftPlanningPanel() {
 
                 // A. Weekly Template Data
                 const template = DAYS.map((dayName, dayIndex) => {
-                    const dayObjects = processedObjects.filter(obj =>
+                    const dayObjects = processedObjects.filter((obj: any) =>
                         obj.schedule_days && obj.schedule_days.includes(dayIndex)
                     );
                     return {
@@ -82,7 +81,7 @@ export default function ShiftPlanningPanel() {
                     date.setDate(today.getDate() + i);
                     const dayIndex = date.getDay(); // 0 (Sun) - 6 (Sat)
 
-                    const dayObjects = processedObjects.filter(obj =>
+                    const dayObjects = processedObjects.filter((obj: any) =>
                         obj.schedule_days && obj.schedule_days.includes(dayIndex)
                     );
 

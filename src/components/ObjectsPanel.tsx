@@ -327,7 +327,7 @@ export default function ObjectsPanel() {
                 owner_rates: await (async () => {
                     const { data } = await supabase.from('admin_object_rates').select('admin_id, monthly_rate').eq('object_id', object.id);
                     const rates: Record<string, number> = {};
-                    data?.forEach(r => rates[r.admin_id] = r.monthly_rate);
+                    data?.forEach((r: any) => rates[r.admin_id] = r.monthly_rate);
                     return rates;
                 })(),
             });
@@ -1420,7 +1420,7 @@ function ObjectDetailsModal({ object, onClose, creators, adminUser }: { object: 
             }
             if (ratesRes.data) {
                 const ratesObj: Record<string, number> = {};
-                ratesRes.data.forEach(r => ratesObj[r.admin_id] = r.monthly_rate);
+                ratesRes.data.forEach((r: any) => ratesObj[r.admin_id] = r.monthly_rate);
                 setRates(ratesObj);
             }
             setLoading(false);

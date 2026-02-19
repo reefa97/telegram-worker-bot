@@ -315,11 +315,11 @@ export default function WorkersPanel() {
                 .from('worker_objects')
                 .select('object_id')
                 .eq('worker_id', worker.id)
-                .then(({ data }) => {
+                .then(({ data }: any) => {
                     if (data) {
                         setFormData(prev => ({
                             ...prev,
-                            selectedObjects: data.map(wo => wo.object_id),
+                            selectedObjects: data.map((wo: any) => wo.object_id),
                         }));
                     }
                 });
