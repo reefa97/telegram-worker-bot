@@ -102,7 +102,10 @@ export default function ClientCalendar() {
     // Get merged events for a specific day
     const getDayEvents = (day: number): UnifiedEvent[] => {
         const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-        const jsDayOfWeek = date.getDay(); // 0-6
+        const jsDayOfWeek = date.getDay(); // 0-6 (0 is Sunday)
+
+        // Convert JS day to DB day: 1-7 (1=Monday, 7=Sunday)
+        const dbDayOfWeek = jsDayOfWeek === 0 ? 7 : jsDayOfWeek;
 
         // 1. Get completed
         const completed = events.filter(e => {
@@ -114,7 +117,7 @@ export default function ClientCalendar() {
 
         // 2. Get planned (only for objects that haven't been completed today)
         const planned = plannedSchedules
-            .filter(p => p.schedule_days.includes(jsDayOfWeek) && !completedObjectIds.has(p.object_id))
+            .filter(p => p.schedule_days.includes(dbDayOfWeek) && !completedObjectIds.has(p.object_id))
             .map(p => ({
                 id: `planned-${p.object_id}-${day}`,
                 object_id: p.object_id,
@@ -144,14 +147,14 @@ export default function ClientCalendar() {
     // Get all events for the month (for list view)
     const allMonthEvents: UnifiedEvent[] = [];
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
 
     for (let day = 1; day <= daysInMonth; day++) {
         const dayDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
         // We might want to only show future "planned" events in the list, to not clutter it with "missed" past planned events.
         // But let's show all completed, and future planned.
         const dayEvents = getDayEvents(day);
-        
+
         dayEvents.forEach(ev => {
             if (ev.type === 'completed') {
                 allMonthEvents.push(ev);
@@ -231,24 +234,21 @@ export default function ClientCalendar() {
                         return (
                             <div
                                 key={day}
-                                className={`min-h-[80px] md:min-h-[100px] border-b border-r border-border p-1.5 transition-colors ${
-                                    isToday ? 'bg-primary/5' : 'hover:bg-subtle/50'
-                                }`}
+                                className={`min-h-[80px] md:min-h-[100px] border-b border-r border-border p-1.5 transition-colors ${isToday ? 'bg-primary/5' : 'hover:bg-subtle/50'
+                                    }`}
                             >
-                                <div className={`text-xs font-bold mb-1 ${
-                                    isToday ? 'w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center' : 'text-muted pl-1'
-                                }`}>
+                                <div className={`text-xs font-bold mb-1 ${isToday ? 'w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center' : 'text-muted pl-1'
+                                    }`}>
                                     {day}
                                 </div>
                                 <div className="space-y-0.5">
                                     {dayEvents.slice(0, 3).map(event => (
                                         <div
                                             key={event.id}
-                                            className={`text-[10px] md:text-xs p-1 rounded truncate cursor-default ${
-                                                event.type === 'completed' 
-                                                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300' 
+                                            className={`text-[10px] md:text-xs p-1 rounded truncate cursor-default ${event.type === 'completed'
+                                                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
                                                     : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-                                            }`}
+                                                }`}
                                             title={event.type === 'completed' ? `${event.object_name} (Zakończone)` : `${event.object_name} (Planowane ${event.planned_start})`}
                                         >
                                             <span className="font-medium">{event.object_name}</span>
@@ -271,12 +271,11 @@ export default function ClientCalendar() {
                     <div className="space-y-2">
                         {allMonthEvents.map(event => (
                             <div key={event.id} className="card p-4 flex items-center gap-4">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                    event.type === 'completed'
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${event.type === 'completed'
                                         ? 'bg-emerald-100 dark:bg-emerald-900/30'
                                         : 'bg-blue-100 dark:bg-blue-900/30'
-                                }`}>
-                                    {event.type === 'completed' 
+                                    }`}>
+                                    {event.type === 'completed'
                                         ? <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                                         : <CalendarDays className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                     }
@@ -290,7 +289,7 @@ export default function ClientCalendar() {
                                             <span className="badge-info text-[10px]">Zaplanowane</span>
                                         )}
                                     </div>
-                                    
+
                                     {event.type === 'completed' ? (
                                         <div className="flex items-center gap-3 text-xs text-muted flex-wrap">
                                             <span className="flex items-center gap-1">
