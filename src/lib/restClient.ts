@@ -252,12 +252,16 @@ export class RestBuilder {
     private async _execute(): Promise<PostgrestResponse> {
         const params: string[] = [];
 
+        // PostgREST select uses special chars like () for embedded resources
+        // Only encode spaces and truly unsafe characters, preserve PostgREST syntax
+        const encodeSelect = (s: string) => s.replace(/\s+/g, '').replace(/#/g, '%23');
+
         if (this._method === 'GET' || this._method === 'HEAD') {
-            params.push(`select=${encodeURIComponent(this._selectCols)}`);
+            params.push(`select=${encodeSelect(this._selectCols)}`);
         }
         // For PATCH/DELETE with select
         if ((this._method === 'PATCH' || this._method === 'DELETE' || this._method === 'POST') && this._selectCols !== '*') {
-            params.push(`select=${encodeURIComponent(this._selectCols)}`);
+            params.push(`select=${encodeSelect(this._selectCols)}`);
         }
 
         params.push(...this._filters);
