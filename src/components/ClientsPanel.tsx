@@ -99,7 +99,16 @@ export default function ClientsPanel() {
                 },
             });
 
-            if (response.error) throw response.error;
+            // Check for error in response data
+            if (response.error) {
+                // Try to get detailed error from response body
+                const errorMsg = response.data?.error || response.error?.message || 'Unknown error';
+                throw new Error(errorMsg);
+            }
+
+            if (response.data?.error) {
+                throw new Error(response.data.error);
+            }
 
             // Get the new client ID
             const { data: newClient } = await supabase
@@ -121,9 +130,9 @@ export default function ClientsPanel() {
             setShowModal(false);
             setFormData({ email: '', password: '', selectedObjects: [] });
             alert('Клиент создан успешно');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating client:', error);
-            alert('Ошибка при создании клиента');
+            alert(`Ошибка при создании клиента: ${error?.message || error}`);
         }
     };
 
