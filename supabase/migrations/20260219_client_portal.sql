@@ -3,6 +3,12 @@
 -- Creates client_objects and client_requests tables
 -- ========================================
 
+-- 0. Update role constraint to allow 'client'
+ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_role_check;
+ALTER TABLE admin_users ADD CONSTRAINT admin_users_role_check
+  CHECK (role IN ('super_admin', 'sub_admin', 'manager', 'client'));
+-- ========================================
+
 -- 1. client_objects — links clients to cleaning objects
 CREATE TABLE IF NOT EXISTS client_objects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
