@@ -22,6 +22,7 @@ function AppContent() {
     const [showForceReload, setShowForceReload] = useState(false);
 
     const [localLoadingOverride, setLocalLoadingOverride] = useState(false);
+    const [showProfileError, setShowProfileError] = useState(false);
 
     useEffect(() => {
         let timer: NodeJS.Timeout;
@@ -30,6 +31,17 @@ function AppContent() {
         }
         return () => clearTimeout(timer);
     }, [loading]);
+
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        if (!adminUser && !loading && user) {
+            // Delay showing the error screen to avoid flashes during rapid auth state changes
+            timer = setTimeout(() => setShowProfileError(true), 1500);
+        } else {
+            setShowProfileError(false);
+        }
+        return () => clearTimeout(timer);
+    }, [adminUser, loading, user]);
 
     if (loading && !localLoadingOverride) {
         return (
@@ -67,19 +79,6 @@ function AppContent() {
             </div>
         );
     }
-
-    const [showProfileError, setShowProfileError] = useState(false);
-
-    useEffect(() => {
-        let timer: NodeJS.Timeout;
-        if (!adminUser && !loading && user) {
-            // Delay showing the error screen to avoid flashes during rapid auth state changes
-            timer = setTimeout(() => setShowProfileError(true), 1500);
-        } else {
-            setShowProfileError(false);
-        }
-        return () => clearTimeout(timer);
-    }, [adminUser, loading, user]);
 
     if (!user) {
         return <AuthForm />;
