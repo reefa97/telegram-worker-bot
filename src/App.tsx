@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
 import Dashboard from './components/Dashboard';
@@ -69,6 +70,46 @@ function AppContent() {
 
     if (!user) {
         return <AuthForm />;
+    }
+
+    // Safety check: User is logged in, but adminUser data is missing.
+    // This could happen if fetchAdminUser failed or timed out.
+    if (!adminUser && !loading) {
+        return (
+            <div className="min-h-screen bg-app flex flex-col items-center justify-center p-4 text-center">
+                <div className="bg-card p-8 rounded-lg border border-border max-w-md w-full shadow-lg">
+                    <h2 className="text-xl font-bold text-danger mb-4">Ошибка профиля</h2>
+                    <p className="text-muted mb-6">
+                        Вы успешно вошли ({user.email}), но не удалось загрузить данные вашего профиля.
+                        Возможно, проблема с соединением или правами доступа.
+                    </p>
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="btn-primary w-full justify-center"
+                        >
+                            Попробовать снова
+                        </button>
+                        <button
+                            onClick={async () => {
+                                const { error } = await supabase.auth.signOut();
+                                if (error) alert('Error signing out');
+                                window.location.reload();
+                            }}
+                            className="btn-secondary w-full justify-center"
+                        >
+                            Выйти и зайти заново
+                        </button>
+                    </div>
+                    <div className="mt-6 pt-4 border-t border-border">
+                        <p className="text-xs text-muted font-mono">
+                            ID: {user.id}<br />
+                            Role: {adminUser ? 'Loaded' : 'Missing'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     if (adminUser?.role === 'client') {

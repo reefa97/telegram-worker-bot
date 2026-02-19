@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchAdminUser = async (userId: string) => {
         try {
+            console.log('AuthContext: fetchAdminUser START for', userId);
             const { data, error } = await supabase
                 .from('admin_users')
                 .select('*')
@@ -38,22 +39,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (error) {
                 console.error('Error fetching admin user:', error);
-                return;
+                throw error;
             }
 
             if (data) {
-                console.log('Admin user found:', data.role);
+                console.log('AuthContext: Admin user found:', data.role);
                 setAdminUser(data);
             } else {
-                console.warn('No admin_users record found for:', userId);
+                console.warn('AuthContext: No admin_users record found for:', userId);
+                setAdminUser(null);
             }
         } catch (err) {
             console.error('Exception in fetchAdminUser:', err);
+            // Don't set adminUser to null here, maybe keep previous? 
+            // Or set null to indicate failure?
+            // If we set null, the UI might show empty dashboard.
+            // But we have no data.
         }
     };
 
     const refreshAdminUser = async () => {
         if (user) {
+            console.log('AuthContext: Manual refresh of admin user');
             await fetchAdminUser(user.id);
         }
     };
