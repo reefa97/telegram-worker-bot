@@ -17,7 +17,10 @@ function App() {
 
 function AppContent() {
     const { user, adminUser, loading } = useAuth();
+    console.log('AppContent render: loading=', loading, 'user=', user?.email, 'adminUser=', adminUser?.role);
     const [showForceReload, setShowForceReload] = useState(false);
+
+    const [localLoadingOverride, setLocalLoadingOverride] = useState(false);
 
     useEffect(() => {
         let timer: NodeJS.Timeout;
@@ -27,7 +30,7 @@ function AppContent() {
         return () => clearTimeout(timer);
     }, [loading]);
 
-    if (loading) {
+    if (loading && !localLoadingOverride) {
         return (
             <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center gap-4">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -35,12 +38,22 @@ function AppContent() {
                 {showForceReload && (
                     <div className="flex flex-col items-center gap-2 mt-4 animate-fadeIn">
                         <p className="text-gray-400 text-sm">Все еще грузится?</p>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
-                        >
-                            Перезагрузить страницу
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
+                            >
+                                Перезагрузить
+                            </button>
+                            {user && (
+                                <button
+                                    onClick={() => setLocalLoadingOverride(true)}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+                                >
+                                    Войти (Данные есть)
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
