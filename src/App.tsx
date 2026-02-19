@@ -17,7 +17,7 @@ function App() {
 }
 
 function AppContent() {
-    const { user, adminUser, loading } = useAuth();
+    const { user, adminUser, loading, refreshAdminUser } = useAuth();
     console.log('AppContent render: loading=', loading, 'user=', user?.email, 'adminUser=', adminUser?.role);
     const [showForceReload, setShowForceReload] = useState(false);
 
@@ -85,7 +85,7 @@ function AppContent() {
                     </p>
                     <div className="flex flex-col gap-3">
                         <button
-                            onClick={() => window.location.reload()}
+                            onClick={() => refreshAdminUser()}
                             className="btn-primary w-full justify-center"
                         >
                             Попробовать снова
