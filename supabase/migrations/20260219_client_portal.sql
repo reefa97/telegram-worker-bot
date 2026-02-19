@@ -131,10 +131,10 @@ BEGIN
   RETURN QUERY
   SELECT
     co.id AS object_id,
-    co.name AS object_name,
+    co.name::TEXT AS object_name,
     co.schedule_days,
-    co.schedule_time_start AS time_start,
-    co.schedule_time_end AS time_end
+    co.schedule_time_start::TEXT AS time_start,
+    co.schedule_time_end::TEXT AS time_end
   FROM client_objects clo
   JOIN cleaning_objects co ON clo.object_id = co.id
   WHERE clo.client_id = p_client_id
