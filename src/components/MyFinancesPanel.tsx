@@ -286,10 +286,35 @@ export default function MyFinancesPanel() {
             if (receiptFile) {
                 const fileExt = receiptFile.name.split('.').pop();
                 const fileName = `${selectedAdminId}/${Math.random()}.${fileExt}`;
-                const { error: uploadError } = await supabase.storage.from('receipts').upload(fileName, receiptFile);
-                if (uploadError) throw uploadError;
-                const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(fileName);
-                receipt_url = publicUrl;
+
+                // Direct REST upload to bypass SES/lockdown.js issues with supabase-js
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+                // Get auth token from localStorage
+                const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
+                const storageKey = `sb-${projectRef}-auth-token`;
+                const raw = localStorage.getItem(storageKey);
+                const token = raw ? JSON.parse(raw)?.access_token : null;
+
+                const uploadRes = await window.fetch(
+                    `${supabaseUrl}/storage/v1/object/receipts/${fileName}`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'apikey': supabaseKey,
+                            'Authorization': `Bearer ${token || supabaseKey}`,
+                        },
+                        body: receiptFile,
+                    }
+                );
+
+                if (!uploadRes.ok) {
+                    const errData = await uploadRes.text();
+                    throw new Error(`Upload failed: ${errData}`);
+                }
+
+                receipt_url = `${supabaseUrl}/storage/v1/object/public/receipts/${fileName}`;
             }
             const { error } = await supabase.from('admin_expenses').insert({ ...expenseForm, receipt_url, admin_id: selectedAdminId });
             if (!error) {

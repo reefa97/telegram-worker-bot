@@ -467,25 +467,78 @@ async function handlePhotoUpload(botToken: string, fileId: string, workerId: str
         : "Unknown Worker";
       const objectName = sessionData.object.name;
 
+      console.log(`[handlePhotoUpload] Forwarding photo to ${recipients.length} recipients:`, recipients);
+
+      await logToSystem(
+        'info',
+        'photo_notification',
+        `Forwarding photo from ${workerName} at ${objectName} to ${recipients.length} recipients`,
+        { recipients, workerName, objectName, sessionId },
+        workerId,
+        sessionData.object.id
+      );
+
       const caption = `📸 <b>Новое фото-отчет</b>\n\n👤 Работник: ${workerName}\n📍 Объект: ${objectName}`;
 
       for (const chatId of recipients) {
-        await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            photo: fileId,
-            caption: caption,
-            parse_mode: "HTML"
-          }),
-        });
+        try {
+          const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: parseInt(chatId),
+              photo: fileId,
+              caption: caption,
+              parse_mode: "HTML"
+            }),
+          });
+
+          const resData = await res.json();
+          if (!resData.ok) {
+            console.error(`[handlePhotoUpload] sendPhoto FAILED for chatId ${chatId}:`, resData);
+            await logToSystem(
+              'error',
+              'photo_notification',
+              `Failed to send photo to chatId ${chatId}: ${resData.description || 'Unknown error'}`,
+              { chatId, error: resData, workerName, objectName },
+              workerId,
+              sessionData.object.id
+            );
+          } else {
+            console.log(`[handlePhotoUpload] Photo sent successfully to chatId ${chatId}`);
+          }
+        } catch (sendErr) {
+          console.error(`[handlePhotoUpload] sendPhoto ERROR for chatId ${chatId}:`, sendErr);
+          await logToSystem(
+            'error',
+            'photo_notification',
+            `Exception sending photo to chatId ${chatId}: ${String(sendErr)}`,
+            { chatId, error: String(sendErr) },
+            workerId,
+            sessionData.object.id
+          );
+        }
       }
+    } else {
+      console.warn(`[handlePhotoUpload] No session data or object found for session ${sessionId}`);
+      await logToSystem(
+        'warn',
+        'photo_notification',
+        `No session data or object found for session ${sessionId}`,
+        { sessionId, sessionData },
+        workerId
+      );
     }
 
     return true;
   } catch (error) {
     console.error('Error handling photo:', error);
+    await logToSystem(
+      'error',
+      'photo_notification',
+      `Critical error in handlePhotoUpload: ${String(error)}`,
+      { error: String(error), workerId, sessionId }
+    );
     return false;
   }
 }
@@ -1525,17 +1578,20 @@ serve(async (req) => {
       // Get largest photo
       const fileId = photo[photo.length - 1].file_id;
 
-      const { data: worker } = await supabase
+      const { data: allWorkers } = await supabase
         .from("workers")
         .select("id, bot_state, temp_procurement_data")
-        .eq("telegram_user_id", userId.toString())
-        .maybeSingle();
+        .eq("telegram_user_id", userId.toString());
 
-      if (worker) {
-        // PROCUREMENT PHOTO HANDLER
-        const isProcurementState = worker.bot_state === 'procurement_upload_photo' || worker.bot_state === 'procurement_enter_name';
+      if (allWorkers && allWorkers.length > 0) {
+        // Check if ANY worker profile is in procurement state
+        const procurementWorker = allWorkers.find((w: any) =>
+          w.bot_state === 'procurement_upload_photo' || w.bot_state === 'procurement_enter_name'
+        );
 
-        if (isProcurementState) {
+        if (procurementWorker) {
+          // PROCUREMENT PHOTO HANDLER (use the procurement worker profile)
+          const worker = procurementWorker;
           let itemName = worker.temp_procurement_data?.item_name;
           const photoCaption = update.message.caption;
 
@@ -1543,7 +1599,6 @@ serve(async (req) => {
           if (worker.bot_state === 'procurement_enter_name') {
             if (photoCaption) {
               itemName = photoCaption;
-              // Update state implicitly for the rest of the logic
             } else {
               await sendTelegramMessage(botToken, chatId, "⚠️ Пожалуйста, сначала введите название товара (текстом) или добавьте подпись к фото.");
               return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
@@ -1566,7 +1621,7 @@ serve(async (req) => {
               const fileName = `procurement/${worker.id}/${Date.now()}.jpg`;
 
               const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('shift-photos') // Reusing bucket for now
+                .from('shift-photos')
                 .upload(fileName, imageBlob, { contentType: 'image/jpeg' });
 
               if (!uploadError) {
@@ -1600,21 +1655,35 @@ serve(async (req) => {
           }
         }
 
+        // SHIFT PHOTO HANDLER: Find the worker profile with an active session
+        let activeWorker = null;
+        let activeSession = null;
 
-        const { data: activeSession } = await supabase
-          .from("work_sessions")
-          .select("id")
-          .eq("worker_id", worker.id)
-          .is("end_time", null)
-          .maybeSingle();
+        for (const w of allWorkers) {
+          const { data: session } = await supabase
+            .from("work_sessions")
+            .select("id")
+            .eq("worker_id", w.id)
+            .is("end_time", null)
+            .maybeSingle();
 
-        if (activeSession) {
-          const success = await handlePhotoUpload(botToken, fileId, worker.id, activeSession.id);
+          if (session) {
+            activeWorker = w;
+            activeSession = session;
+            break;
+          }
+        }
+
+        if (activeWorker && activeSession) {
+          console.log(`[photo] Found active session ${activeSession.id} for worker ${activeWorker.id} (out of ${allWorkers.length} profiles)`);
+          const success = await handlePhotoUpload(botToken, fileId, activeWorker.id, activeSession.id);
           if (success) {
             // Optional: React to message
           } else {
             await sendTelegramMessage(botToken, chatId, "❌ Ошибка загрузки фото.");
           }
+        } else {
+          console.warn(`[photo] No active session found for any of ${allWorkers.length} worker profiles (telegram_user_id: ${userId})`);
         }
       }
     }
