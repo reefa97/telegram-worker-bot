@@ -66,24 +66,22 @@ export default function ClientCalendar() {
             if (sessionError) throw sessionError;
             setEvents(sessionData || []);
 
-            // 2. Fetch planned schedules from objects
-            const { data: objectsData, error: objectsError } = await supabase
-                .from('client_objects')
-                .select(`
-                    object_id,
-                    cleaning_objects(name, schedule_days, schedule_time_start, schedule_time_end)
-                `)
-                .eq('client_id', adminUser.id);
+            // 2. Fetch planned schedules from objects (via RPC to bypass cleaning_objects RLS)
+            const { data: plannedData, error: plannedError } = await supabase.rpc('get_client_planned_schedules', {
+                p_client_id: adminUser.id
+            });
 
-            if (objectsError) throw objectsError;
+            if (plannedError) {
+                console.error('Error fetching planned schedules:', plannedError);
+            }
 
-            if (objectsData) {
-                setPlannedSchedules(objectsData.map((o: any) => ({
+            if (plannedData) {
+                setPlannedSchedules(plannedData.map((o: any) => ({
                     object_id: o.object_id,
-                    object_name: o.cleaning_objects?.name || 'Obiekt',
-                    schedule_days: o.cleaning_objects?.schedule_days || [],
-                    time_start: o.cleaning_objects?.schedule_time_start || '09:00',
-                    time_end: o.cleaning_objects?.schedule_time_end || '18:00',
+                    object_name: o.object_name,
+                    schedule_days: o.schedule_days || [],
+                    time_start: o.time_start || '09:00',
+                    time_end: o.time_end || '18:00',
                 })));
             }
 
@@ -246,8 +244,8 @@ export default function ClientCalendar() {
                                         <div
                                             key={event.id}
                                             className={`text-[10px] md:text-xs p-1 rounded truncate cursor-default ${event.type === 'completed'
-                                                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
-                                                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                                                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
+                                                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
                                                 }`}
                                             title={event.type === 'completed' ? `${event.object_name} (Zakończone)` : `${event.object_name} (Planowane ${event.planned_start})`}
                                         >
@@ -272,8 +270,8 @@ export default function ClientCalendar() {
                         {allMonthEvents.map(event => (
                             <div key={event.id} className="card p-4 flex items-center gap-4">
                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${event.type === 'completed'
-                                        ? 'bg-emerald-100 dark:bg-emerald-900/30'
-                                        : 'bg-blue-100 dark:bg-blue-900/30'
+                                    ? 'bg-emerald-100 dark:bg-emerald-900/30'
+                                    : 'bg-blue-100 dark:bg-blue-900/30'
                                     }`}>
                                     {event.type === 'completed'
                                         ? <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
