@@ -68,6 +68,19 @@ function AppContent() {
         );
     }
 
+    const [showProfileError, setShowProfileError] = useState(false);
+
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        if (!adminUser && !loading && user) {
+            // Delay showing the error screen to avoid flashes during rapid auth state changes
+            timer = setTimeout(() => setShowProfileError(true), 1500);
+        } else {
+            setShowProfileError(false);
+        }
+        return () => clearTimeout(timer);
+    }, [adminUser, loading, user]);
+
     if (!user) {
         return <AuthForm />;
     }
@@ -75,6 +88,15 @@ function AppContent() {
     // Safety check: User is logged in, but adminUser data is missing.
     // This could happen if fetchAdminUser failed or timed out.
     if (!adminUser && !loading) {
+        if (!showProfileError) {
+            return (
+                <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center gap-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <div className="text-white text-xl">Проверка профиля...</div>
+                </div>
+            );
+        }
+
         return (
             <div className="min-h-screen bg-app flex flex-col items-center justify-center p-4 text-center">
                 <div className="bg-card p-8 rounded-lg border border-border max-w-md w-full shadow-lg">
