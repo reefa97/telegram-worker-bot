@@ -99,10 +99,26 @@ export default function ClientsPanel() {
                 },
             });
 
-            // Check for error in response data
+            // FunctionsHttpError stores response body in error.context
             if (response.error) {
-                // Try to get detailed error from response body
-                const errorMsg = response.data?.error || response.error?.message || 'Unknown error';
+                let errorMsg = 'Unknown error';
+                try {
+                    // error.context is the JSON response body from the edge function
+                    const ctx = response.error.context;
+                    if (ctx && typeof ctx === 'object') {
+                        // If it's a Response object, parse it
+                        if (ctx instanceof Response) {
+                            const body = await ctx.json();
+                            errorMsg = body?.error || JSON.stringify(body);
+                        } else {
+                            errorMsg = ctx.error || JSON.stringify(ctx);
+                        }
+                    } else {
+                        errorMsg = response.error.message || String(response.error);
+                    }
+                } catch {
+                    errorMsg = response.error.message || String(response.error);
+                }
                 throw new Error(errorMsg);
             }
 
@@ -118,7 +134,6 @@ export default function ClientsPanel() {
                 .maybeSingle();
 
             if (newClient && formData.selectedObjects.length > 0) {
-                // Insert client_objects links
                 const links = formData.selectedObjects.map(objectId => ({
                     client_id: newClient.id,
                     object_id: objectId
@@ -132,7 +147,7 @@ export default function ClientsPanel() {
             alert('Клиент создан успешно');
         } catch (error: any) {
             console.error('Error creating client:', error);
-            alert(`Ошибка при создании клиента: ${error?.message || error}`);
+            alert(`Ошибка: ${error?.message || error}`);
         }
     };
 
