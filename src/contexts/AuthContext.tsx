@@ -31,15 +31,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const fetchAdminUser = async (userId: string) => {
         try {
             console.log('AuthContext: fetchAdminUser START for', userId);
-            const { data, error } = await supabase
+
+            // 1. Try standard Supabase client with a timeout race
+            const clientPromise = supabase
                 .from('admin_users')
                 .select('*')
                 .eq('id', userId)
                 .maybeSingle();
 
-            if (error) {
-                console.error('Error fetching admin user:', error);
-                throw error;
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Client timeout')), 5000)
+            );
+
+            let data, error;
+            try {
+                // @ts-ignore - Promise.race types can be tricky with different return types
+                const result = await Promise.race([clientPromise, timeoutPromise]);
+                // @ts-ignore
+                data = result.data;
+                // @ts-ignore
+                error = result.error;
+            } catch (err) {
+                console.warn('AuthContext: Supabase client timed out or failed, trying fallback REST...', err);
+                // Fallthrough to REST fallback
+                error = { message: 'Client timeout' };
+            }
+
+            // 2. Fallback: Direct REST API call if client failed/timed out
+            if (error || !data) {
+                console.log('AuthContext: Attempting Direct REST Fallback...');
+                const session = (await supabase.auth.getSession()).data.session;
+                if (!session) throw new Error('No session for fallback fetch');
+
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+                const response = await fetch(`${supabaseUrl}/rest/v1/admin_users?id=eq.${userId}&select=*`, {
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const jsonData = await response.json();
+                    if (jsonData && jsonData.length > 0) {
+                        data = jsonData[0];
+                        console.log('AuthContext: REST Fallback SUCCESS');
+                    }
+                } else {
+                    console.error('AuthContext: REST Fallback failed', await response.text());
+                }
             }
 
             if (data) {
@@ -51,10 +94,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         } catch (err) {
             console.error('Exception in fetchAdminUser:', err);
-            // Don't set adminUser to null here, maybe keep previous? 
-            // Or set null to indicate failure?
-            // If we set null, the UI might show empty dashboard.
-            // But we have no data.
         }
     };
 
