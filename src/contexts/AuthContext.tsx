@@ -91,25 +91,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Get initial session
         const initAuth = async () => {
-            try {
-                console.log('AuthContext: Getting session...');
-                const { data: { session }, error } = await supabase.auth.getSession();
-                if (error) throw error;
+            console.log('AuthContext: initAuth starting');
+            let mounted = true;
 
-                console.log('AuthContext: Session retrieved', session?.user?.email);
-                setSession(session);
-                setUser(session?.user ?? null);
+            const authPromise = async () => {
+                try {
+                    console.log('AuthContext: Getting session...');
+                    const { data: { session }, error } = await supabase.auth.getSession();
+                    if (error) throw error;
 
-                if (session?.user) {
-                    console.log('AuthContext: Fetching admin user...');
-                    await fetchAdminUser(session.user.id);
+                    if (!mounted) return;
+
+                    console.log('AuthContext: Session retrieved', session?.user?.email);
+                    setSession(session);
+                    setUser(session?.user ?? null);
+
+                    if (session?.user) {
+                        console.log('AuthContext: Fetching admin user...');
+                        await fetchAdminUser(session.user.id);
+                    }
+                } catch (err) {
+                    console.error('AuthContext: Error initializing auth', err);
                 }
+            };
+
+            // Race between auth and timeout
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Auth timeout')), 7000);
+            });
+
+            try {
+                await Promise.race([authPromise(), timeoutPromise]);
             } catch (err) {
-                console.error('AuthContext: Error initializing auth', err);
+                console.error('AuthContext: Initialization error/timeout', err);
             } finally {
-                console.log('AuthContext: Setting loading false');
-                setLoading(false);
+                if (mounted) {
+                    console.log('AuthContext: Setting loading false (finally)');
+                    setLoading(false);
+                }
             }
+
+            return () => { mounted = false; };
         };
 
         initAuth();

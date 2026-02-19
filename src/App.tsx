@@ -45,12 +45,19 @@ function AppContent() {
                             >
                                 Перезагрузить
                             </button>
-                            {user && (
+                            {user ? (
                                 <button
                                     onClick={() => setLocalLoadingOverride(true)}
                                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
                                 >
                                     Войти (Данные есть)
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => setLocalLoadingOverride(true)}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
+                                >
+                                    Отменить загрузку
                                 </button>
                             )}
                         </div>
