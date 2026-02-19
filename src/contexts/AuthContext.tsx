@@ -28,66 +28,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const fetchAdminUser = async (userId: string) => {
+    const fetchAdminUser = async (userId: string, accessToken?: string) => {
         try {
-            console.log('AuthContext: fetchAdminUser START for', userId);
+            console.log('AuthContext: fetchAdminUser START for', userId, 'Token present:', !!accessToken);
 
-            // 1. Try standard Supabase client with a timeout race
-            const clientPromise = supabase
-                .from('admin_users')
-                .select('*')
-                .eq('id', userId)
-                .maybeSingle();
+            // Strategies to try
+            const strategies: Array<() => Promise<AdminUser | null>> = [];
 
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Client timeout')), 5000)
-            );
-
-            let data, error;
-            try {
-                // @ts-ignore - Promise.race types can be tricky with different return types
-                const result = await Promise.race([clientPromise, timeoutPromise]);
-                // @ts-ignore
-                data = result.data;
-                // @ts-ignore
-                error = result.error;
-            } catch (err) {
-                console.warn('AuthContext: Supabase client timed out or failed, trying fallback REST...', err);
-                // Fallthrough to REST fallback
-                error = { message: 'Client timeout' };
-            }
-
-            // 2. Fallback: Direct REST API call if client failed/timed out
-            if (error || !data) {
-                console.log('AuthContext: Attempting Direct REST Fallback...');
-                const session = (await supabase.auth.getSession()).data.session;
-                if (!session) throw new Error('No session for fallback fetch');
-
-                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-                const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-                const response = await fetch(`${supabaseUrl}/rest/v1/admin_users?id=eq.${userId}&select=*`, {
-                    headers: {
-                        'apikey': supabaseKey,
-                        'Authorization': `Bearer ${session.access_token}`,
-                        'Content-Type': 'application/json'
+            // 1. REST API Strategy (Priority if token exists)
+            if (accessToken) {
+                strategies.push(async () => {
+                    try {
+                        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+                        const res = await fetch(`${supabaseUrl}/rest/v1/admin_users?id=eq.${userId}&select=*`, {
+                            headers: {
+                                'apikey': supabaseKey,
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        if (!res.ok) throw new Error(`REST Error: ${res.status}`);
+                        const json = await res.json();
+                        if (json && json.length > 0) {
+                            console.log('AuthContext: REST API fetch SUCCESS');
+                            return json[0] as AdminUser;
+                        }
+                        return null;
+                    } catch (e) {
+                        console.warn('AuthContext: REST attempt failed', e);
+                        return null;
                     }
                 });
-
-                if (response.ok) {
-                    const jsonData = await response.json();
-                    if (jsonData && jsonData.length > 0) {
-                        data = jsonData[0];
-                        console.log('AuthContext: REST Fallback SUCCESS');
-                    }
-                } else {
-                    console.error('AuthContext: REST Fallback failed', await response.text());
-                }
             }
 
-            if (data) {
-                console.log('AuthContext: Admin user found:', data.role);
-                setAdminUser(data);
+            // 2. Client Strategy (Standard)
+            strategies.push(async () => {
+                try {
+                    const { data, error } = await supabase
+                        .from('admin_users')
+                        .select('*')
+                        .eq('id', userId)
+                        .maybeSingle();
+                    if (error) throw error;
+                    return data as AdminUser;
+                } catch (e) {
+                    console.warn('AuthContext: Client attempt failed', e);
+                    return null;
+                }
+            });
+
+            // Execute race
+            const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000));
+
+            const successPromise = new Promise<AdminUser | null>((resolve) => {
+                let failureCount = 0;
+                strategies.forEach(async (strat) => {
+                    const result = await strat();
+                    if (result) resolve(result);
+                    else {
+                        failureCount++;
+                        if (failureCount === strategies.length) resolve(null);
+                    }
+                });
+            });
+
+            const adminData = await Promise.race([successPromise, timeout]);
+
+            if (adminData) {
+                console.log('AuthContext: Admin user found:', adminData.role);
+                setAdminUser(adminData);
             } else {
                 console.warn('AuthContext: No admin_users record found for:', userId);
                 setAdminUser(null);
@@ -98,9 +108,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const refreshAdminUser = async () => {
-        if (user) {
+        if (user && session) {
             console.log('AuthContext: Manual refresh of admin user');
-            await fetchAdminUser(user.id);
+            await fetchAdminUser(user.id, session.access_token);
         }
     };
 
@@ -152,9 +162,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setSession(session);
                     setUser(session?.user ?? null);
 
-                    if (session?.user) {
+                    if (session?.user && session?.access_token) {
                         console.log('AuthContext: Fetching admin user...');
-                        await fetchAdminUser(session.user.id);
+                        await fetchAdminUser(session.user.id, session.access_token);
                     }
                 } catch (err) {
                     console.error('AuthContext: Error initializing auth', err);
@@ -190,10 +200,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSession(session);
             setUser(session?.user ?? null);
 
-            if (session?.user) {
-                // If we already have the correct adminUser, skip fetch to avoid loops if needed, 
-                // but usually fine to refetch.
-                await fetchAdminUser(session.user.id);
+            if (session?.user && session?.access_token) {
+                await fetchAdminUser(session.user.id, session.access_token);
             } else {
                 setAdminUser(null);
             }
