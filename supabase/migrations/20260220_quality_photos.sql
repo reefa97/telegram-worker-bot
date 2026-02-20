@@ -11,15 +11,15 @@ INSERT INTO storage.buckets (id, name, public)
   VALUES ('quality_checks', 'quality_checks', true)
   ON CONFLICT (id) DO NOTHING;
 
--- 3. Storage RLS policies
+-- 3. Storage RLS policies (drop first to make re-runnable)
 
--- Allow authenticated users to view photos
+DROP POLICY IF EXISTS "Anyone can view quality photos" ON storage.objects;
 CREATE POLICY "Anyone can view quality photos"
   ON storage.objects FOR SELECT
   TO authenticated
   USING (bucket_id = 'quality_checks');
 
--- Allow admins to upload photos
+DROP POLICY IF EXISTS "Admins can upload quality photos" ON storage.objects;
 CREATE POLICY "Admins can upload quality photos"
   ON storage.objects FOR INSERT
   TO authenticated
@@ -32,7 +32,7 @@ CREATE POLICY "Admins can upload quality photos"
     )
   );
 
--- Allow admins to update photos
+DROP POLICY IF EXISTS "Admins can update quality photos" ON storage.objects;
 CREATE POLICY "Admins can update quality photos"
   ON storage.objects FOR UPDATE
   TO authenticated
@@ -45,7 +45,7 @@ CREATE POLICY "Admins can update quality photos"
     )
   );
 
--- Allow admins to delete photos
+DROP POLICY IF EXISTS "Admins can delete quality photos" ON storage.objects;
 CREATE POLICY "Admins can delete quality photos"
   ON storage.objects FOR DELETE
   TO authenticated
