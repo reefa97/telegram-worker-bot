@@ -21,9 +21,10 @@ import ProcurementPanel from './ProcurementPanel';
 import MyFinancesPanel from './MyFinancesPanel';
 import MyCabinetPanel from './MyCabinetPanel';
 import ClientsPanel from './ClientsPanel';
-import { Shield, ShoppingBag, CheckSquare } from 'lucide-react';
+import QualityControlPanel from './QualityControlPanel';
+import { Shield, ShoppingBag, CheckSquare, ClipboardCheck } from 'lucide-react';
 
-type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks' | 'logs' | 'trash' | 'email_search' | 'roles' | 'procurement' | 'emails' | 'my_finances' | 'my_cabinet' | 'clients';
+type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks' | 'logs' | 'trash' | 'email_search' | 'roles' | 'procurement' | 'emails' | 'my_finances' | 'my_cabinet' | 'clients' | 'quality';
 
 export default function Dashboard() {
     const { signOut, adminUser } = useAuth();
@@ -60,6 +61,7 @@ export default function Dashboard() {
         { id: 'my_cabinet', label: 'Мой кабинет', icon: CheckSquare, requiredPermission: 'workers_view' },
         { id: 'shifts', label: 'Смены', icon: Calendar, requiredPermission: 'shifts_view' },
         { id: 'procurement', label: 'Закупки', icon: ShoppingBag, requiredPermission: 'objects_view' }, // Assuming objects_view implies access to object supplies
+        { id: 'quality', label: 'Контроль', icon: ClipboardCheck, requiredPermission: 'objects_view' },
         { id: 'reports', label: 'Отчеты', icon: FileText, requiredPermission: 'reports_view' },
         { id: 'logs', label: 'Логи', icon: ScrollText, superAdminOnly: true },
         { id: 'superadmins', label: 'Super Admins', icon: UserCog, superAdminOnly: true },
@@ -257,6 +259,7 @@ export default function Dashboard() {
                     {activeTab === 'roles' && <RolesPanel />}
                     {activeTab === 'trash' && <TrashPanel />}
                     {activeTab === 'clients' && <ClientsPanel />}
+                    {activeTab === 'quality' && <QualityControlPanel />}
                 </div>
             </main>
         </div>
