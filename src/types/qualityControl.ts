@@ -34,6 +34,7 @@ export interface QualityCheckItem {
     check_id: string;
     task_name: string;
     is_passed: boolean;
+    photo_urls: string[];
 }
 
 export interface WorkerPointsLog {

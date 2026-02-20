@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye, AlertTriangle, SkipForward, CalendarClock } from 'lucide-react';
+import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye, AlertTriangle, SkipForward, CalendarClock, Camera, Image as ImageIcon } from 'lucide-react';
 import type { QualityCheck, QualityCheckSchedule, QualityCheckItem } from '../types/qualityControl';
+import imageCompression from 'browser-image-compression';
 
 interface ObjectInfo {
     id: string;
@@ -21,6 +22,8 @@ interface AdminInfo {
 interface CheckItem {
     task_name: string;
     is_passed: boolean;
+    photos: File[];       // local files pending upload
+    photoUrls: string[];  // remote URLs after upload
 }
 
 const DAY_LABELS = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -54,11 +57,11 @@ export default function QualityControlPanel() {
 
     // Check form
     const [checkItems, setCheckItems] = useState<CheckItem[]>([
-        { task_name: 'Подлоги', is_passed: false },
-        { task_name: 'Пыль на поверхностях', is_passed: false },
-        { task_name: 'Мусорные корзины', is_passed: false },
-        { task_name: 'Санузлы', is_passed: false },
-        { task_name: 'Зеркала и стекла', is_passed: false },
+        { task_name: 'Подлоги', is_passed: false, photos: [], photoUrls: [] },
+        { task_name: 'Пыль на поверхностях', is_passed: false, photos: [], photoUrls: [] },
+        { task_name: 'Мусорные корзины', is_passed: false, photos: [], photoUrls: [] },
+        { task_name: 'Санузлы', is_passed: false, photos: [], photoUrls: [] },
+        { task_name: 'Зеркала и стекла', is_passed: false, photos: [], photoUrls: [] },
     ]);
     const [checkNotes, setCheckNotes] = useState('');
     const [newItemName, setNewItemName] = useState('');
@@ -77,7 +80,9 @@ export default function QualityControlPanel() {
     const [detailItems, setDetailItems] = useState<QualityCheckItem[]>([]);
     const [detailPoints, setDetailPoints] = useState<number>(0);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
     const PAGE_SIZE = 20;
+    const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
     // Load data
     useEffect(() => {
@@ -293,11 +298,11 @@ export default function QualityControlPanel() {
     const startCheck = (obj: ObjectInfo) => {
         setCheckObject(obj);
         setCheckItems([
-            { task_name: 'Подлоги', is_passed: false },
-            { task_name: 'Пыль на поверхностях', is_passed: false },
-            { task_name: 'Мусорные корзины', is_passed: false },
-            { task_name: 'Санузлы', is_passed: false },
-            { task_name: 'Зеркала и стекла', is_passed: false },
+            { task_name: 'Подлоги', is_passed: false, photos: [], photoUrls: [] },
+            { task_name: 'Пыль на поверхностях', is_passed: false, photos: [], photoUrls: [] },
+            { task_name: 'Мусорные корзины', is_passed: false, photos: [], photoUrls: [] },
+            { task_name: 'Санузлы', is_passed: false, photos: [], photoUrls: [] },
+            { task_name: 'Зеркала и стекла', is_passed: false, photos: [], photoUrls: [] },
         ]);
         setCheckNotes('');
         setNewItemName('');
@@ -307,7 +312,7 @@ export default function QualityControlPanel() {
     // Add custom check item
     const addCheckItem = () => {
         if (!newItemName.trim()) return;
-        setCheckItems([...checkItems, { task_name: newItemName.trim(), is_passed: false }]);
+        setCheckItems([...checkItems, { task_name: newItemName.trim(), is_passed: false, photos: [], photoUrls: [] }]);
         setNewItemName('');
     };
 
@@ -321,6 +326,38 @@ export default function QualityControlPanel() {
         if (checkItems.length === 0) return 0;
         const passed = checkItems.filter(i => i.is_passed).length;
         return Math.round((passed / checkItems.length) * 100);
+    };
+
+    // Compress and upload photo
+    const compressAndUpload = async (file: File, checkId: string, itemIdx: number): Promise<string> => {
+        const compressed = await imageCompression(file, {
+            maxSizeMB: 0.5,
+            maxWidthOrHeight: 1200,
+            useWebWorker: true,
+        });
+        const timestamp = Date.now();
+        const path = `${checkId}/${itemIdx}_${timestamp}.jpg`;
+        const { error: uploadError } = await supabase.storage
+            .from('quality_checks')
+            .upload(path, compressed, { contentType: 'image/jpeg' });
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from('quality_checks').getPublicUrl(path);
+        return urlData.publicUrl;
+    };
+
+    // Handle photo selection for a check item
+    const handlePhotoSelect = async (idx: number, files: FileList | null) => {
+        if (!files || files.length === 0) return;
+        const updated = [...checkItems];
+        updated[idx].photos = [...updated[idx].photos, ...Array.from(files)];
+        setCheckItems(updated);
+    };
+
+    // Remove a pending photo
+    const removePhoto = (itemIdx: number, photoIdx: number) => {
+        const updated = [...checkItems];
+        updated[itemIdx].photos = updated[itemIdx].photos.filter((_, i) => i !== photoIdx);
+        setCheckItems(updated);
     };
 
     // Submit check
@@ -339,23 +376,40 @@ export default function QualityControlPanel() {
 
             if (checkError) throw checkError;
 
-            // 2. Insert check items
+            // 2. Insert check items (without photos first)
             const items = checkItems.map(item => ({
                 check_id: checkData.id,
                 task_name: item.task_name,
                 is_passed: item.is_passed,
+                photo_urls: [] as string[],
             }));
-            const { error: itemsError } = await supabase.from('quality_check_items').insert(items);
+            const { data: insertedItems, error: itemsError } = await supabase.from('quality_check_items').insert(items).select('id');
             if (itemsError) throw itemsError;
 
-            // 3. Update schedule last_check_date
+            // 3. Upload photos and update items with URLs
+            if (insertedItems) {
+                for (let i = 0; i < checkItems.length; i++) {
+                    if (checkItems[i].photos.length > 0) {
+                        const urls: string[] = [];
+                        for (const file of checkItems[i].photos) {
+                            const url = await compressAndUpload(file, checkData.id, i);
+                            urls.push(url);
+                        }
+                        await supabase.from('quality_check_items')
+                            .update({ photo_urls: urls })
+                            .eq('id', insertedItems[i].id);
+                    }
+                }
+            }
+
+            // 4. Update schedule last_check_date
             const todayStr = new Date().toISOString().split('T')[0];
             await supabase.from('quality_check_schedules')
                 .update({ last_check_date: todayStr })
                 .eq('object_id', checkObject.id)
                 .eq('manager_id', adminUser?.id);
 
-            // 4. Send Telegram notifications to workers (fire-and-forget)
+            // 5. Send Telegram notifications to workers (fire-and-forget)
             supabase.functions.invoke('quality-check-notifications', {
                 body: { check_id: checkData.id },
             }).catch((err: any) => console.error('Notification error:', err));
@@ -883,22 +937,42 @@ export default function QualityControlPanel() {
                         {detailItems.length > 0 && (
                             <div className="mb-5">
                                 <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Чек-лист ({detailItems.filter(i => i.is_passed).length}/{detailItems.length})</h4>
-                                <div className="space-y-1.5">
+                                <div className="space-y-2">
                                     {detailItems.map(item => (
-                                        <div
-                                            key={item.id}
-                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${item.is_passed
-                                                ? 'bg-green-50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200'
-                                                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-medium'
-                                                }`}
-                                        >
-                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
-                                                ? 'bg-green-500 text-white'
-                                                : 'bg-red-500 text-white'
-                                                }`}>
-                                                {item.is_passed ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                        <div key={item.id}>
+                                            <div
+                                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${item.is_passed
+                                                        ? 'bg-green-50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200'
+                                                        : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-medium'
+                                                    }`}
+                                            >
+                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
+                                                        ? 'bg-green-500 text-white'
+                                                        : 'bg-red-500 text-white'
+                                                    }`}>
+                                                    {item.is_passed ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                                </div>
+                                                <span className="flex-1">{item.task_name}</span>
+                                                {item.photo_urls && item.photo_urls.length > 0 && (
+                                                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                                                        <ImageIcon className="w-3 h-3" /> {item.photo_urls.length}
+                                                    </span>
+                                                )}
                                             </div>
-                                            <span>{item.task_name}</span>
+                                            {/* Photo thumbnails */}
+                                            {item.photo_urls && item.photo_urls.length > 0 && (
+                                                <div className="flex gap-2 mt-1.5 ml-9 flex-wrap">
+                                                    {item.photo_urls.map((url, pi) => (
+                                                        <img
+                                                            key={pi}
+                                                            src={url}
+                                                            alt=""
+                                                            onClick={() => setLightboxUrl(url)}
+                                                            className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
+                                                        />
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -928,6 +1002,27 @@ export default function QualityControlPanel() {
                             Закрыть
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* ===== LIGHTBOX ===== */}
+            {lightboxUrl && (
+                <div
+                    className="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4 cursor-pointer"
+                    onClick={() => setLightboxUrl(null)}
+                >
+                    <button
+                        onClick={() => setLightboxUrl(null)}
+                        className="absolute top-4 right-4 text-white/70 hover:text-white p-2 z-10"
+                    >
+                        <X className="w-8 h-8" />
+                    </button>
+                    <img
+                        src={lightboxUrl}
+                        alt=""
+                        className="max-w-full max-h-full object-contain rounded-lg"
+                        onClick={(e) => e.stopPropagation()}
+                    />
                 </div>
             )}
 
@@ -1043,31 +1138,80 @@ export default function QualityControlPanel() {
                         {/* Check items */}
                         <div className="space-y-2 mb-4">
                             {checkItems.map((item, idx) => (
-                                <div
-                                    key={idx}
-                                    className={`flex items-center gap-3 pl-4 pr-2 py-3 rounded-xl border transition-all cursor-pointer ${item.is_passed
-                                        ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700'
-                                        : 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
-                                        }`}
-                                    onClick={() => {
-                                        const updated = [...checkItems];
-                                        updated[idx].is_passed = !updated[idx].is_passed;
-                                        setCheckItems(updated);
-                                    }}
-                                >
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
-                                        ? 'bg-green-500 text-white'
-                                        : 'bg-red-500 text-white'
-                                        }`}>
-                                        {item.is_passed ? <Check className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
-                                    </div>
-                                    <span className="flex-1 text-sm font-medium text-gray-900 dark:text-white">{item.task_name}</span>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); removeCheckItem(idx); }}
-                                        className="text-gray-300 hover:text-red-500 p-1 transition-colors"
+                                <div key={idx}>
+                                    <div
+                                        className={`flex items-center gap-3 pl-4 pr-2 py-3 rounded-xl border transition-all cursor-pointer ${item.is_passed
+                                            ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700'
+                                            : 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
+                                            }`}
+                                        onClick={() => {
+                                            const updated = [...checkItems];
+                                            updated[idx].is_passed = !updated[idx].is_passed;
+                                            setCheckItems(updated);
+                                        }}
                                     >
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
+                                            ? 'bg-green-500 text-white'
+                                            : 'bg-red-500 text-white'
+                                            }`}>
+                                            {item.is_passed ? <Check className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+                                        </div>
+                                        <span className="flex-1 text-sm font-medium text-gray-900 dark:text-white">{item.task_name}</span>
+                                        {/* Camera button */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                fileInputRefs.current[idx]?.click();
+                                            }}
+                                            className="text-gray-400 hover:text-primary-500 p-1.5 transition-colors relative"
+                                            title="Добавить фото"
+                                        >
+                                            <Camera className="w-4 h-4" />
+                                            {item.photos.length > 0 && (
+                                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary-500 text-white rounded-full text-[10px] flex items-center justify-center">
+                                                    {item.photos.length}
+                                                </span>
+                                            )}
+                                        </button>
+                                        <input
+                                            ref={el => { fileInputRefs.current[idx] = el; }}
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            capture="environment"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                handlePhotoSelect(idx, e.target.files);
+                                                e.target.value = '';
+                                            }}
+                                        />
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); removeCheckItem(idx); }}
+                                            className="text-gray-300 hover:text-red-500 p-1 transition-colors"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                    {/* Photo thumbnails */}
+                                    {item.photos.length > 0 && (
+                                        <div className="flex gap-2 mt-1.5 ml-14 flex-wrap">
+                                            {item.photos.map((photo, pi) => (
+                                                <div key={pi} className="relative group/photo">
+                                                    <img
+                                                        src={URL.createObjectURL(photo)}
+                                                        alt=""
+                                                        className="w-14 h-14 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
+                                                    />
+                                                    <button
+                                                        onClick={() => removePhoto(idx, pi)}
+                                                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

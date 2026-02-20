@@ -36,6 +36,30 @@ async function sendTelegram(botToken: string, chatId: number | string, text: str
     }
 }
 
+async function sendMediaGroup(botToken: string, chatId: number | string, photoUrls: string[], caption: string) {
+    const numericChatId = typeof chatId === "string" ? parseInt(chatId) : chatId;
+    if (!numericChatId || isNaN(numericChatId) || photoUrls.length === 0) return;
+
+    const media = photoUrls.slice(0, 10).map((url, idx) => ({
+        type: "photo" as const,
+        media: url,
+        ...(idx === 0 ? { caption, parse_mode: "HTML" } : {}),
+    }));
+
+    try {
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMediaGroup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                chat_id: numericChatId,
+                media,
+            }),
+        });
+    } catch (e) {
+        console.error(`Failed to send media group to ${numericChatId}:`, e);
+    }
+}
+
 // -------- 1. CRON: Daily reminders for managers about scheduled checks --------
 
 async function handleCronReminders(botToken: string) {
@@ -214,7 +238,7 @@ async function handleCheckNotification(botToken: string, checkId: string) {
     // Get check items for details
     const { data: items } = await supabase
         .from("quality_check_items")
-        .select("task_name, is_passed")
+        .select("task_name, is_passed, photo_urls")
         .eq("check_id", checkId);
 
     if (items && items.length > 0) {
@@ -222,6 +246,16 @@ async function handleCheckNotification(botToken: string, checkId: string) {
         items.forEach((item: { task_name: string; is_passed: boolean }) => {
             msg += `${item.is_passed ? "✅" : "❌"} ${item.task_name}\n`;
         });
+    }
+
+    // Collect photo URLs from failed items for low-score notifications
+    const failedPhotos: string[] = [];
+    if (items && check.score_percentage < 80) {
+        for (const item of items) {
+            if (!item.is_passed && item.photo_urls && item.photo_urls.length > 0) {
+                failedPhotos.push(...item.photo_urls);
+            }
+        }
     }
 
     // Get workers assigned to this object
@@ -237,6 +271,15 @@ async function handleCheckNotification(botToken: string, checkId: string) {
             const chatId = (wo as any).workers?.telegram_chat_id;
             if (chatId) {
                 await sendTelegram(botToken, chatId, msg);
+                // Send photos for low-score checks
+                if (failedPhotos.length > 0) {
+                    await sendMediaGroup(
+                        botToken,
+                        chatId,
+                        failedPhotos,
+                        `📷 Фото нарушений на объекте <b>${objectName}</b>`
+                    );
+                }
                 sentCount++;
             }
         }
