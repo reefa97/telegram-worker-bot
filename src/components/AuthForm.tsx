@@ -24,7 +24,7 @@ export default function AuthForm() {
                 await ensureFirstUserIsSuperAdmin(user.id, user.email || '');
             }
         } catch (err: any) {
-            setError(err.message || 'Ошибка входа');
+            setError(err.message || 'Login error');
         } finally {
             setLoading(false);
         }
@@ -40,7 +40,7 @@ export default function AuthForm() {
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">
                         Worker Tracking
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Вход в панель администратора</p>
+
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -72,7 +72,7 @@ export default function AuthForm() {
 
                         <div>
                             <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                Пароль
+                                Password
                             </label>
                             <div className="relative">
                                 <input
@@ -94,15 +94,11 @@ export default function AuthForm() {
                         disabled={loading}
                         className="btn-primary w-full py-2.5 text-base shadow-lg shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                     >
-                        {loading ? 'Вход...' : 'Войти'}
+                        {loading ? 'Signing in...' : 'Sign In'}
                     </button>
                 </form>
 
-                <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 text-center">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Первый пользователь автоматически становится <span className="font-medium text-primary-600 dark:text-primary-400">Super Admin</span>
-                    </p>
-                </div>
+
             </div>
         </div>
     );
