@@ -70,11 +70,11 @@ export default function SubAdminsPanel() {
 
     const loadSubAdmins = async () => {
         setLoading(true);
-        // Fetch ALL admin_users except super_admin (or include them?)
+        // Fetch only sub_admins and managers
         const { data, error } = await supabase
             .from('admin_users')
             .select('*')
-            .neq('role', 'super_admin')
+            .in('role', ['sub_admin', 'manager'])
             .order('created_at', { ascending: false });
 
         if (data) setSubAdmins(data);

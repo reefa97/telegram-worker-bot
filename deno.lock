@@ -140,6 +140,7 @@
         "npm:@types/react@^18.2.43",
         "npm:@vitejs/plugin-react@^4.2.1",
         "npm:autoprefixer@^10.4.16",
+        "npm:browser-image-compression@^2.0.2",
         "npm:jspdf-autotable@^3.8.2",
         "npm:jspdf@^2.5.1",
         "npm:leaflet@^1.9.4",

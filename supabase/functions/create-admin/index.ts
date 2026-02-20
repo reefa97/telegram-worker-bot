@@ -19,27 +19,29 @@ serve(async (req: Request) => {
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
         );
 
+        // Validate role first
+        const allowedRoles = ['super_admin', 'sub_admin', 'manager', 'client'];
+        const userRole = role || 'sub_admin';
+        console.log('Role received:', role, 'Assigned role:', userRole);
+
+        if (!allowedRoles.includes(userRole)) {
+            return new Response(
+                JSON.stringify({ error: `Invalid role: ${userRole}. Allowed: ${allowedRoles.join(', ')}` }),
+                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
         // Create user in auth.users
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
             email_confirm: true,
-            user_metadata: { name } // Store name in metadata as well
+            user_metadata: { name, role: userRole } // Store name and role in metadata
         });
 
         if (authError) {
             return new Response(
                 JSON.stringify({ error: authError.message }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-        }
-
-        // Validate role
-        const allowedRoles = ['super_admin', 'sub_admin', 'manager', 'client'];
-        const userRole = role || 'sub_admin';
-        if (!allowedRoles.includes(userRole)) {
-            return new Response(
-                JSON.stringify({ error: `Invalid role: ${userRole}. Allowed: ${allowedRoles.join(', ')}` }),
                 { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
