@@ -218,6 +218,11 @@ export default function QualityControlPanel() {
                 .eq('object_id', checkObject.id)
                 .eq('manager_id', adminUser?.id);
 
+            // 4. Send Telegram notifications to workers (fire-and-forget)
+            supabase.functions.invoke('quality-check-notifications', {
+                body: { check_id: checkData.id },
+            }).catch((err: any) => console.error('Notification error:', err));
+
             setShowCheckModal(false);
             loadData();
         } catch (err) {
