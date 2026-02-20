@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ensureFirstUserIsSuperAdmin } from '../lib/adminSync';
-import { LogIn, Lock, Mail } from 'lucide-react';
+import { Lock, Mail } from 'lucide-react';
 
 export default function AuthForm() {
     const [email, setEmail] = useState('');
@@ -34,11 +34,9 @@ export default function AuthForm() {
         <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
             <div className="card w-full max-w-md p-8 shadow-2xl dark:shadow-none border-t-4 border-primary-500">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-primary-100 dark:bg-primary-900/30 rounded-full mb-6 ring-8 ring-primary-50 dark:ring-primary-900/10">
-                        <LogIn className="w-10 h-10 text-primary-600 dark:text-primary-400 ml-1" />
-                    </div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">
-                        Worker Tracking
+                    <img src="/reefa-logo.png" alt="Reefa" className="w-32 h-32 mx-auto mb-4 object-contain" />
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">
+                        Firma sprzątająca
                     </h1>
 
                 </div>
