@@ -128,7 +128,7 @@ export default function ClientRequests() {
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'new':
-                return <span className="badge-warning flex items-center gap-1"><AlertCircle size={12} />Nowa</span>;
+                return <span className="badge-neutral flex items-center gap-1"><AlertCircle size={12} />Nowa</span>;
             case 'in_progress':
                 return <span className="badge-info flex items-center gap-1"><Loader2 size={12} className="animate-spin" />W trakcie</span>;
             case 'done':
