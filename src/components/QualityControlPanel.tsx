@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye, AlertTriangle, SkipForward, CalendarClock } from 'lucide-react';
 import type { QualityCheck, QualityCheckSchedule, QualityCheckItem } from '../types/qualityControl';
 
 interface ObjectInfo {
@@ -161,6 +161,74 @@ export default function QualityControlPanel() {
             .eq('check_id', check.id);
         const totalPts = (points || []).reduce((sum: number, p: any) => sum + p.points_change, 0);
         setDetailPoints(totalPts);
+    };
+
+    // Check if schedule is overdue (no check in 3+ weeks) or missed
+    const getScheduleStatus = (s: QualityCheckSchedule): 'ok' | 'overdue' | 'missed' => {
+        const now = new Date();
+        const THREE_WEEKS_MS = 21 * 24 * 60 * 60 * 1000;
+
+        // No check ever done
+        if (!s.last_check_date) {
+            return 'overdue';
+        }
+
+        const lastCheck = new Date(s.last_check_date);
+        const diff = now.getTime() - lastCheck.getTime();
+
+        // Overdue: more than 3 weeks since last check
+        if (diff > THREE_WEEKS_MS) {
+            return 'overdue';
+        }
+
+        // Missed: scheduled day passed this week without a check
+        const jsDay = now.getDay();
+        const todayDow = jsDay === 0 ? 7 : jsDay;
+        const lastCheckDate = s.last_check_date;
+
+        // Calculate the most recent occurrence of the scheduled day
+        const daysDiff = todayDow - s.day_of_week;
+        if (daysDiff > 0) {
+            // The scheduled day already passed this week
+            const scheduledDate = new Date(now);
+            scheduledDate.setDate(scheduledDate.getDate() - daysDiff);
+            const scheduledDateStr = scheduledDate.toISOString().split('T')[0];
+
+            // If last check was before this scheduled occurrence, it was missed
+            if (lastCheckDate < scheduledDateStr) {
+                return 'missed';
+            }
+        }
+
+        return 'ok';
+    };
+
+    // Reschedule: update last_check_date to push the next check forward
+    const handleReschedule = async (scheduleId: string) => {
+        // Set last_check_date to today so the frequency counter resets
+        const todayStr = new Date().toISOString().split('T')[0];
+        try {
+            await supabase.from('quality_check_schedules')
+                .update({ last_check_date: todayStr })
+                .eq('id', scheduleId);
+            loadData();
+        } catch (err) {
+            console.error('Error rescheduling:', err);
+        }
+    };
+
+    // Skip: mark as checked without doing a real check
+    const handleSkip = async (scheduleId: string) => {
+        if (!confirm('Пропустить эту проверку? Следующая будет по графику.')) return;
+        const todayStr = new Date().toISOString().split('T')[0];
+        try {
+            await supabase.from('quality_check_schedules')
+                .update({ last_check_date: todayStr })
+                .eq('id', scheduleId);
+            loadData();
+        } catch (err) {
+            console.error('Error skipping:', err);
+        }
     };
 
     // Get today's scheduled objects for the current manager
@@ -512,43 +580,94 @@ export default function QualityControlPanel() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {schedules.map(s => (
-                                <div key={s.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h4 className="font-bold text-gray-900 dark:text-white">{getObjectName(s.object_id)}</h4>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
-                                                <MapPin className="w-3.5 h-3.5" /> {getObjectAddress(s.object_id)}
-                                            </p>
+                            {schedules.map(s => {
+                                const status = getScheduleStatus(s);
+                                const isAlert = status === 'overdue' || status === 'missed';
+                                const cardBorder = isAlert
+                                    ? 'border-red-400 dark:border-red-600 border-2 shadow-red-100 dark:shadow-red-900/20 shadow-md'
+                                    : 'border-gray-200 dark:border-gray-700';
+                                const daysSinceCheck = s.last_check_date
+                                    ? Math.floor((new Date().getTime() - new Date(s.last_check_date).getTime()) / (24 * 60 * 60 * 1000))
+                                    : null;
+
+                                return (
+                                    <div key={s.id} className={`bg-white dark:bg-gray-800 rounded-xl border ${cardBorder} p-5 shadow-sm transition-all`}>
+                                        {/* Alert banner */}
+                                        {isAlert && (
+                                            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium mb-3 ${status === 'overdue'
+                                                ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                                                : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+                                                }`}>
+                                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                                {status === 'overdue'
+                                                    ? `Просрочено! ${daysSinceCheck !== null ? `${daysSinceCheck} дн. без проверки` : 'Ни одной проверки'}`
+                                                    : 'Пропущенная проверка'
+                                                }
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h4 className="font-bold text-gray-900 dark:text-white">{getObjectName(s.object_id)}</h4>
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                                                    <MapPin className="w-3.5 h-3.5" /> {getObjectAddress(s.object_id)}
+                                                </p>
+                                            </div>
+                                            {isSuperAdmin && (
+                                                <button
+                                                    onClick={() => handleDeleteSchedule(s.id)}
+                                                    className="text-gray-400 hover:text-red-500 p-1 transition-colors"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
-                                        {isSuperAdmin && (
-                                            <button
-                                                onClick={() => handleDeleteSchedule(s.id)}
-                                                className="text-gray-400 hover:text-red-500 p-1 transition-colors"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                                                <Calendar className="w-3 h-3" />
+                                                {DAY_LABELS[s.day_of_week]}
+                                            </span>
+                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
+                                                {FREQ_LABELS[s.frequency_weeks]}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-3 flex items-center gap-1">
+                                            <User className="w-3 h-3" /> Опекун: {getAdminName(s.manager_id)}
+                                        </p>
+                                        {s.last_check_date && (
+                                            <p className={`text-xs mt-1 ${isAlert ? 'text-red-500 dark:text-red-400 font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
+                                                Последняя проверка: {new Date(s.last_check_date).toLocaleDateString('pl-PL')}
+                                                {daysSinceCheck !== null && isAlert && ` (${daysSinceCheck} дн. назад)`}
+                                            </p>
+                                        )}
+                                        {!s.last_check_date && (
+                                            <p className="text-xs mt-1 text-red-500 dark:text-red-400 font-medium">
+                                                ⚠️ Ещё не было ни одной проверки
+                                            </p>
+                                        )}
+
+                                        {/* Reschedule / Skip buttons for super admin */}
+                                        {isSuperAdmin && isAlert && (
+                                            <div className="mt-3 flex gap-2">
+                                                <button
+                                                    onClick={() => handleReschedule(s.id)}
+                                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 transition-colors"
+                                                >
+                                                    <CalendarClock className="w-3.5 h-3.5" />
+                                                    Перенести
+                                                </button>
+                                                <button
+                                                    onClick={() => handleSkip(s.id)}
+                                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 transition-colors"
+                                                >
+                                                    <SkipForward className="w-3.5 h-3.5" />
+                                                    Пропустить
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
-                                            <Calendar className="w-3 h-3" />
-                                            {DAY_LABELS[s.day_of_week]}
-                                        </span>
-                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
-                                            {FREQ_LABELS[s.frequency_weeks]}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-3 flex items-center gap-1">
-                                        <User className="w-3 h-3" /> Опекун: {getAdminName(s.manager_id)}
-                                    </p>
-                                    {s.last_check_date && (
-                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                            Последняя проверка: {new Date(s.last_check_date).toLocaleDateString('pl-PL')}
-                                        </p>
-                                    )}
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -743,8 +862,8 @@ export default function QualityControlPanel() {
                                 {detailCheck.score_percentage}%
                             </div>
                             <p className={`text-sm mt-1 font-medium ${detailCheck.score_percentage >= 90 ? 'text-green-600 dark:text-green-400' :
-                                    detailCheck.score_percentage >= 70 ? 'text-yellow-600 dark:text-yellow-400' :
-                                        'text-red-600 dark:text-red-400'
+                                detailCheck.score_percentage >= 70 ? 'text-yellow-600 dark:text-yellow-400' :
+                                    'text-red-600 dark:text-red-400'
                                 }`}>
                                 {detailCheck.score_percentage >= 90 ? '✅ Отлично' : detailCheck.score_percentage >= 70 ? '⚠️ Нужно улучшить' : '❌ Требует внимания'}
                             </p>
@@ -753,8 +872,8 @@ export default function QualityControlPanel() {
                         {/* Points */}
                         {detailPoints !== 0 && (
                             <div className={`text-center mb-5 py-2 px-4 rounded-lg text-sm font-medium ${detailPoints > 0
-                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
                                 }`}>
                                 {detailPoints > 0 ? `+${detailPoints}` : detailPoints} баллов работникам
                             </div>
@@ -769,13 +888,13 @@ export default function QualityControlPanel() {
                                         <div
                                             key={item.id}
                                             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${item.is_passed
-                                                    ? 'bg-green-50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200'
-                                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-medium'
+                                                ? 'bg-green-50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200'
+                                                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-medium'
                                                 }`}
                                         >
                                             <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
-                                                    ? 'bg-green-500 text-white'
-                                                    : 'bg-red-500 text-white'
+                                                ? 'bg-green-500 text-white'
+                                                : 'bg-red-500 text-white'
                                                 }`}>
                                                 {item.is_passed ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
                                             </div>
