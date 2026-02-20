@@ -103,10 +103,13 @@ export default function ClientRequests() {
                     p_object_id: formData.object_id
                 });
 
+                console.log('Sending notification. Owners found:', owners);
+
                 if (owners && owners.length > 0) {
                     const objectName = objects.find(o => o.object_id === formData.object_id)?.object_name || 'Obiekt';
                     for (const owner of owners) {
                         if (owner.telegram_chat_id) {
+                            console.log('Invoking send-telegram-notification for chat:', owner.telegram_chat_id);
                             // Use edge function to send Telegram message
                             await supabase.functions.invoke('send-telegram-notification', {
                                 body: {
