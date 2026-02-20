@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star } from 'lucide-react';
-import type { QualityCheck, QualityCheckSchedule } from '../types/qualityControl';
+import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import type { QualityCheck, QualityCheckSchedule, QualityCheckItem } from '../types/qualityControl';
 
 interface ObjectInfo {
     id: string;
@@ -30,7 +30,7 @@ export default function QualityControlPanel() {
     const { adminUser } = useAuth();
     const isSuperAdmin = adminUser?.role === 'super_admin';
 
-    const [activeSubTab, setActiveSubTab] = useState<'checks' | 'schedules'>(isSuperAdmin ? 'checks' : 'checks');
+    const [activeSubTab, setActiveSubTab] = useState<'checks' | 'schedules' | 'history'>(isSuperAdmin ? 'checks' : 'checks');
     const [loading, setLoading] = useState(true);
 
     // Data
@@ -64,10 +64,32 @@ export default function QualityControlPanel() {
     const [newItemName, setNewItemName] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
 
+    // History state
+    const [historyChecks, setHistoryChecks] = useState<any[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyPage, setHistoryPage] = useState(0);
+    const [historyTotal, setHistoryTotal] = useState(0);
+    const [historyFilterObject, setHistoryFilterObject] = useState('');
+    const [historyFilterManager, setHistoryFilterManager] = useState('');
+    const [historyFilterDateFrom, setHistoryFilterDateFrom] = useState('');
+    const [historyFilterDateTo, setHistoryFilterDateTo] = useState('');
+    const [detailCheck, setDetailCheck] = useState<any | null>(null);
+    const [detailItems, setDetailItems] = useState<QualityCheckItem[]>([]);
+    const [detailPoints, setDetailPoints] = useState<number>(0);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const PAGE_SIZE = 20;
+
     // Load data
     useEffect(() => {
         loadData();
     }, []);
+
+    // Load history when tab or filters change
+    useEffect(() => {
+        if (activeSubTab === 'history') {
+            loadHistory();
+        }
+    }, [activeSubTab, historyPage, historyFilterObject, historyFilterManager, historyFilterDateFrom, historyFilterDateTo]);
 
     const loadData = async () => {
         setLoading(true);
@@ -92,6 +114,53 @@ export default function QualityControlPanel() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Load history with filters and pagination
+    const loadHistory = async () => {
+        setHistoryLoading(true);
+        try {
+            let query = supabase
+                .from('quality_checks')
+                .select('*', { count: 'exact' })
+                .order('check_date', { ascending: false })
+                .range(historyPage * PAGE_SIZE, (historyPage + 1) * PAGE_SIZE - 1);
+
+            if (historyFilterObject) query = query.eq('object_id', historyFilterObject);
+            if (historyFilterManager) query = query.eq('manager_id', historyFilterManager);
+            if (historyFilterDateFrom) query = query.gte('check_date', historyFilterDateFrom);
+            if (historyFilterDateTo) query = query.lte('check_date', historyFilterDateTo + 'T23:59:59');
+
+            const { data, count, error } = await query;
+            if (error) throw error;
+            setHistoryChecks(data || []);
+            setHistoryTotal(count || 0);
+        } catch (err) {
+            console.error('Error loading history:', err);
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    // Open detail modal
+    const openDetail = async (check: any) => {
+        setDetailCheck(check);
+        setShowDetailModal(true);
+
+        // Fetch check items
+        const { data: items } = await supabase
+            .from('quality_check_items')
+            .select('*')
+            .eq('check_id', check.id);
+        setDetailItems(items || []);
+
+        // Fetch points for this check
+        const { data: points } = await supabase
+            .from('worker_points_log')
+            .select('points_change')
+            .eq('check_id', check.id);
+        const totalPts = (points || []).reduce((sum: number, p: any) => sum + p.points_change, 0);
+        setDetailPoints(totalPts);
     };
 
     // Get today's scheduled objects for the current manager
@@ -296,6 +365,16 @@ export default function QualityControlPanel() {
                     Проверки
                 </button>
                 <button
+                    onClick={() => setActiveSubTab('history')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeSubTab === 'history'
+                        ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                        }`}
+                >
+                    <History className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+                    История
+                </button>
+                <button
                     onClick={() => setActiveSubTab('schedules')}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeSubTab === 'schedules'
                         ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
@@ -472,6 +551,264 @@ export default function QualityControlPanel() {
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ===== HISTORY TAB ===== */}
+            {activeSubTab === 'history' && (
+                <div>
+                    {/* Filters */}
+                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-6">
+                        <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <Filter className="w-4 h-4" />
+                            Фильтры
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                            <select
+                                value={historyFilterObject}
+                                onChange={e => { setHistoryFilterObject(e.target.value); setHistoryPage(0); }}
+                                className="input text-sm"
+                            >
+                                <option value="">Все объекты</option>
+                                {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                            </select>
+                            <select
+                                value={historyFilterManager}
+                                onChange={e => { setHistoryFilterManager(e.target.value); setHistoryPage(0); }}
+                                className="input text-sm"
+                            >
+                                <option value="">Все опекуны</option>
+                                {admins.map(a => <option key={a.id} value={a.id}>{a.name || a.email}</option>)}
+                            </select>
+                            <input
+                                type="date"
+                                value={historyFilterDateFrom}
+                                onChange={e => { setHistoryFilterDateFrom(e.target.value); setHistoryPage(0); }}
+                                className="input text-sm"
+                                placeholder="От"
+                            />
+                            <input
+                                type="date"
+                                value={historyFilterDateTo}
+                                onChange={e => { setHistoryFilterDateTo(e.target.value); setHistoryPage(0); }}
+                                className="input text-sm"
+                                placeholder="До"
+                            />
+                        </div>
+                        {(historyFilterObject || historyFilterManager || historyFilterDateFrom || historyFilterDateTo) && (
+                            <button
+                                onClick={() => { setHistoryFilterObject(''); setHistoryFilterManager(''); setHistoryFilterDateFrom(''); setHistoryFilterDateTo(''); setHistoryPage(0); }}
+                                className="text-xs text-primary-500 hover:text-primary-600 mt-2 flex items-center gap-1"
+                            >
+                                <X className="w-3 h-3" /> Сбросить фильтры
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Results count */}
+                    <div className="flex justify-between items-center mb-4">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Найдено: <span className="font-semibold text-gray-700 dark:text-gray-300">{historyTotal}</span> проверок
+                        </p>
+                    </div>
+
+                    {historyLoading ? (
+                        <div className="flex justify-center items-center h-40">
+                            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    ) : historyChecks.length === 0 ? (
+                        <div className="text-center py-16 text-gray-400">
+                            <History className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                            <p className="text-lg font-medium">Нет проверок</p>
+                            <p className="text-sm mt-1">Проведите первый контроль качества</p>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Cards grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+                                {historyChecks.map(c => {
+                                    const scoreBg = c.score_percentage >= 90
+                                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700'
+                                        : c.score_percentage >= 70
+                                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700'
+                                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-300 dark:border-red-700';
+                                    const scoreBorder = c.score_percentage >= 90
+                                        ? 'border-l-green-500'
+                                        : c.score_percentage >= 70
+                                            ? 'border-l-yellow-500'
+                                            : 'border-l-red-500';
+                                    return (
+                                        <div
+                                            key={c.id}
+                                            onClick={() => openDetail(c)}
+                                            className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 border-l-4 ${scoreBorder} p-5 shadow-sm hover:shadow-lg transition-all cursor-pointer group`}
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-bold text-gray-900 dark:text-white truncate">{getObjectName(c.object_id)}</h4>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                                                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                                        <span className="truncate">{getObjectAddress(c.object_id)}</span>
+                                                    </p>
+                                                </div>
+                                                <span className={`shrink-0 ml-3 px-3 py-1.5 rounded-lg text-lg font-black border ${scoreBg}`}>
+                                                    {c.score_percentage}%
+                                                </span>
+                                            </div>
+
+                                            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+                                                <span className="flex items-center gap-1">
+                                                    <Calendar className="w-3.5 h-3.5" />
+                                                    {new Date(c.check_date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <User className="w-3.5 h-3.5" />
+                                                    {getAdminName(c.manager_id)}
+                                                </span>
+                                            </div>
+
+                                            {c.notes && (
+                                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 italic">💬 {c.notes}</p>
+                                            )}
+
+                                            <div className="mt-3 flex justify-end">
+                                                <span className="text-xs text-primary-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                                    <Eye className="w-3.5 h-3.5" /> Подробнее
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Pagination */}
+                            {historyTotal > PAGE_SIZE && (
+                                <div className="flex items-center justify-center gap-3">
+                                    <button
+                                        onClick={() => setHistoryPage(p => Math.max(0, p - 1))}
+                                        disabled={historyPage === 0}
+                                        className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 transition-colors"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                                        {historyPage + 1} / {Math.ceil(historyTotal / PAGE_SIZE)}
+                                    </span>
+                                    <button
+                                        onClick={() => setHistoryPage(p => Math.min(Math.ceil(historyTotal / PAGE_SIZE) - 1, p + 1))}
+                                        disabled={historyPage >= Math.ceil(historyTotal / PAGE_SIZE) - 1}
+                                        className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 transition-colors"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
+            {/* ===== DETAIL MODAL ===== */}
+            {showDetailModal && detailCheck && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDetailModal(false)}>
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-2">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Детали проверки</h3>
+                            <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Header info */}
+                        <div className="bg-gray-50 dark:bg-gray-700/30 rounded-xl p-4 mb-5">
+                            <h4 className="font-bold text-gray-900 dark:text-white">{getObjectName(detailCheck.object_id)}</h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                                <MapPin className="w-3.5 h-3.5" /> {getObjectAddress(detailCheck.object_id)}
+                            </p>
+                            <div className="flex items-center gap-4 mt-3 flex-wrap">
+                                <span className="text-sm text-gray-500 flex items-center gap-1">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    {new Date(detailCheck.check_date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <span className="text-sm text-gray-500 flex items-center gap-1">
+                                    <User className="w-3.5 h-3.5" />
+                                    {getAdminName(detailCheck.manager_id)}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Score */}
+                        <div className="text-center mb-5">
+                            <div className={`text-5xl font-black ${detailCheck.score_percentage >= 90 ? 'text-green-500' : detailCheck.score_percentage >= 70 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                {detailCheck.score_percentage}%
+                            </div>
+                            <p className={`text-sm mt-1 font-medium ${detailCheck.score_percentage >= 90 ? 'text-green-600 dark:text-green-400' :
+                                    detailCheck.score_percentage >= 70 ? 'text-yellow-600 dark:text-yellow-400' :
+                                        'text-red-600 dark:text-red-400'
+                                }`}>
+                                {detailCheck.score_percentage >= 90 ? '✅ Отлично' : detailCheck.score_percentage >= 70 ? '⚠️ Нужно улучшить' : '❌ Требует внимания'}
+                            </p>
+                        </div>
+
+                        {/* Points */}
+                        {detailPoints !== 0 && (
+                            <div className={`text-center mb-5 py-2 px-4 rounded-lg text-sm font-medium ${detailPoints > 0
+                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                                }`}>
+                                {detailPoints > 0 ? `+${detailPoints}` : detailPoints} баллов работникам
+                            </div>
+                        )}
+
+                        {/* Checklist items */}
+                        {detailItems.length > 0 && (
+                            <div className="mb-5">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Чек-лист ({detailItems.filter(i => i.is_passed).length}/{detailItems.length})</h4>
+                                <div className="space-y-1.5">
+                                    {detailItems.map(item => (
+                                        <div
+                                            key={item.id}
+                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${item.is_passed
+                                                    ? 'bg-green-50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200'
+                                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-medium'
+                                                }`}
+                                        >
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
+                                                    ? 'bg-green-500 text-white'
+                                                    : 'bg-red-500 text-white'
+                                                }`}>
+                                                {item.is_passed ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                            </div>
+                                            <span>{item.task_name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Notes */}
+                        {detailCheck.notes && (
+                            <div className="mb-5">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Примечание</h4>
+                                <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 text-sm text-gray-700 dark:text-gray-300 italic">
+                                    💬 {detailCheck.notes}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Placeholder for future photos */}
+                        {/* <div className="mb-5">
+                            <h4 className="text-sm font-semibold mb-2">Фотографии</h4>
+                            <div className="grid grid-cols-3 gap-2">thumbnails here</div>
+                        </div> */}
+
+                        <button
+                            onClick={() => setShowDetailModal(false)}
+                            className="w-full btn-secondary px-4 py-2.5 mt-2"
+                        >
+                            Закрыть
+                        </button>
+                    </div>
                 </div>
             )}
 
