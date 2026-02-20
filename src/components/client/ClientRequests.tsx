@@ -100,7 +100,7 @@ export default function ClientRequests() {
             // Send Telegram notification to guardian
             try {
                 const { data: owners } = await supabase.rpc('get_object_owners_with_chat_ids', {
-                    p_object_id: formData.object_id
+                    target_object_id: formData.object_id
                 });
 
                 console.log('Sending notification. Owners found:', owners);
