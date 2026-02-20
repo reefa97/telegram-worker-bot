@@ -2,11 +2,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Plus, Trash2, Building2, Search, ChevronDown, ChevronUp, X, Check } from 'lucide-react';
+import { User, Plus, Trash2, Building2, Search, ChevronDown, ChevronUp, X, Check, Mail } from 'lucide-react';
 
 interface ClientUser {
     id: string;
     email: string;
+    name?: string | null;
     role: string;
     created_at: string;
     objects?: { object_id: string; object_name: string }[];
@@ -27,6 +28,7 @@ export default function ClientsPanel() {
     const [searchTerm, setSearchTerm] = useState('');
 
     const [formData, setFormData] = useState({
+        name: '',
         email: '',
         password: '',
         selectedObjects: [] as string[],
@@ -92,7 +94,8 @@ export default function ClientsPanel() {
             // Create client via edge function
             const response = await supabase.functions.invoke('create-admin', {
                 body: {
-                    email: formData.email,
+                    name: formData.name.trim(),
+                    email: formData.email.trim(),
                     password: formData.password,
                     role: 'client',
                     createdBy: adminUser?.id,
@@ -103,10 +106,8 @@ export default function ClientsPanel() {
             if (response.error) {
                 let errorMsg = 'Unknown error';
                 try {
-                    // error.context is the JSON response body from the edge function
                     const ctx = response.error.context;
                     if (ctx && typeof ctx === 'object') {
-                        // If it's a Response object, parse it
                         if (ctx instanceof Response) {
                             const body = await ctx.json();
                             errorMsg = body?.error || JSON.stringify(body);
@@ -130,7 +131,7 @@ export default function ClientsPanel() {
             const { data: newClient } = await supabase
                 .from('admin_users')
                 .select('id')
-                .eq('email', formData.email)
+                .eq('email', formData.email.trim())
                 .maybeSingle();
 
             if (newClient && formData.selectedObjects.length > 0) {
@@ -143,7 +144,7 @@ export default function ClientsPanel() {
 
             loadClients();
             setShowModal(false);
-            setFormData({ email: '', password: '', selectedObjects: [] });
+            setFormData({ name: '', email: '', password: '', selectedObjects: [] });
             alert('Клиент создан успешно');
         } catch (error: any) {
             console.error('Error creating client:', error);
@@ -151,8 +152,8 @@ export default function ClientsPanel() {
         }
     };
 
-    const handleDelete = async (id: string, email: string) => {
-        if (!confirm(`Удалить клиента ${email}?`)) return;
+    const handleDelete = async (id: string, nameOrEmail: string) => {
+        if (!confirm(`Удалить клиента ${nameOrEmail}?`)) return;
 
         try {
             // Delete client_objects links first
@@ -175,10 +176,8 @@ export default function ClientsPanel() {
 
     const handleUpdateObjects = async (clientId: string, newObjects: string[]) => {
         try {
-            // Delete all existing links
             await supabase.from('client_objects').delete().eq('client_id', clientId);
 
-            // Insert new links
             if (newObjects.length > 0) {
                 const links = newObjects.map(objectId => ({
                     client_id: clientId,
@@ -204,7 +203,8 @@ export default function ClientsPanel() {
     };
 
     const filteredClients = clients.filter(c =>
-        c.email.toLowerCase().includes(searchTerm.toLowerCase())
+        c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.name && c.name.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     if (!canManageClients) {
@@ -249,61 +249,54 @@ export default function ClientsPanel() {
                         type="text"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Поиск по email..."
+                        placeholder="Поиск по имени или email..."
                         className="input pl-10"
                     />
                 </div>
             )}
 
             {/* Clients List */}
-            <div className="space-y-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredClients.map((client) => (
-                    <div key={client.id} className="card overflow-hidden">
-                        <div
-                            className="flex items-center justify-between p-4 cursor-pointer hover:bg-subtle/50 transition-colors"
-                            onClick={() => setExpandedClient(expandedClient === client.id ? null : client.id)}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                    {client.email[0].toUpperCase()}
+                    <div key={client.id} className="card p-5 hover:border-primary/30 transition-colors">
+                        <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
+                                    {(client.name || client.email)[0].toUpperCase()}
                                 </div>
-                                <div>
-                                    <div className="font-medium text-main">{client.email}</div>
-                                    <div className="text-xs text-muted flex items-center gap-2 mt-0.5">
-                                        <span>Создан: {new Date(client.created_at).toLocaleDateString('ru-RU')}</span>
-                                        {client.objects && client.objects.length > 0 && (
-                                            <>
-                                                <span>•</span>
-                                                <span className="flex items-center gap-1">
-                                                    <Building2 size={11} />
-                                                    {client.objects.length} объект{client.objects.length === 1 ? '' : client.objects.length < 5 ? 'а' : 'ов'}
-                                                </span>
-                                            </>
-                                        )}
+                                <div className="min-w-0">
+                                    <div className="font-bold text-main truncate" title={client.name || client.email}>
+                                        {client.name || 'Без имени'}
+                                    </div>
+                                    <div className="text-sm text-muted flex items-center gap-1.5 truncate">
+                                        <Mail className="w-3 h-3 shrink-0" />
+                                        <span className="truncate" title={client.email}>{client.email}</span>
                                     </div>
                                 </div>
                             </div>
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleDelete(client.id, client.email); }}
-                                    className="btn-icon text-muted hover:text-danger"
-                                    title="Удалить"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                                {expandedClient === client.id ? <ChevronUp size={16} className="text-muted" /> : <ChevronDown size={16} className="text-muted" />}
-                            </div>
+                            <button
+                                onClick={() => handleDelete(client.id, client.name || client.email)}
+                                className="text-muted hover:text-danger p-1 rounded-md transition-colors shrink-0"
+                                title="Удалить клиента"
+                            >
+                                <Trash2 size={16} />
+                            </button>
                         </div>
 
-                        {/* Expanded: Object Assignment */}
-                        {expandedClient === client.id && (
-                            <div className="border-t border-border p-4 bg-subtle/30 animate-fadeIn">
-                                <h4 className="text-sm font-bold text-main mb-3 flex items-center gap-2">
-                                    <Building2 size={14} />
-                                    Привязанные объекты
-                                </h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                        <div className="pt-4 border-t border-border">
+                            <button
+                                onClick={() => setExpandedClient(expandedClient === client.id ? null : client.id)}
+                                className="w-full flex items-center justify-between text-sm font-semibold text-main hover:text-primary transition-colors mb-2"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <Building2 size={16} className="text-primary" />
+                                    Привязанные объекты ({client.objects?.length || 0})
+                                </span>
+                                {expandedClient === client.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+
+                            {expandedClient === client.id && (
+                                <div className="mt-3 space-y-1 max-h-48 overflow-y-auto pr-1">
                                     {allObjects.map(obj => {
                                         const isLinked = client.objects?.some(o => o.object_id === obj.id);
                                         return (
@@ -316,123 +309,136 @@ export default function ClientsPanel() {
                                                         : [...currentObjectIds, obj.id];
                                                     handleUpdateObjects(client.id, newObjectIds);
                                                 }}
-                                                className={`flex items-center gap-2 p-3 rounded-xl border text-sm text-left transition-all ${isLinked
-                                                    ? 'border-primary/50 bg-primary/10 text-primary font-medium'
-                                                    : 'border-border bg-card text-muted hover:border-primary/30 hover:bg-primary/5'
+                                                className={`w-full flex items-center gap-2 p-2 rounded-lg text-sm text-left transition-all ${isLinked
+                                                    ? 'bg-primary/10 text-primary font-medium'
+                                                    : 'bg-transparent text-muted hover:bg-subtle'
                                                     }`}
                                             >
-                                                <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${isLinked ? 'bg-primary text-white' : 'border border-border'
+                                                <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${isLinked ? 'bg-primary text-white' : 'border border-border'
                                                     }`}>
-                                                    {isLinked && <Check size={12} />}
+                                                    {isLinked && <Check size={10} />}
                                                 </div>
                                                 <span className="truncate">{obj.name}</span>
                                             </button>
                                         );
                                     })}
                                 </div>
-                                {allObjects.length === 0 && (
-                                    <p className="text-sm text-muted italic">Нет доступных объектов</p>
-                                )}
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 ))}
-
-                {filteredClients.length === 0 && (
-                    <div className="card p-12 text-center text-muted flex flex-col items-center">
-                        <User className="w-12 h-12 mb-3 opacity-20" />
-                        {searchTerm ? (
-                            <p>Ничего не найдено по запросу "{searchTerm}"</p>
-                        ) : (
-                            <>
-                                <p>Клиентов пока нет</p>
-                                <p className="text-sm mt-1">Создайте первого клиента, чтобы предоставить доступ к кабинету</p>
-                            </>
-                        )}
-                    </div>
-                )}
             </div>
+
+            {filteredClients.length === 0 && (
+                <div className="card p-12 text-center text-muted flex flex-col items-center">
+                    <User className="w-12 h-12 mb-3 opacity-20" />
+                    {searchTerm ? (
+                        <p>Ничего не найдено по запросу "{searchTerm}"</p>
+                    ) : (
+                        <>
+                            <p>Клиентов пока нет</p>
+                            <p className="text-sm mt-1">Добавьте первого клиента, чтобы предоставить доступ к кабинету</p>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* Create Client Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-                    <div className="bg-card rounded-2xl shadow-xl max-w-lg w-full overflow-hidden animate-scaleIn max-h-[90vh] flex flex-col">
-                        <div className="p-6 border-b border-border flex items-center justify-between">
+                <div className="modal-overlay animate-fadeIn">
+                    <div className="modal-content animate-scaleIn max-h-[90vh] flex flex-col">
+                        <div className="modal-header">
                             <h3 className="text-xl font-bold text-main">Новый Клиент</h3>
-                            <button onClick={() => setShowModal(false)} className="btn-icon text-muted">
+                            <button onClick={() => setShowModal(false)} className="btn-icon">
                                 <X size={20} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
-                            <div>
-                                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
-                                    Email клиента
-                                </label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className="input"
-                                    placeholder="client@company.com"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
-                                    Пароль
-                                </label>
-                                <input
-                                    type="password"
-                                    value={formData.password}
-                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    className="input"
-                                    placeholder="Минимум 6 символов"
-                                    required
-                                    minLength={6}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-                                    Привязать объекты
-                                </label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-1">
-                                    {allObjects.map(obj => {
-                                        const isSelected = formData.selectedObjects.includes(obj.id);
-                                        return (
-                                            <button
-                                                key={obj.id}
-                                                type="button"
-                                                onClick={() => toggleObjectSelection(obj.id)}
-                                                className={`flex items-center gap-2 p-3 rounded-xl border text-sm text-left transition-all ${isSelected
-                                                    ? 'border-primary/50 bg-primary/10 text-primary font-medium'
-                                                    : 'border-border bg-subtle text-muted hover:border-primary/30'
-                                                    }`}
-                                            >
-                                                <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-primary text-white' : 'border border-border'
-                                                    }`}>
-                                                    {isSelected && <Check size={12} />}
-                                                </div>
-                                                <span className="truncate">{obj.name}</span>
-                                            </button>
-                                        );
-                                    })}
+                        <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+                            <div className="modal-body space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
+                                        Имя (Название компании)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        className="input"
+                                        placeholder="Например: ООО Ромашка"
+                                        required
+                                    />
                                 </div>
-                                {formData.selectedObjects.length > 0 && (
-                                    <p className="text-xs text-primary mt-2">
-                                        Выбрано: {formData.selectedObjects.length}
-                                    </p>
-                                )}
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
+                                        Email клиента
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        className="input"
+                                        placeholder="client@company.com"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
+                                        Пароль
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={formData.password}
+                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                        className="input"
+                                        placeholder="Минимум 6 символов"
+                                        required
+                                        minLength={6}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+                                        Доступ к объектам
+                                    </label>
+                                    <div className="grid gap-2 border border-border rounded-xl p-2 bg-subtle/30 overflow-y-auto max-h-48">
+                                        {allObjects.map(obj => {
+                                            const isSelected = formData.selectedObjects.includes(obj.id);
+                                            return (
+                                                <button
+                                                    key={obj.id}
+                                                    type="button"
+                                                    onClick={() => toggleObjectSelection(obj.id)}
+                                                    className={`flex items-center gap-2 p-2.5 rounded-lg text-sm text-left transition-all ${isSelected
+                                                        ? 'bg-primary/10 text-primary font-medium'
+                                                        : 'bg-card text-muted hover:border-primary/30'
+                                                        }`}
+                                                >
+                                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-primary text-white' : 'border border-border'
+                                                        }`}>
+                                                        {isSelected && <Check size={10} />}
+                                                    </div>
+                                                    <span className="truncate">{obj.name}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {formData.selectedObjects.length > 0 && (
+                                        <p className="text-xs text-primary mt-2 flex justify-end">
+                                            Выбрано объектов: {formData.selectedObjects.length}
+                                        </p>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1">
+                            <div className="modal-footer mt-auto">
+                                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">
                                     Отмена
                                 </button>
-                                <button type="submit" className="btn-primary flex-1">
-                                    Создать
+                                <button type="submit" className="btn-primary">
+                                    Создать клиента
                                 </button>
                             </div>
                         </form>
