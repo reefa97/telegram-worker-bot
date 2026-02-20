@@ -409,7 +409,19 @@ export default function QualityControlPanel() {
                 .eq('object_id', checkObject.id)
                 .eq('manager_id', adminUser?.id);
 
-            // 5. Send Telegram notifications to workers (fire-and-forget)
+            // 5. Distribute points to workers who actually worked in the period
+            const { data: pointsResult, error: pointsError } = await supabase.rpc('distribute_quality_points', {
+                p_check_id: checkData.id,
+                p_object_id: checkObject.id,
+                p_score: score,
+            });
+            if (pointsError) {
+                console.error('Points distribution error:', pointsError);
+            } else {
+                console.log('Points distributed:', pointsResult);
+            }
+
+            // 6. Send Telegram notifications to workers (fire-and-forget)
             supabase.functions.invoke('quality-check-notifications', {
                 body: { check_id: checkData.id },
             }).catch((err: any) => console.error('Notification error:', err));
@@ -942,13 +954,13 @@ export default function QualityControlPanel() {
                                         <div key={item.id}>
                                             <div
                                                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${item.is_passed
-                                                        ? 'bg-green-50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200'
-                                                        : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-medium'
+                                                    ? 'bg-green-50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200'
+                                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-medium'
                                                     }`}
                                             >
                                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
-                                                        ? 'bg-green-500 text-white'
-                                                        : 'bg-red-500 text-white'
+                                                    ? 'bg-green-500 text-white'
+                                                    : 'bg-red-500 text-white'
                                                     }`}>
                                                     {item.is_passed ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
                                                 </div>
