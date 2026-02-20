@@ -44,7 +44,14 @@ CREATE TABLE IF NOT EXISTS worker_points_log (
 
 -- 5. Добавить total_points в workers
 ALTER TABLE workers ADD COLUMN IF NOT EXISTS total_points INT NOT NULL DEFAULT 0;
-ALTER TABLE workers ADD CONSTRAINT IF NOT EXISTS workers_total_points_non_negative CHECK (total_points >= 0);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'workers_total_points_non_negative'
+  ) THEN
+    ALTER TABLE workers ADD CONSTRAINT workers_total_points_non_negative CHECK (total_points >= 0);
+  END IF;
+END $$;
 
 -- ========================================
 -- INDEXES
