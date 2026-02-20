@@ -28,49 +28,57 @@ export default function ClientRequests() {
     const [showForm, setShowForm] = useState(false);
     const [formData, setFormData] = useState({ object_id: '', message: '' });
 
-    useEffect(() => {
-        if (adminUser?.id) {
-            loadRequests();
-            loadObjects();
-        }
-    }, [adminUser]);
-
-    const loadObjects = async () => {
-        const { data } = await supabase
-            .from('client_objects')
-            .select('object_id, cleaning_objects(id, name)')
-            .eq('client_id', adminUser!.id);
-
-        if (data) {
-            setObjects(data.map((d: any) => ({
-                object_id: d.cleaning_objects?.id || d.object_id,
-                object_name: d.cleaning_objects?.name || 'Obiekt'
-            })));
-        }
-    };
-
-    const loadRequests = async () => {
+    const loadData = async () => {
+        if (!adminUser?.id) return;
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            // 1. Fetch objects via RPC to bypass RLS on cleaning_objects
+            const { data: guardiansData } = await supabase.rpc('get_client_guardians', {
+                p_client_id: adminUser.id
+            });
+
+            const objectsMap = new Map<string, string>();
+            if (guardiansData) {
+                guardiansData.forEach((d: any) => {
+                    if (!objectsMap.has(d.object_id)) {
+                        objectsMap.set(d.object_id, d.object_name);
+                    }
+                });
+
+                const uniqueObjects = Array.from(objectsMap.entries()).map(([id, name]) => ({
+                    object_id: id,
+                    object_name: name
+                }));
+                setObjects(uniqueObjects);
+            }
+
+            // 2. Fetch requests and map names
+            const { data: reqData, error } = await supabase
                 .from('client_requests')
-                .select('*, cleaning_objects(name)')
-                .eq('client_id', adminUser!.id)
+                .select('*')
+                .eq('client_id', adminUser.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            if (data) {
-                setRequests(data.map((r: any) => ({
+            if (reqData) {
+                setRequests(reqData.map((r: any) => ({
                     ...r,
-                    object_name: r.cleaning_objects?.name || 'Obiekt'
+                    object_name: objectsMap.get(r.object_id) || 'Obiekt'
                 })));
             }
         } catch (err) {
-            console.error('Error loading requests:', err);
+            console.error('Error loading data:', err);
         } finally {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        loadData();
+    }, [adminUser]);
+
+    // Used for refreshing after submit
+    const loadRequests = loadData;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
