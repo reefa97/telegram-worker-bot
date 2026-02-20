@@ -1,13 +1,23 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 serve(async (req) => {
+    // Handle CORS preflight request
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders });
+    }
+
     try {
         const { chat_id, message } = await req.json();
 
         if (!chat_id || !message) {
             return new Response(JSON.stringify({ error: 'chat_id and message required' }), {
                 status: 400,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
@@ -15,7 +25,7 @@ serve(async (req) => {
         if (!botToken) {
             return new Response(JSON.stringify({ error: 'Bot token not configured' }), {
                 status: 500,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
@@ -35,18 +45,18 @@ serve(async (req) => {
             console.error('Telegram API error:', data);
             return new Response(JSON.stringify({ error: data.description || 'Telegram error' }), {
                 status: 500,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
         return new Response(JSON.stringify({ success: true }), {
-            headers: { 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (error) {
         console.error('Error:', error);
         return new Response(JSON.stringify({ error: String(error) }), {
             status: 500,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }
 });
