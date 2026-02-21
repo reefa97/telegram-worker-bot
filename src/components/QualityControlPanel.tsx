@@ -428,9 +428,10 @@ export default function QualityControlPanel() {
 
             setShowCheckModal(false);
             loadData();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error submitting check:', err);
-            alert('Ошибка при сохранении проверки');
+            const errorMsg = err?.message || JSON.stringify(err);
+            alert(`Ошибка при сохранении проверки: ${errorMsg}`);
         }
     };
 
