@@ -378,6 +378,7 @@ export default function QualityControlPanel() {
                 notes: checkNotes || null,
             });
 
+            console.log('Step 1: Inserting check...');
             // 1. Insert check
             const { data: checkData, error: checkError } = await supabase.from('quality_checks').insert({
                 object_id: checkObject.id,
@@ -388,6 +389,7 @@ export default function QualityControlPanel() {
 
             if (checkError) throw checkError;
 
+            console.log('Step 2: Inserting check items...', { itemsCount: checkItems.length });
             // 2. Insert check items (without photos first)
             const items = checkItems.map(item => ({
                 check_id: checkData.id,
@@ -398,6 +400,7 @@ export default function QualityControlPanel() {
             const { data: insertedItems, error: itemsError } = await supabase.from('quality_check_items').insert(items).select('id');
             if (itemsError) throw itemsError;
 
+            console.log('Step 3: Uploading photos...');
             // 3. Upload photos and update items with URLs
             if (insertedItems) {
                 for (let i = 0; i < checkItems.length; i++) {
@@ -414,6 +417,7 @@ export default function QualityControlPanel() {
                 }
             }
 
+            console.log('Step 4: Updating schedule...');
             // 4. Update schedule last_check_date
             const todayStr = new Date().toISOString().split('T')[0];
             await supabase.from('quality_check_schedules')
@@ -421,6 +425,7 @@ export default function QualityControlPanel() {
                 .eq('object_id', checkObject.id)
                 .eq('manager_id', adminUser?.id);
 
+            console.log('Step 5: Distributing points...');
             // 5. Distribute points to workers who actually worked in the period
             const { data: pointsResult, error: pointsError } = await supabase.rpc('distribute_quality_points', {
                 p_check_id: checkData.id,
@@ -433,6 +438,7 @@ export default function QualityControlPanel() {
                 console.log('Points distributed:', pointsResult);
             }
 
+            console.log('Step 6: Sending notification...');
             // 6. Send Telegram notifications to workers (fire-and-forget)
             supabase.functions.invoke('quality-check-notifications', {
                 body: { check_id: checkData.id },
