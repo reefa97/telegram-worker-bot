@@ -430,7 +430,8 @@ export default function QualityControlPanel() {
             loadData();
         } catch (err: any) {
             console.error('Error submitting check:', err);
-            const errorMsg = err?.message || JSON.stringify(err);
+            // Handle Supabase error object structure or generic Error
+            const errorMsg = err?.message || err?.details || JSON.stringify(err);
             alert(`Ошибка при сохранении проверки: ${errorMsg}`);
         }
     };
