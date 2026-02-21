@@ -300,9 +300,19 @@ async function handleCheckNotification(botToken: string, checkId: string) {
     return { sent: sentCount };
 }
 
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 // -------- Main Handler --------
 
 serve(async (req) => {
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders })
+    }
+
     try {
         const botToken = await getBotToken();
 
@@ -318,26 +328,26 @@ serve(async (req) => {
             if (!checkId) {
                 return new Response(JSON.stringify({ error: "check_id required" }), {
                     status: 400,
-                    headers: { "Content-Type": "application/json" },
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
                 });
             }
 
             const result = await handleCheckNotification(botToken, checkId);
             return new Response(JSON.stringify({ success: true, ...result }), {
-                headers: { "Content-Type": "application/json" },
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
 
         // GET or cron invocation = Daily reminder
         const result = await handleCronReminders(botToken);
         return new Response(JSON.stringify({ success: true, ...result }), {
-            headers: { "Content-Type": "application/json" },
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     } catch (error: any) {
         console.error("Quality check notification error:", error);
         return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
-            headers: { "Content-Type": "application/json" },
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     }
 });
