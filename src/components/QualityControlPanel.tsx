@@ -364,12 +364,24 @@ export default function QualityControlPanel() {
     const handleSubmitCheck = async () => {
         if (!checkObject || checkItems.length === 0) return;
 
+        if (!adminUser?.id) {
+            alert('Ошибка: Не найден ID пользователя. Пожалуйста, перезайдите.');
+            return;
+        }
+
         const score = getScore();
         try {
+            console.log('Inserting quality check with payload:', {
+                object_id: checkObject.id,
+                manager_id: adminUser.id,
+                score_percentage: score,
+                notes: checkNotes || null,
+            });
+
             // 1. Insert check
             const { data: checkData, error: checkError } = await supabase.from('quality_checks').insert({
                 object_id: checkObject.id,
-                manager_id: adminUser?.id,
+                manager_id: adminUser.id,
                 score_percentage: score,
                 notes: checkNotes || null,
             }).select('id').single();
