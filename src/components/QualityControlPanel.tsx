@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye, AlertTriangle, SkipForward, CalendarClock, Camera, Image as ImageIcon } from 'lucide-react';
+import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye, AlertTriangle, SkipForward, CalendarClock, Camera, Image as ImageIcon, Shield, Trash2 } from 'lucide-react';
 import type { QualityCheck, QualityCheckSchedule, QualityCheckItem } from '../types/qualityControl';
 import imageCompression from 'browser-image-compression';
 
@@ -9,8 +9,11 @@ interface ObjectInfo {
     id: string;
     name: string;
     address: string;
-    owner_names?: string[];
+    owner_ids?: string[];
+    created_by?: string;
+    is_active?: boolean;
 }
+
 
 interface AdminInfo {
     id: string;
@@ -50,7 +53,7 @@ export default function QualityControlPanel() {
     // Schedule form
     const [scheduleForm, setScheduleForm] = useState({
         object_id: '',
-        manager_id: '',
+        manager_id: '', // Optional now, empty string = object owner
         day_of_week: 1,
         frequency_weeks: 1 as 1 | 2 | 3 | 4,
     });
@@ -99,9 +102,14 @@ export default function QualityControlPanel() {
     const loadData = async () => {
         setLoading(true);
         try {
-            // Load objects
-            const { data: objData } = await supabase.from('cleaning_objects').select('id, name, address').eq('is_active', true).order('name');
-            setObjects(objData || []);
+            // Load all objects (including inactive) to show names in history
+            const { data: rawObjData } = await supabase.from('cleaning_objects').select('id, name, address, created_by, is_active, object_owners(admin_id)').order('name');
+            const objData = (rawObjData as any[])?.map((o: any) => ({
+                ...o,
+                owner_ids: o.object_owners?.map((oo: any) => oo.admin_id) || []
+            })) || [];
+
+            setObjects(objData);
 
             // Load admins
             const { data: adminData } = await supabase.from('admin_users').select('id, email, name, role').in('role', ['super_admin', 'sub_admin']);
@@ -166,6 +174,26 @@ export default function QualityControlPanel() {
             .eq('check_id', check.id);
         const totalPts = (points || []).reduce((sum: number, p: any) => sum + p.points_change, 0);
         setDetailPoints(totalPts);
+    };
+
+    // Delete check
+    const handleDeleteCheck = async () => {
+        if (!detailCheck) return;
+        if (!confirm('Вы уверены, что хотите БЕЗВОЗВРАТНО удалить эту проверку? Начисленные баллы работникам будут списаны автоматически.')) return;
+
+        try {
+            const { error } = await supabase.rpc('delete_quality_check', {
+                p_check_id: detailCheck.id
+            });
+            if (error) throw error;
+
+            setShowDetailModal(false);
+            loadData();
+            if (activeSubTab === 'history') loadHistory();
+        } catch (err) {
+            console.error('Error deleting check:', err);
+            alert('Ошибка при удалении проверки');
+        }
     };
 
     // Check if schedule is overdue (no check in 3+ weeks) or missed
@@ -250,8 +278,22 @@ export default function QualityControlPanel() {
                 const weeksSince = Math.floor((today.getTime() - lastCheck.getTime()) / (7 * 24 * 60 * 60 * 1000));
                 if (weeksSince < s.frequency_weeks) return false;
             }
-            // If not super_admin, only show own assignments
-            if (!isSuperAdmin && s.manager_id !== adminUser?.id) return false;
+
+            // If not super_admin, only show assignments if current user is the configured manager or the object owner (when manager is not configured)
+            if (!isSuperAdmin) {
+                if (s.manager_id) {
+                    // Explicitly assigned to someone - only show if it's me
+                    if (s.manager_id !== adminUser?.id) return false;
+                } else {
+                    // Not explicitly assigned - fallback to object owner
+                    const obj = objects.find(o => o.id === s.object_id);
+                    if (!obj) return false;
+
+                    const isOwner = obj.owner_ids?.includes(adminUser?.id || '') || obj.created_by === adminUser?.id;
+                    if (!isOwner) return false;
+                }
+            }
+
             return true;
         });
     };
@@ -265,11 +307,11 @@ export default function QualityControlPanel() {
 
     // Save schedule
     const handleSaveSchedule = async () => {
-        if (!scheduleForm.object_id || !scheduleForm.manager_id) return;
+        if (!scheduleForm.object_id) return;
         try {
             const { error } = await supabase.from('quality_check_schedules').insert({
                 object_id: scheduleForm.object_id,
-                manager_id: scheduleForm.manager_id,
+                manager_id: scheduleForm.manager_id || null,
                 day_of_week: scheduleForm.day_of_week,
                 frequency_weeks: scheduleForm.frequency_weeks,
             });
@@ -370,6 +412,12 @@ export default function QualityControlPanel() {
         }
 
         const score = getScore();
+        console.log('DEBUG: Submitting check', {
+            adminUserId: adminUser.id,
+            objectId: checkObject.id,
+            score
+        });
+
         try {
             console.log('Inserting quality check with payload:', {
                 object_id: checkObject.id,
@@ -378,7 +426,6 @@ export default function QualityControlPanel() {
                 notes: checkNotes || null,
             });
 
-            console.log('Step 1: Inserting check...');
             // 1. Insert check
             const { data: checkData, error: checkError } = await supabase.from('quality_checks').insert({
                 object_id: checkObject.id,
@@ -387,9 +434,11 @@ export default function QualityControlPanel() {
                 notes: checkNotes || null,
             }).select('id').single();
 
-            if (checkError) throw checkError;
+            if (checkError) {
+                console.error('Check insertion error:', checkError);
+                throw new Error(`Ошибка при сохранении основной записи: ${checkError.message}`);
+            }
 
-            console.log('Step 2: Inserting check items...', { itemsCount: checkItems.length });
             // 2. Insert check items (without photos first)
             const items = checkItems.map(item => ({
                 check_id: checkData.id,
@@ -398,9 +447,11 @@ export default function QualityControlPanel() {
                 photo_urls: [] as string[],
             }));
             const { data: insertedItems, error: itemsError } = await supabase.from('quality_check_items').insert(items).select('id');
-            if (itemsError) throw itemsError;
+            if (itemsError) {
+                console.error('Items insertion error:', itemsError);
+                throw new Error(`Ошибка при сохранении пунктов проверки: ${itemsError.message}`);
+            }
 
-            console.log('Step 3: Uploading photos...');
             // 3. Upload photos and update items with URLs
             if (insertedItems) {
                 for (let i = 0; i < checkItems.length; i++) {
@@ -417,15 +468,12 @@ export default function QualityControlPanel() {
                 }
             }
 
-            console.log('Step 4: Updating schedule...');
             // 4. Update schedule last_check_date
             const todayStr = new Date().toISOString().split('T')[0];
             await supabase.from('quality_check_schedules')
                 .update({ last_check_date: todayStr })
-                .eq('object_id', checkObject.id)
-                .eq('manager_id', adminUser?.id);
+                .eq('object_id', checkObject.id);
 
-            console.log('Step 5: Distributing points...');
             // 5. Distribute points to workers who actually worked in the period
             const { data: pointsResult, error: pointsError } = await supabase.rpc('distribute_quality_points', {
                 p_check_id: checkData.id,
@@ -438,19 +486,19 @@ export default function QualityControlPanel() {
                 console.log('Points distributed:', pointsResult);
             }
 
-            console.log('Step 6: Sending notification...');
             // 6. Send Telegram notifications to workers (fire-and-forget)
             supabase.functions.invoke('quality-check-notifications', {
                 body: { check_id: checkData.id },
             }).catch((err: any) => console.error('Notification error:', err));
 
+            alert('✅ Проверка успешно сохранена! Уведомления отправлены работникам и опекунам.');
             setShowCheckModal(false);
             loadData();
+            loadHistory();
         } catch (err: any) {
             console.error('Error submitting check:', err);
-            // Handle Supabase error object structure or generic Error
             const errorMsg = err?.message || err?.details || JSON.stringify(err);
-            alert(`Ошибка при сохранении проверки: ${errorMsg}`);
+            alert(`КРИТИЧЕСКАЯ ОШИБКА: Проверка НЕ сохранена. Пожалуйста, сделайте скриншот этого сообщения и отправьте в поддержку.\n\nДетали: ${errorMsg}`);
         }
     };
 
@@ -468,11 +516,15 @@ export default function QualityControlPanel() {
     };
 
     const filteredObjects = objects.filter(o =>
-        o.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        o.address.toLowerCase().includes(searchQuery.toLowerCase())
+        (o.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            o.address.toLowerCase().includes(searchQuery.toLowerCase())) &&
+        o.is_active !== false // Only active objects
     );
 
-    const todayScheduled = getTodayScheduled();
+    const todayScheduled = getTodayScheduled().filter(s => {
+        const obj = objects.find(o => o.id === s.object_id);
+        return obj && obj.is_active !== false;
+    });
 
     if (loading) {
         return (
@@ -561,7 +613,14 @@ export default function QualityControlPanel() {
                                                 <MapPin className="w-3.5 h-3.5" /> {obj.address}
                                             </p>
                                             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 flex items-center gap-1">
-                                                <User className="w-3.5 h-3.5" /> {getAdminName(s.manager_id)}
+                                                <User className="w-3.5 h-3.5" /> {
+                                                    s.manager_id
+                                                        ? `Доп: ${getAdminName(s.manager_id)}`
+                                                        : (() => {
+                                                            const objOwnerIds = obj.owner_ids || [];
+                                                            return objOwnerIds.length > 0 ? getAdminName(objOwnerIds[0]) : (obj.created_by ? getAdminName(obj.created_by) : '—');
+                                                        })()
+                                                }
                                             </p>
                                             <button
                                                 onClick={() => startCheck(obj)}
@@ -607,7 +666,7 @@ export default function QualityControlPanel() {
                                         <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                                             <th className="text-left px-4 py-3 font-medium text-gray-500">Дата</th>
                                             <th className="text-left px-4 py-3 font-medium text-gray-500">Объект</th>
-                                            <th className="text-left px-4 py-3 font-medium text-gray-500">Проверяющий</th>
+                                            <th className="text-left px-4 py-3 font-medium text-gray-500">Опекун</th>
                                             <th className="text-center px-4 py-3 font-medium text-gray-500">Оценка</th>
                                             <th className="text-left px-4 py-3 font-medium text-gray-500">Заметки</th>
                                         </tr>
@@ -622,7 +681,13 @@ export default function QualityControlPanel() {
                                                     {getObjectName(c.object_id)}
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                                                    {getAdminName(c.manager_id)}
+                                                    {(() => {
+                                                        const obj = objects.find(o => o.id === c.object_id);
+                                                        if (obj?.owner_ids && obj.owner_ids.length > 0) {
+                                                            return getAdminName(obj.owner_ids[0]);
+                                                        }
+                                                        return obj?.created_by ? getAdminName(obj.created_by) : '—';
+                                                    })()}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${getScoreBg(c.score_percentage)}`}>
@@ -718,7 +783,16 @@ export default function QualityControlPanel() {
                                             </span>
                                         </div>
                                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-3 flex items-center gap-1">
-                                            <User className="w-3 h-3" /> Опекун: {getAdminName(s.manager_id)}
+                                            <User className="w-3 h-3" /> Проверяет: {
+                                                s.manager_id
+                                                    ? `Опекун + ${getAdminName(s.manager_id)}`
+                                                    : (() => {
+                                                        const obj = objects.find(o => o.id === s.object_id);
+                                                        if (obj?.owner_ids && obj.owner_ids.length > 0) return getAdminName(obj.owner_ids[0]);
+                                                        if (obj?.created_by) return getAdminName(obj.created_by);
+                                                        return '—';
+                                                    })()
+                                            }
                                         </p>
                                         {s.last_check_date && (
                                             <p className={`text-xs mt-1 ${isAlert ? 'text-red-500 dark:text-red-400 font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
@@ -867,8 +941,18 @@ export default function QualityControlPanel() {
                                                     {new Date(c.check_date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                                                 </span>
                                                 <span className="flex items-center gap-1">
+                                                    <Shield className="w-3.5 h-3.5" />
+                                                    Опекун: {(() => {
+                                                        const obj = objects.find(o => o.id === c.object_id);
+                                                        if (obj?.owner_ids && obj.owner_ids.length > 0) {
+                                                            return getAdminName(obj.owner_ids[0]);
+                                                        }
+                                                        return obj?.created_by ? getAdminName(obj.created_by) : '—';
+                                                    })()}
+                                                </span>
+                                                <span className="flex items-center gap-1">
                                                     <User className="w-3.5 h-3.5" />
-                                                    {getAdminName(c.manager_id)}
+                                                    Проверяющий: {getAdminName(c.manager_id)}
                                                 </span>
                                             </div>
 
@@ -919,9 +1003,20 @@ export default function QualityControlPanel() {
                     <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Детали проверки</h3>
-                            <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
-                                <X className="w-5 h-5" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                                {isSuperAdmin && (
+                                    <button
+                                        onClick={handleDeleteCheck}
+                                        className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                        title="Удалить проверку"
+                                    >
+                                        <Trash2 className="w-5 h-5" />
+                                    </button>
+                                )}
+                                <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Header info */}
@@ -936,8 +1031,18 @@ export default function QualityControlPanel() {
                                     {new Date(detailCheck.check_date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                                 <span className="text-sm text-gray-500 flex items-center gap-1">
+                                    <Shield className="w-3.5 h-3.5" />
+                                    Опекун: {(() => {
+                                        const obj = objects.find(o => o.id === detailCheck.object_id);
+                                        if (obj?.owner_ids && obj.owner_ids.length > 0) {
+                                            return getAdminName(obj.owner_ids[0]);
+                                        }
+                                        return obj?.created_by ? getAdminName(obj.created_by) : '—';
+                                    })()}
+                                </span>
+                                <span className="text-sm text-gray-500 flex items-center gap-1">
                                     <User className="w-3.5 h-3.5" />
-                                    {getAdminName(detailCheck.manager_id)}
+                                    Проверяющий: {getAdminName(detailCheck.manager_id)}
                                 </span>
                             </div>
                         </div>
@@ -1079,19 +1184,19 @@ export default function QualityControlPanel() {
                                     className="input w-full"
                                 >
                                     <option value="">Выберите объект...</option>
-                                    {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                                    {objects.filter(o => o.is_active !== false).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                                 </select>
                             </div>
 
                             {/* Manager */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Опекун</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Доп. проверяющий <span className="text-gray-400 font-normal">(необязательно)</span></label>
                                 <select
                                     value={scheduleForm.manager_id}
                                     onChange={e => setScheduleForm({ ...scheduleForm, manager_id: e.target.value })}
                                     className="input w-full"
                                 >
-                                    <option value="">Выберите опекуна...</option>
+                                    <option value="">Нет (проверяет опекун объекта)</option>
                                     {admins.map(a => <option key={a.id} value={a.id}>{a.name || a.email}</option>)}
                                 </select>
                             </div>
@@ -1137,7 +1242,7 @@ export default function QualityControlPanel() {
                             </button>
                             <button
                                 onClick={handleSaveSchedule}
-                                disabled={!scheduleForm.object_id || !scheduleForm.manager_id}
+                                disabled={!scheduleForm.object_id}
                                 className="flex-1 btn-primary px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Сохранить
