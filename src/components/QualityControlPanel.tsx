@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye, AlertTriangle, SkipForward, CalendarClock, Camera, Image as ImageIcon, Shield, Trash2 } from 'lucide-react';
+import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye, AlertTriangle, SkipForward, CalendarClock, Camera, Image as ImageIcon, Shield, Trash2, Edit2 } from 'lucide-react';
 import type { QualityCheck, QualityCheckSchedule, QualityCheckItem } from '../types/qualityControl';
 import imageCompression from 'browser-image-compression';
 
@@ -51,6 +51,7 @@ export default function QualityControlPanel() {
     const [checkObject, setCheckObject] = useState<ObjectInfo | null>(null);
 
     // Schedule form
+    const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
     const [scheduleForm, setScheduleForm] = useState({
         object_id: '',
         manager_id: '', // Optional now, empty string = object owner
@@ -250,7 +251,63 @@ export default function QualityControlPanel() {
         }
     };
 
-    // Skip: mark as checked without doing a real check
+    // Save schedule (create or update)
+    const handleSaveSchedule = async () => {
+        if (!scheduleForm.object_id) return;
+        try {
+            const payload = {
+                object_id: scheduleForm.object_id,
+                manager_id: scheduleForm.manager_id || null,
+                day_of_week: scheduleForm.day_of_week,
+                frequency_weeks: scheduleForm.frequency_weeks,
+            };
+
+            if (editingScheduleId) {
+                // Update existing
+                const { error } = await supabase.from('quality_check_schedules')
+                    .update(payload)
+                    .eq('id', editingScheduleId);
+                if (error) throw error;
+            } else {
+                // Insert new
+                const { error } = await supabase.from('quality_check_schedules').insert(payload);
+                if (error) throw error;
+            }
+
+            setShowScheduleModal(false);
+            setEditingScheduleId(null);
+            setScheduleForm({ object_id: '', manager_id: '', day_of_week: 1, frequency_weeks: 1 });
+            loadData();
+        } catch (err) {
+            console.error('Error saving schedule:', err);
+            alert('Ошибка при сохранении графика');
+        }
+    };
+
+    const handleEditSchedule = (s: QualityCheckSchedule) => {
+        setEditingScheduleId(s.id);
+        setScheduleForm({
+            object_id: s.object_id,
+            manager_id: s.manager_id || '',
+            day_of_week: s.day_of_week,
+            frequency_weeks: s.frequency_weeks as 1 | 2 | 3 | 4,
+        });
+        setShowScheduleModal(true);
+    };
+
+    // Open schedule modal for new creation
+    const handleOpenNewSchedule = () => {
+        setEditingScheduleId(null);
+        setScheduleForm({ object_id: '', manager_id: '', day_of_week: 1, frequency_weeks: 1 });
+        setShowScheduleModal(true);
+    };
+
+    // Go to history for specific object
+    const goToHistory = (objectId: string) => {
+        setHistoryFilterObject(objectId);
+        setHistoryPage(0);
+        setActiveSubTab('history');
+    };
     const handleSkip = async (scheduleId: string) => {
         if (!confirm('Пропустить эту проверку? Следующая будет по графику.')) return;
         const todayStr = new Date().toISOString().split('T')[0];
@@ -305,25 +362,7 @@ export default function QualityControlPanel() {
         return admin?.name || admin?.email || 'Неизвестный';
     };
 
-    // Save schedule
-    const handleSaveSchedule = async () => {
-        if (!scheduleForm.object_id) return;
-        try {
-            const { error } = await supabase.from('quality_check_schedules').insert({
-                object_id: scheduleForm.object_id,
-                manager_id: scheduleForm.manager_id || null,
-                day_of_week: scheduleForm.day_of_week,
-                frequency_weeks: scheduleForm.frequency_weeks,
-            });
-            if (error) throw error;
-            setShowScheduleModal(false);
-            setScheduleForm({ object_id: '', manager_id: '', day_of_week: 1, frequency_weeks: 1 });
-            loadData();
-        } catch (err) {
-            console.error('Error saving schedule:', err);
-            alert('Ошибка при сохранении графика');
-        }
-    };
+
 
     // Delete schedule
     const handleDeleteSchedule = async (id: string) => {
@@ -714,7 +753,7 @@ export default function QualityControlPanel() {
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Графики проверок</h3>
                         {isSuperAdmin && (
                             <button
-                                onClick={() => setShowScheduleModal(true)}
+                                onClick={handleOpenNewSchedule}
                                 className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                             >
                                 <Plus className="w-4 h-4" />
@@ -825,6 +864,28 @@ export default function QualityControlPanel() {
                                                 </button>
                                             </div>
                                         )}
+
+                                        {/* Actions row: View History + Edit Buttons */}
+                                        <div className="mt-4 flex gap-2 pt-3 border-t border-gray-100 dark:border-gray-700/50">
+                                            <button
+                                                onClick={() => goToHistory(s.object_id)}
+                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                            >
+                                                <History className="w-3.5 h-3.5" />
+                                                История проверок
+                                            </button>
+
+                                            {isSuperAdmin && (
+                                                <button
+                                                    onClick={() => handleEditSchedule(s)}
+                                                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                    title="Изменить день или частоту"
+                                                >
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                    Настроить
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -1168,7 +1229,9 @@ export default function QualityControlPanel() {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowScheduleModal(false)}>
                     <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-gray-700" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Назначить график проверки</h3>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                {editingScheduleId ? 'Редактировать график' : 'Назначить график проверки'}
+                            </h3>
                             <button onClick={() => setShowScheduleModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
                                 <X className="w-5 h-5" />
                             </button>
