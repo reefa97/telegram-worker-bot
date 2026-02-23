@@ -175,16 +175,11 @@ export default function EmailSearchPanel() {
             // const { error: invokeError } = await supabase.functions.invoke('email-search-worker', { ... });
 
             setSearchQuery('');
-            await fetchJobs(); // Refresh jobs list immediately
-
             setSearchQuery('');
             await fetchJobs(); // Refresh jobs list immediately
         } catch (err: any) {
             console.error('Search failed:', err);
-            // If job was created but invocation failed, mark it as failed
-            // (We can't easily get the job ID here if job creation succeeded but variable is lost scope-wise in try block structure,
-            // but usually we'd want to handle this better. For now, alert detail.)
-            alert(`Не удалось начать поиск. Проверьте консоль.\nОшибка: ${err.message || JSON.stringify(err)}`);
+            alert(`Не удалось начать поиск. Проверьте консоль.\nПодробности ошибки:\n${JSON.stringify(err, null, 2)}`);
         } finally {
             setLoading(false);
         }
