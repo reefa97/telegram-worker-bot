@@ -165,11 +165,12 @@ async def process_job(job):
                 best_emails = await BusinessAnalyzer.analyze_emails(all_emails, query, "")
                 
                 # Update database for recognized business emails
-                for email in best_emails:
-                    db_manager.save_email(
-                        email, "", query, job_id=job_id, 
-                        is_business_email=True
-                    )
+                if best_emails:
+                    for email in best_emails:
+                        db_manager.save_email(
+                            email, "", query, job_id=job_id, 
+                            is_business_email=True
+                        )
             
             # Remove invalid/duplicate/irrelevant emails from database
             # 1. Emails that failed validation or deduplication
@@ -179,6 +180,7 @@ async def process_job(job):
             # 2. Emails that AI rejected (if AI enrichment ran)
             if best_emails is None:
                 logger.warning("AI enrichment failed (returned None). Skipping AI filtering (keeping all emails).")
+                best_emails = all_emails
             elif all_emails:
                 ai_rejected = [e for e in all_emails if e not in best_emails]
                 emails_to_remove.extend(ai_rejected)

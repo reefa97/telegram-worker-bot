@@ -18,7 +18,7 @@ async def ainvoke_llm(
     Invokes LLM and returns response, optionally parsed into a Pydantic model.
     """
     if not model:
-        model = os.getenv("LLM_MODEL", "gpt-4.1-mini")
+        model = os.getenv("LLM_MODEL", "gpt-4o-mini")
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         # Try to find in other env vars if exists
