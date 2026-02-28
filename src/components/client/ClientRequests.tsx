@@ -111,12 +111,18 @@ export default function ClientRequests() {
                         if (owner.telegram_chat_id) {
                             console.log('Invoking send-telegram-notification for chat:', owner.telegram_chat_id);
                             // Use edge function to send Telegram message
-                            await supabase.functions.invoke('send-telegram-notification', {
+                            const res = await supabase.functions.invoke('send-telegram-notification', {
                                 body: {
                                     chat_id: parseInt(owner.telegram_chat_id),
                                     message: `📋 <b>Nowa prośba od klienta</b>\n\n📍 Obiekt: <b>${objectName}</b>\n💬 ${formData.message.trim()}\n\n👤 Klient: ${adminUser?.email}`
                                 }
                             });
+
+                            if (res.error) {
+                                console.error('Edge function returned error:', res.error);
+                            } else {
+                                console.log('Edge function success:', res.data);
+                            }
                         }
                     }
                 }

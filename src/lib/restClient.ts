@@ -97,7 +97,9 @@ export class RestBuilder {
     constructor(table: string) { this._table = table; }
 
     select(columns?: string, options?: { count?: string; head?: boolean }): this {
-        this._method = options?.head ? 'HEAD' : 'GET';
+        if (this._method !== 'POST' && this._method !== 'PATCH' && this._method !== 'DELETE') {
+            this._method = options?.head ? 'HEAD' : 'GET';
+        }
         this._selectCols = columns || '*';
         if (options?.count) this._count = options.count;
         return this;
@@ -260,7 +262,7 @@ export class RestBuilder {
             params.push(`select=${encodeSelect(this._selectCols)}`);
         }
         // For PATCH/DELETE with select
-        if ((this._method === 'PATCH' || this._method === 'DELETE' || this._method === 'POST') && this._selectCols !== '*') {
+        if (this._method === 'PATCH' || this._method === 'DELETE' || this._method === 'POST') {
             params.push(`select=${encodeSelect(this._selectCols)}`);
         }
 

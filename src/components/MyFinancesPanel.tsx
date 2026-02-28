@@ -82,6 +82,7 @@ export default function MyFinancesPanel() {
     const [showExpenseModal, setShowExpenseModal] = useState(false);
     const [showHoursModal, setShowHoursModal] = useState(false);
     const [showIncomeModal, setShowIncomeModal] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'expense' | 'income' | 'hours', title: string } | null>(null);
 
     // Form states
     const [expenseForm, setExpenseForm] = useState({
@@ -352,23 +353,39 @@ export default function MyFinancesPanel() {
         }
     };
 
-    const handleDeleteExpense = async (id: string) => {
-        if (!confirm('Удалить расход?')) return;
-        await supabase.from('admin_expenses').delete().eq('id', id);
-        loadExpenses(selectedAdminId);
-        loadCreditData(selectedAdminId);
+    const handleDeleteExpense = (id: string) => {
+        setDeleteConfirm({ id, type: 'expense', title: 'Удалить расход?' });
     };
 
-    const handleDeleteIncome = async (id: string) => {
-        if (!confirm('Удалить доход?')) return;
-        await supabase.from('admin_extra_income').delete().eq('id', id);
-        loadExtraIncome(selectedAdminId);
+    const handleDeleteIncome = (id: string) => {
+        setDeleteConfirm({ id, type: 'income', title: 'Удалить доход?' });
     };
 
-    const handleDeleteHours = async (id: string) => {
-        if (!confirm('Удалить запись о часах?')) return;
-        await supabase.from('admin_extra_hours').delete().eq('id', id);
-        loadExtraHours(selectedAdminId);
+    const handleDeleteHours = (id: string) => {
+        setDeleteConfirm({ id, type: 'hours', title: 'Удалить запись о часах?' });
+    };
+
+    const executeDelete = async () => {
+        if (!deleteConfirm) return;
+        const { id, type } = deleteConfirm;
+
+        setDeleteConfirm(null); // Close modal immediately for snappy UI
+
+        switch (type) {
+            case 'expense':
+                await supabase.from('admin_expenses').delete().eq('id', id);
+                loadExpenses(selectedAdminId);
+                loadCreditData(selectedAdminId);
+                break;
+            case 'income':
+                await supabase.from('admin_extra_income').delete().eq('id', id);
+                loadExtraIncome(selectedAdminId);
+                break;
+            case 'hours':
+                await supabase.from('admin_extra_hours').delete().eq('id', id);
+                loadExtraHours(selectedAdminId);
+                break;
+        }
     };
 
     // Calculations
@@ -655,8 +672,25 @@ export default function MyFinancesPanel() {
             </div>
 
             {/* Modals */}
-            {(showExpenseModal || showHoursModal || showIncomeModal || showAddCreditModal || showDeductCreditModal) && (
+            {(showExpenseModal || showHoursModal || showIncomeModal || showAddCreditModal || showDeductCreditModal || deleteConfirm) && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+
+                    {/* Delete Confirmation Modal */}
+                    {deleteConfirm && (
+                        <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn">
+                            <div className="p-4 border-b border-border flex justify-between items-center bg-red-50 dark:bg-red-900/20">
+                                <h3 className="font-bold text-lg text-red-700 dark:text-red-400">Подтверждение</h3>
+                                <button onClick={() => setDeleteConfirm(null)} className="text-muted hover:text-main"><X size={20} /></button>
+                            </div>
+                            <div className="p-6">
+                                <p className="text-gray-700 dark:text-gray-300 mb-6">{deleteConfirm.title}</p>
+                                <div className="flex justify-end gap-3 font-medium">
+                                    <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">Отмена</button>
+                                    <button onClick={executeDelete} className="btn-primary bg-red-600 hover:bg-red-700 px-6">Удалить</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Add Credit Modal */}
                     {showAddCreditModal && (

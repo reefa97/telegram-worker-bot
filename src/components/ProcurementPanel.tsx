@@ -374,7 +374,7 @@ export default function ProcurementPanel() {
                                         href={selectedRequest.photo_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="absolute bottom-4 right-4 bg-gray-900/80 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hover:bg-black"
+                                        className="absolute bottom-4 right-4 bg-gray-900/80 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity backdrop-blur-sm hover:bg-black"
                                     >
                                         <ExternalLink size={14} />
                                         Открыть оригинал

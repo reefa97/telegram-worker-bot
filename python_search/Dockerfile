@@ -5,9 +5,15 @@ WORKDIR /app
 
 # Install system dependencies required for Playwright and general build tools
 # We use the 'playwright install-deps' command later, but having basic tools is good.
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
+    build-essential \
+    gcc \
+    libffi-dev \
+    libssl-dev \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to cache dependencies

@@ -377,7 +377,7 @@ export default function MyCabinetPanel() {
                                 {(adminUser?.role === 'super_admin' || task.created_by === adminUser?.id) && (
                                     <button
                                         onClick={(e) => handleDeleteTask(task.id, e)}
-                                        className="text-muted hover:text-rose-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="text-muted hover:text-rose-500 p-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                                         title="Удалить"
                                     >
                                         <Trash2 size={15} />

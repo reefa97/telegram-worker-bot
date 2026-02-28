@@ -89,9 +89,12 @@ async def process_job(job):
         # Start Infinite Search Loop
         page = 1
         total_emails = 0
-        MAX_PAGES = 1000 # Increased limit
         
-        crawler = AsyncCrawler(deep_scan=True)
+        # Load limits from env or defaults
+        MAX_PAGES = int(os.getenv("MAX_SEARCH_PAGES", "4"))
+        CRAWL_DEPTH = int(os.getenv("CRAWL_DEPTH", "1"))
+        
+        crawler = AsyncCrawler(deep_scan=True, max_depth=CRAWL_DEPTH)
     
         while page <= MAX_PAGES:
             logger.info(f"Searching Serper (Organic + Maps) page {page} for '{query}'...")

@@ -90,12 +90,17 @@ export default function EmailSearchPanel() {
     };
 
     const fetchJobs = async () => {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('email_search_jobs')
             .select('*')
             .eq('admin_id', user?.id)
             .order('created_at', { ascending: false });
 
+        if (error) {
+            console.error('Error fetching jobs:', error);
+            // Don't alert here to avoid spamming on background refreshes, 
+            // but log it clearly.
+        }
         if (data) setJobs(data);
     };
 
@@ -179,7 +184,8 @@ export default function EmailSearchPanel() {
             await fetchJobs(); // Refresh jobs list immediately
         } catch (err: any) {
             console.error('Search failed:', err);
-            alert(`Не удалось начать поиск. Проверьте консоль.\nПодробности ошибки:\n${JSON.stringify(err, null, 2)}`);
+            const errorMsg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+            alert(`Не удалось начать поиск.\n\nОшибка: ${errorMsg}`);
         } finally {
             setLoading(false);
         }
@@ -245,8 +251,8 @@ export default function EmailSearchPanel() {
             </div>
 
             {/* Settings & Search Bar */}
-            <div className="card p-6 flex flex-col gap-6">
-                <div className="flex gap-4 items-end">
+            <div className="card p-4 md:p-6 flex flex-col gap-4 md:gap-6">
+                <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
                     <div className="flex-1">
                         <label className="block text-sm font-medium text-main mb-2">API Токен Serper</label>
                         <div className="flex gap-2">
@@ -288,9 +294,9 @@ export default function EmailSearchPanel() {
                 </div>
             </div>
 
-            <div className="flex gap-6 h-full min-h-0">
+            <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
                 {/* Jobs List */}
-                <div className="w-1/3 card overflow-hidden flex flex-col">
+                <div className="md:w-1/3 card overflow-hidden flex flex-col max-h-[40vh] md:max-h-none">
                     <div className="p-3 bg-subtle border-b border-border font-medium text-main">История поиска</div>
                     <div className="overflow-y-auto flex-1 p-2 space-y-2">
                         {jobs.map(job => (
@@ -325,7 +331,7 @@ export default function EmailSearchPanel() {
                                         )}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); deleteJob(job.id); }}
-                                            className="text-zinc-400 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="text-zinc-400 hover:text-red-500 p-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                                             title="Удалить историю"
                                         >
                                             <Trash2 size={16} />
@@ -342,7 +348,7 @@ export default function EmailSearchPanel() {
                 </div>
 
                 {/* Results List */}
-                <div className="w-2/3 flex flex-col gap-6 min-h-0">
+                <div className="md:w-2/3 flex flex-col gap-6 min-h-0 flex-1">
                     <div className="card overflow-hidden flex flex-col flex-1">
                         <div className="p-3 bg-subtle border-b border-border font-medium flex justify-between items-center text-main">
                             <span>Результаты {results.length > 0 && `(${results.length})`}</span>

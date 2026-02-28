@@ -107,6 +107,9 @@ async function getWorkerKeyboard(workerId: string) {
     keyboard.push([{ text: "🛍 Заказать закупку" }]);
   }
 
+  // Common button for all states
+  keyboard.push([{ text: "💼 Мой кабинет" }]);
+
   return keyboard;
 }
 
@@ -1210,6 +1213,26 @@ serve(async (req) => {
       if (text === "/start") {
         const keyboard = await getWorkerKeyboard(activeWorker.id);
         await sendTelegramMessage(botToken, chatId, `👋 С возвращением, ${activeWorker.first_name}!`, {
+          keyboard,
+          resize_keyboard: true
+        });
+      } else if (text === "💼 Мой кабинет") {
+        const { data: worker } = await supabase
+          .from("workers")
+          .select("first_name, last_name, total_points")
+          .eq("id", activeWorker.id)
+          .single();
+
+        const points = worker?.total_points || 0;
+        const name = worker ? `${worker.first_name} ${worker.last_name}` : activeWorker.first_name;
+
+        const message = `👤 <b>Мой кабинет</b>\n\n` +
+          `Работник: <b>${name}</b>\n` +
+          `💰 Ваш баланс: <b>${points}</b> баллов\n\n` +
+          `<i>Здесь вы можете видеть свои накопленные баллы за качество работы.</i>`;
+
+        const keyboard = await getWorkerKeyboard(activeWorker.id);
+        await sendTelegramMessage(botToken, chatId, message, {
           keyboard,
           resize_keyboard: true
         });

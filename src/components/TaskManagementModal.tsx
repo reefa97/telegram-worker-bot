@@ -634,7 +634,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                             <div key={task.id} onClick={() => openEditForm(task)} className="bg-white dark:bg-gray-700 p-3 rounded-lg border border-purple-100 dark:border-gray-600 shadow-sm cursor-pointer hover:shadow-md transition-all group relative">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <span className="font-medium text-gray-800 dark:text-gray-200 text-sm line-clamp-2">{task.title}</span>
-                                                    <button onClick={(e) => handleDeleteTask(task.id, e)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5">
+                                                    <button onClick={(e) => handleDeleteTask(task.id, e)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5">
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
                                                 </div>
@@ -669,7 +669,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                                 <div key={task.id} onClick={() => openEditForm(task)} className="bg-white dark:bg-gray-700 p-3 rounded-lg border border-amber-100 dark:border-gray-600 shadow-sm cursor-pointer hover:shadow-md transition-all group relative">
                                                     <div className="flex justify-between items-start mb-2">
                                                         <span className="font-medium text-gray-800 dark:text-gray-200 text-sm line-clamp-2">{task.title}</span>
-                                                        <button onClick={(e) => handleDeleteTask(task.id, e)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5">
+                                                        <button onClick={(e) => handleDeleteTask(task.id, e)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5">
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
                                                     </div>
@@ -721,7 +721,7 @@ function TaskCard({ task, onDragStart, onClick, onDelete, showDelete = false }: 
                 {onDelete && (
                     <button
                         onClick={onDelete}
-                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5"
+                        className="md:opacity-0 md:group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5"
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                     </button>

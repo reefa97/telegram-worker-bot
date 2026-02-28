@@ -258,14 +258,23 @@ async function handleCheckNotification(botToken: string, checkId: string) {
         }
     }
 
-    // Get workers assigned to this object
     const { data: workerObjects } = await supabase
         .from("worker_objects")
         .select("worker_id, workers(telegram_chat_id, first_name)")
         .eq("object_id", check.object_id);
 
+    // Get Guardians (owner_ids) for this object
+    const { data: objOwners } = await supabase
+        .from("cleaning_objects")
+        .select("owner_ids")
+        .eq("id", check.object_id)
+        .single();
+
+    const guardianIds = objOwners?.owner_ids || [];
+
     let sentCount = 0;
 
+    // 1. Notify Workers
     if (workerObjects) {
         for (const wo of workerObjects) {
             const chatId = (wo as any).workers?.telegram_chat_id;
@@ -281,6 +290,23 @@ async function handleCheckNotification(botToken: string, checkId: string) {
                     );
                 }
                 sentCount++;
+            }
+        }
+    }
+
+    // 2. Notify Guardians (Coordinators)
+    if (guardianIds.length > 0) {
+        const { data: guardians } = await supabase
+            .from("admin_users")
+            .select("telegram_chat_id")
+            .in("id", guardianIds);
+
+        if (guardians) {
+            for (const g of guardians) {
+                if (g.telegram_chat_id) {
+                    const guardianMsg = `📢 <b>Уведомление для опекуна</b>\n\n${msg}`;
+                    await sendTelegram(botToken, g.telegram_chat_id, guardianMsg);
+                }
             }
         }
     }

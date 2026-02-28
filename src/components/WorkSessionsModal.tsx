@@ -281,7 +281,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                                                 </div>
                                             </td>
                                             <td className="pr-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                                     {editingSession === session.id ? (
                                                         <>
                                                             <button

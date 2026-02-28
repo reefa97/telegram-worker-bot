@@ -1,6 +1,6 @@
 import fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
 
-// Read .env file directly
 const envFile = fs.readFileSync('.env', 'utf8');
 const env = {};
 envFile.split('\n').forEach(line => {
@@ -13,16 +13,17 @@ envFile.split('\n').forEach(line => {
 const SUPABASE_URL = env.SUPABASE_URL;
 const SUPABASE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
 
-async function run() {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/admin_users?email=eq.test@test.pl`, {
-        headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-    });
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const data = await res.json();
-    console.log("admin_users containing test@test.pl:");
+async function run() {
+    const { data } = await supabase
+        .from('client_objects')
+        .select(`
+            object_id,
+            cleaning_objects(id, name)
+        `)
+        .limit(2);
+
     console.log(JSON.stringify(data, null, 2));
 }
 

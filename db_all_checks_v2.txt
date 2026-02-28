@@ -1,0 +1,33 @@
+Checking ALL checks...
+All checks: [
+  {
+    "id": "4b985473-7470-460d-84f5-d81acdc744e1",
+    "object_id": "d795c1f7-a00d-4c31-8aad-197424a16500",
+    "manager_id": "e4cc7c10-fcaa-4399-8946-673413f442e8",
+    "check_date": "2026-02-21T09:24:24.606604+00:00",
+    "score_percentage": 99,
+    "notes": "manual test",
+    "created_at": "2026-02-21T09:24:24.606604+00:00",
+    "cleaning_objects": {
+      "name": "Przedszkole Mali Artyści"
+    },
+    "admin_users": {
+      "name": "Diana Tsvihun"
+    }
+  },
+  {
+    "id": "abb527be-d019-4943-af2f-c1845dc9ecb1",
+    "object_id": "d795c1f7-a00d-4c31-8aad-197424a16500",
+    "manager_id": "e4cc7c10-fcaa-4399-8946-673413f442e8",
+    "check_date": "2026-02-21T07:50:46.956979+00:00",
+    "score_percentage": 60,
+    "notes": "test",
+    "created_at": "2026-02-21T07:50:46.956979+00:00",
+    "cleaning_objects": {
+      "name": "Przedszkole Mali Artyści"
+    },
+    "admin_users": {
+      "name": "Diana Tsvihun"
+    }
+  }
+]

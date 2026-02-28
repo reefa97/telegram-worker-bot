@@ -1022,7 +1022,7 @@ export default function QualityControlPanel() {
                                             )}
 
                                             <div className="mt-3 flex justify-end">
-                                                <span className="text-xs text-primary-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                                <span className="text-xs text-primary-500 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center gap-1">
                                                     <Eye className="w-3.5 h-3.5" /> Подробнее
                                                 </span>
                                             </div>

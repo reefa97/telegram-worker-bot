@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Edit2, Trash2, Send, Copy, Check, Users, History, Search } from 'lucide-react';
@@ -66,6 +66,8 @@ export default function WorkersPanel() {
     const [isAddingRole, setIsAddingRole] = useState(false);
     const [newRoleName, setNewRoleName] = useState('');
     const [isSavingRole, setIsSavingRole] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSubmittingRef = useRef(false);
 
     useEffect(() => {
         loadWorkers();
@@ -121,6 +123,10 @@ export default function WorkersPanel() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
+        setIsSubmitting(true);
+
         try {
             if (editingWorker) {
                 const { error } = await supabase
@@ -139,12 +145,15 @@ export default function WorkersPanel() {
                 await supabase.from('worker_objects').delete().eq('worker_id', editingWorker.id);
 
                 if (formData.selectedObjects.length > 0) {
-                    const workerObjects = formData.selectedObjects.map(objId => ({
+                    console.log('Sending selected objects for EDIT:', formData.selectedObjects);
+                    const uniqueObjectIds = Array.from(new Set(formData.selectedObjects.filter(Boolean)));
+                    const workerObjects = uniqueObjectIds.map(objId => ({
                         worker_id: editingWorker.id,
                         object_id: objId,
                     }));
 
-                    await supabase.from('worker_objects').insert(workerObjects);
+                    const { error: woError } = await supabase.from('worker_objects').insert(workerObjects);
+                    if (woError) throw new Error('Ошибка при привязке объектов к работнику: ' + woError.message);
                 }
             } else {
                 const token = generateToken();
@@ -164,12 +173,18 @@ export default function WorkersPanel() {
                 if (error) throw error;
 
                 if (formData.selectedObjects.length > 0 && newWorker) {
-                    const workerObjects = formData.selectedObjects.map(objId => ({
+                    console.log('Sending selected objects for NEW:', formData.selectedObjects);
+                    const uniqueObjectIds = Array.from(new Set(formData.selectedObjects.filter(Boolean)));
+                    const workerObjects = uniqueObjectIds.map(objId => ({
                         worker_id: newWorker.id,
                         object_id: objId,
                     }));
+                    console.log('Final workerObjects array:', workerObjects);
 
-                    await supabase.from('worker_objects').insert(workerObjects);
+                    const { error: woError } = await supabase.from('worker_objects').insert(workerObjects);
+                    if (woError) {
+                        alert('Работник создан, но произошла ошибка при привязке объектов: ' + woError.message);
+                    }
                 }
             }
 
@@ -179,6 +194,9 @@ export default function WorkersPanel() {
             console.error('Error saving worker:', error);
             const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
             alert(`Ошибка при сохранении работника: ${errorMessage}`);
+        } finally {
+            isSubmittingRef.current = false;
+            setIsSubmitting(false);
         }
     };
 
@@ -492,7 +510,7 @@ export default function WorkersPanel() {
                                     )}
                                 </td>
                                 <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => setHistoryWorker(worker)}
                                             className="btn-icon"
@@ -675,15 +693,15 @@ export default function WorkersPanel() {
                                                     checked={formData.selectedObjects.includes(obj.id)}
                                                     onChange={(e) => {
                                                         if (e.target.checked) {
-                                                            setFormData({
-                                                                ...formData,
-                                                                selectedObjects: [...formData.selectedObjects, obj.id],
-                                                            });
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                selectedObjects: Array.from(new Set([...prev.selectedObjects, obj.id])),
+                                                            }));
                                                         } else {
-                                                            setFormData({
-                                                                ...formData,
-                                                                selectedObjects: formData.selectedObjects.filter(id => id !== obj.id),
-                                                            });
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                selectedObjects: prev.selectedObjects.filter(id => id !== obj.id),
+                                                            }));
                                                         }
                                                     }}
                                                     className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
@@ -697,11 +715,11 @@ export default function WorkersPanel() {
                             </div>
 
                             <div className="modal-footer">
-                                <button type="button" onClick={closeModal} className="btn-secondary flex-1">
+                                <button type="button" onClick={closeModal} className="btn-secondary flex-1" disabled={isSubmitting}>
                                     Отмена
                                 </button>
-                                <button type="submit" className="btn-primary flex-1">
-                                    {editingWorker ? 'Сохранить' : 'Создать'}
+                                <button type="submit" className="btn-primary flex-1 whitespace-nowrap" disabled={isSubmitting}>
+                                    {isSubmitting ? 'Сохранение...' : (editingWorker ? 'Сохранить' : 'Создать')}
                                 </button>
                             </div>
                         </form>

@@ -247,7 +247,7 @@ export default function ShiftPlanningPanel() {
                                                             <span className="text-main font-medium">
                                                                 {worker.first_name} {worker.last_name}
                                                             </span>
-                                                            <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="ml-auto md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                                                 {/* Potential action buttons for future */}
                                                             </div>
                                                         </div>

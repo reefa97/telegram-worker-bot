@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import {
     LogOut, Users, Briefcase, FileText, Settings, UserCog, UserPlus2,
-    Calendar, X, Trash2, ScrollText, Search, ChevronLeft, ChevronRight, Sun, Moon, Mail, Menu, User
+    Calendar, X, Trash2, ScrollText, Search, ChevronLeft, ChevronRight, Sun, Moon, Menu, User
 } from 'lucide-react';
 import WorkersPanel from './WorkersPanel';
 import ObjectsPanel from './ObjectsPanel';
@@ -16,7 +16,7 @@ import LogsPanel from './LogsPanel';
 import TrashPanel from './TrashPanel';
 import EmailSearchPanel from './EmailSearchPanel';
 import RolesPanel from './RolesPanel';
-import { EmailLayout } from './email/EmailLayout';
+
 import ProcurementPanel from './ProcurementPanel';
 import MyFinancesPanel from './MyFinancesPanel';
 import MyCabinetPanel from './MyCabinetPanel';
@@ -24,7 +24,7 @@ import ClientsPanel from './ClientsPanel';
 import QualityControlPanel from './QualityControlPanel';
 import { Shield, ShoppingBag, CheckSquare, ClipboardCheck } from 'lucide-react';
 
-type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks' | 'logs' | 'trash' | 'email_search' | 'roles' | 'procurement' | 'emails' | 'my_finances' | 'my_cabinet' | 'clients' | 'quality';
+type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks' | 'logs' | 'trash' | 'email_search' | 'roles' | 'procurement' | 'my_finances' | 'my_cabinet' | 'clients' | 'quality';
 
 export default function Dashboard() {
     const { signOut, adminUser } = useAuth();
@@ -71,7 +71,7 @@ export default function Dashboard() {
         { id: 'roles', label: 'Роли', icon: Shield, requiredPermission: 'roles_view' },
         { id: 'trash', label: 'Корзина', icon: Trash2, superAdminOnly: true },
         { id: 'settings', label: 'Настройки', icon: Settings, superAdminOnly: true },
-        { id: 'emails', label: 'Почта', icon: Mail, requiredPermission: 'email_search_view' },
+
     ];
 
     const visibleTabs = tabs.filter(tab => {
@@ -236,13 +236,13 @@ export default function Dashboard() {
                             <Menu size={20} />
                         </button>
                         <span className="text-sm font-semibold tracking-tight text-main">
-                            Reefa
+                            {tabs.find(t => t.id === activeTab)?.label || 'Reefa'}
                         </span>
                     </div>
                 </header>
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-y-auto p-4 lg:p-8">
+                <div className="flex-1 overflow-y-auto p-4 lg:p-8 pb-20 lg:pb-8">
                     {activeTab === 'workers' && <WorkersPanel />}
                     {activeTab === 'objects' && <ObjectsPanel />}
                     {activeTab === 'my_finances' && <MyFinancesPanel />}
@@ -255,7 +255,7 @@ export default function Dashboard() {
                     {activeTab === 'settings' && <SettingsPanel />}
                     {activeTab === 'logs' && <LogsPanel />}
                     {activeTab === 'email_search' && <EmailSearchPanel />}
-                    {activeTab === 'emails' && <EmailLayout />}
+
                     {activeTab === 'roles' && <RolesPanel />}
                     {activeTab === 'trash' && <TrashPanel />}
                     {activeTab === 'clients' && <ClientsPanel />}
