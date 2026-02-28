@@ -194,6 +194,16 @@ html:not(.dark) body {
     height: 36px;
   }
 
+  /* Fix iOS Safari date/time input overflow */
+  .input[type="date"],
+  .input[type="time"],
+  .input[type="datetime-local"] {
+    display: block;
+    -webkit-appearance: none;
+    appearance: none;
+    max-width: 100%;
+  }
+
   /* --- Cards --- */
   .card {
     background-color: var(--bg-card);
