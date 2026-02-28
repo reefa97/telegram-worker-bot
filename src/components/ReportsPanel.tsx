@@ -280,7 +280,7 @@ export default function ReportsPanel() {
             {/* Filters */}
             <div className="card p-4 lg:p-6 mb-6 overflow-hidden">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                    <div className="min-w-0 overflow-hidden">
+                    <div className="min-w-0">
                         <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Дата от</label>
                         <input
                             type="date"
@@ -289,7 +289,7 @@ export default function ReportsPanel() {
                             className="input w-full min-w-0 max-w-full box-border"
                         />
                     </div>
-                    <div className="min-w-0 overflow-hidden">
+                    <div className="min-w-0">
                         <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Дата до</label>
                         <input
                             type="date"
