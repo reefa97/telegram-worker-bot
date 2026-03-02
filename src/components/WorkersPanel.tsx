@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, Send, Copy, Check, Users, History, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Send, Copy, Check, Users, History, Search, RefreshCw } from 'lucide-react';
 import WorkSessionsModal from './WorkSessionsModal';
 import WorkerDetailsModal from './WorkerDetailsModal';
 
@@ -317,6 +317,31 @@ export default function WorkersPanel() {
         setTimeout(() => setCopiedToken(null), 2000);
     };
 
+    const regenerateToken = async (worker: Worker) => {
+        if (!confirm(`Сгенерировать новую ссылку активации для ${worker.first_name} ${worker.last_name}?\n\nЭто сбросит текущее подключение к Telegram (если есть).`)) return;
+        const newToken = generateToken();
+        const { error } = await supabase
+            .from('workers')
+            .update({
+                invitation_token: newToken,
+                telegram_user_id: null,
+                telegram_chat_id: null,
+                telegram_username: null,
+                is_active: false,
+            })
+            .eq('id', worker.id);
+
+        if (error) {
+            console.error('Error regenerating token:', error);
+            alert('Ошибка при генерации новой ссылки: ' + error.message);
+            return;
+        }
+
+        copyInvitationLink(newToken);
+        alert('✅ Новая ссылка сгенерирована и скопирована в буфер обмена!');
+        loadWorkers();
+    };
+
     const openModal = (worker?: Worker) => {
         if (worker) {
             setEditingWorker(worker);
@@ -538,7 +563,7 @@ export default function WorkersPanel() {
                                                         <Trash2 size={16} />
                                                     </button>
                                                 )}
-                                                {!worker.telegram_user_id && (
+                                                {(!worker.telegram_user_id || !worker.is_active) && worker.invitation_token && (
                                                     <button
                                                         onClick={() => copyInvitationLink(worker.invitation_token)}
                                                         className="btn-icon text-success hover:text-success hover:bg-green-50 dark:hover:bg-green-900/10"
@@ -551,6 +576,13 @@ export default function WorkersPanel() {
                                                         )}
                                                     </button>
                                                 )}
+                                                <button
+                                                    onClick={() => regenerateToken(worker)}
+                                                    className="btn-icon text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/10"
+                                                    title="Сгенерировать новую ссылку активации"
+                                                >
+                                                    <RefreshCw size={16} />
+                                                </button>
                                             </>
                                         )}
                                     </div>

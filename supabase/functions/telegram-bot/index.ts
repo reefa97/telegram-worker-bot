@@ -1135,30 +1135,69 @@ serve(async (req) => {
       // 1. Activation Check (/start <token>)
       if (text?.startsWith("/start") && text.split(" ").length > 1) {
         const token = text.split(" ")[1];
-        console.log(`[activation] Checking token: ${token}`);
+        console.log(`[activation] Checking token: ${token} from user ${userId} (chat ${chatId})`);
+        await logToSystem('info', 'activation', `Activation attempt with token: ${token}`, { userId, chatId, username: from.username });
 
         // Try Worker Token
-        const { data: worker } = await supabase.from("workers").select("id").eq("invitation_token", token).maybeSingle();
+        const { data: worker, error: workerLookupError } = await supabase.from("workers").select("id, first_name, last_name").eq("invitation_token", token).maybeSingle();
+        if (workerLookupError) {
+          console.error(`[activation] Worker lookup error:`, workerLookupError);
+          await logToSystem('error', 'activation', `Worker token lookup failed: ${workerLookupError.message}`, { token, userId });
+        }
         if (worker) {
-          await supabase.from("workers").update({
+          const { error: updateError } = await supabase.from("workers").update({
             telegram_user_id: userId.toString(),
             telegram_chat_id: chatId,
             telegram_username: from.username || "",
             is_active: true,
+            invitation_token: null, // Clear token after successful activation
           }).eq("id", worker.id);
+
+          if (updateError) {
+            console.error(`[activation] Worker update FAILED for ${worker.id}:`, updateError);
+            await logToSystem('error', 'activation', `Worker activation update failed: ${updateError.message}`, { workerId: worker.id, token, userId });
+            await sendTelegramMessage(botToken, chatId, "❌ Ошибка при активации. Пожалуйста, попросите администратора сгенерировать новую ссылку.");
+            return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+          }
+
+          console.log(`[activation] Worker ${worker.id} (${worker.first_name} ${worker.last_name}) activated successfully`);
+          await logToSystem('info', 'activation', `Worker activated: ${worker.first_name} ${worker.last_name}`, { workerId: worker.id, userId, chatId }, worker.id);
           const keyboard = await getWorkerKeyboard(worker.id);
           await sendTelegramMessage(botToken, chatId, `✅ Вы успешно активировали аккаунт работника!`, { keyboard, resize_keyboard: true });
           return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
         }
 
+        // Check if worker already activated with this telegram user (re-click of old link)
+        const { data: existingWorker } = await supabase.from("workers").select("id, first_name, last_name").eq("telegram_user_id", userId.toString()).maybeSingle();
+        if (existingWorker) {
+          console.log(`[activation] User ${userId} already activated as worker ${existingWorker.id}`);
+          const keyboard = await getWorkerKeyboard(existingWorker.id);
+          await sendTelegramMessage(botToken, chatId, `👋 Вы уже активированы как ${existingWorker.first_name} ${existingWorker.last_name}!`, { keyboard, resize_keyboard: true });
+          return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+        }
+
         // Try Admin Token
-        const { data: tokenAdmin } = await supabase.from("admin_users").select("id, role").eq("invitation_token", token).maybeSingle();
+        const { data: tokenAdmin, error: adminLookupError } = await supabase.from("admin_users").select("id, role").eq("invitation_token", token).maybeSingle();
+        if (adminLookupError) {
+          console.error(`[activation] Admin lookup error:`, adminLookupError);
+          await logToSystem('error', 'activation', `Admin token lookup failed: ${adminLookupError.message}`, { token, userId });
+        }
         if (tokenAdmin) {
-          await supabase.from("admin_users").update({
+          const { error: adminUpdateError } = await supabase.from("admin_users").update({
             telegram_chat_id: chatId.toString(),
             telegram_username: from.username || "",
-            is_active: true
+            is_active: true,
+            invitation_token: null, // Clear token after successful activation
           }).eq("id", tokenAdmin.id);
+
+          if (adminUpdateError) {
+            console.error(`[activation] Admin update FAILED for ${tokenAdmin.id}:`, adminUpdateError);
+            await logToSystem('error', 'activation', `Admin activation update failed: ${adminUpdateError.message}`, { adminId: tokenAdmin.id, token, userId });
+            await sendTelegramMessage(botToken, chatId, "❌ Ошибка при активации. Пожалуйста, попросите главного администратора сгенерировать новую ссылку.");
+            return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+          }
+
+          await logToSystem('info', 'activation', `Admin activated successfully`, { adminId: tokenAdmin.id, userId, chatId });
           await sendTelegramMessage(botToken, chatId, `✅ Вы успешно активировали аккаунт администратора!`, {
             keyboard: getAdminKeyboard(tokenAdmin.role),
             resize_keyboard: true
@@ -1166,7 +1205,8 @@ serve(async (req) => {
           return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
         }
 
-        await sendTelegramMessage(botToken, chatId, "❌ Неверный или истекший код активации.");
+        await logToSystem('warn', 'activation', `Invalid or expired activation token`, { token, userId, chatId });
+        await sendTelegramMessage(botToken, chatId, "❌ Неверный или истекший код активации. Попросите администратора сгенерировать новую ссылку.");
         return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
       }
 
