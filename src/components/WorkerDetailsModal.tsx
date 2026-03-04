@@ -146,19 +146,18 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn" onClick={onClose}>
-            <div className="bg-white dark:bg-zinc-950 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 max-w-lg w-full max-h-[90vh] overflow-y-auto animate-scaleIn" onClick={e => e.stopPropagation()}>
-                <div className="p-6">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                            <User className="w-5 h-5 text-zinc-500" />
-                            Карточка работника
-                        </h3>
-                        <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
-                            <span className="sr-only">Закрыть</span>
-                            <X className="w-6 h-6" />
-                        </button>
-                    </div>
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content sm:max-w-lg" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h3 className="text-xl font-bold text-main flex items-center gap-2">
+                        <User className="w-5 h-5 text-muted" />
+                        Карточка работника
+                    </h3>
+                    <button onClick={onClose} className="btn-icon">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="modal-body">
 
                     <div className="space-y-6">
                         {/* Header Info */}
@@ -327,8 +326,8 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
                                                 type="button"
                                                 onClick={() => setAdjustMode('add')}
                                                 className={`flex-1 py-1.5 rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition-colors ${adjustMode === 'add'
-                                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800'
-                                                        : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700'
+                                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800'
+                                                    : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700'
                                                     }`}
                                             >
                                                 <Plus className="w-3.5 h-3.5" /> Начислить
@@ -337,8 +336,8 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
                                                 type="button"
                                                 onClick={() => setAdjustMode('deduct')}
                                                 className={`flex-1 py-1.5 rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition-colors ${adjustMode === 'deduct'
-                                                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800'
-                                                        : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700'
+                                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800'
+                                                    : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700'
                                                     }`}
                                             >
                                                 <Minus className="w-3.5 h-3.5" /> Списать
@@ -390,11 +389,11 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
                         )}
                     </div>
 
-                    <div className="mt-8 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
-                        <button onClick={onClose} className="btn-secondary w-full sm:w-auto">
-                            Закрыть
-                        </button>
-                    </div>
+                </div>
+                <div className="modal-footer">
+                    <button onClick={onClose} className="btn-secondary flex-1 sm:flex-none">
+                        Закрыть
+                    </button>
                 </div>
             </div>
         </div>

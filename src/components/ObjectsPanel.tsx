@@ -1430,7 +1430,7 @@ function ObjectDetailsModal({ object, onClose, creators, adminUser }: { object: 
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content max-w-2xl" onClick={e => e.stopPropagation()}>
+            <div className="modal-content sm:max-w-2xl" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
                     <h3 className="text-xl font-bold text-main">{object.name}</h3>
                     <button onClick={onClose} className="btn-icon">

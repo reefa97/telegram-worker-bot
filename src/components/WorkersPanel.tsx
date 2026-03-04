@@ -474,9 +474,9 @@ export default function WorkersPanel() {
                             </th>
                             <th>Имя</th>
                             <th>Роль</th>
-                            <th>Телефон</th>
-                            <th>Telegram</th>
-                            <th>Опекун</th>
+                            <th className="hidden sm:table-cell">Телефон</th>
+                            <th className="hidden sm:table-cell">Telegram</th>
+                            <th className="hidden md:table-cell">Опекун</th>
                             <th>Статус</th>
                             <th className="text-right">Действия</th>
                         </tr>
@@ -502,8 +502,8 @@ export default function WorkersPanel() {
                                 <td className="text-muted">
                                     {worker.worker_roles?.name || worker.role || '-'}
                                 </td>
-                                <td className="text-muted font-mono text-xs">{worker.phone_number}</td>
-                                <td className="text-muted" onClick={(e) => e.stopPropagation()}>
+                                <td className="text-muted font-mono text-xs hidden sm:table-cell">{worker.phone_number}</td>
+                                <td className="text-muted hidden sm:table-cell" onClick={(e) => e.stopPropagation()}>
                                     {worker.telegram_username ? (
                                         <a
                                             href={`https://t.me/${worker.telegram_username}`}
@@ -517,7 +517,7 @@ export default function WorkersPanel() {
                                         <span className="opacity-50">Не активирован</span>
                                     )}
                                 </td>
-                                <td className="text-muted">
+                                <td className="text-muted hidden md:table-cell">
                                     {(worker as any).created_by && creators[(worker as any).created_by] ? creators[(worker as any).created_by] : '-'}
                                 </td>
 
@@ -535,7 +535,7 @@ export default function WorkersPanel() {
                                     )}
                                 </td>
                                 <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => setHistoryWorker(worker)}
                                             className="btn-icon"
@@ -595,8 +595,8 @@ export default function WorkersPanel() {
 
             {/* Modal */}
             {showModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
+                <div className="modal-overlay" onClick={closeModal}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                                 {editingWorker ? 'Редактировать работника' : 'Новый работник'}
@@ -761,8 +761,8 @@ export default function WorkersPanel() {
 
             {/* Bulk Message Modal */}
             {showBulkModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content max-w-md">
+                <div className="modal-overlay" onClick={() => setShowBulkModal(false)}>
+                    <div className="modal-content max-w-md" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                                 Написать {selectedWorkers.size} работникам

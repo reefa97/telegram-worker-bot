@@ -147,24 +147,24 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn overflow-hidden">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col animate-scaleIn border border-gray-100 dark:border-gray-700">
-                <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50 rounded-t-2xl">
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content sm:max-w-5xl" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
                     <div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-main flex items-center gap-2">
                             <History className="w-5 h-5 text-primary-500" />
                             История работы
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            Сотрудник: <span className="font-medium text-gray-900 dark:text-white">{workerName}</span>
+                        <p className="text-sm text-muted mt-1">
+                            Сотрудник: <span className="font-medium text-main">{workerName}</span>
                         </p>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
+                    <button onClick={onClose} className="btn-icon">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-auto p-0 custom-scrollbar">
+                <div className="modal-body p-0">
                     {loading ? (
                         <div className="flex justify-center items-center h-64">
                             <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>

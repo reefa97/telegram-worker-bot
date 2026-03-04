@@ -369,33 +369,33 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
     const getMonthlyTasks = () => tasks.filter(t => t.frequency === 'monthly');
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-hidden animate-fadeIn">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-[95vw] w-full h-[90vh] flex flex-col animate-scaleIn border border-gray-100 dark:border-gray-700">
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content sm:max-w-[95vw] sm:h-[90vh]" onClick={e => e.stopPropagation()}>
                 {/* Header */}
-                <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/80 dark:bg-gray-800/80 rounded-t-2xl backdrop-blur-sm">
-                    <div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="modal-header flex-col sm:flex-row gap-3">
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-lg sm:text-xl font-bold text-main flex items-center gap-2">
                             <span className="bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 p-1.5 rounded-lg">
                                 <Calendar className="w-5 h-5" />
                             </span>
                             Планировщик задач
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 ml-10">
-                            Объект: <span className="font-semibold text-gray-900 dark:text-gray-200">{objectName}</span>
+                        <p className="text-sm text-muted mt-1 ml-10 truncate">
+                            Объект: <span className="font-semibold text-main">{objectName}</span>
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <label className="btn-secondary flex items-center gap-2 cursor-pointer shadow-sm relative px-3 py-2 text-sm">
-                            {loading ? <span className="animate-pulse">Загрузка...</span> : <><ScanText className="w-4 h-4" /> OCR Импорт</>}
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <label className="btn-secondary flex items-center gap-2 cursor-pointer shadow-sm relative px-3 py-2 text-sm flex-1 sm:flex-none justify-center">
+                            {loading ? <span className="animate-pulse">Загрузка...</span> : <><ScanText className="w-4 h-4" /> OCR</>}
                             <input type="file" accept="image/*" className="hidden" onChange={handleOcrUpload} disabled={loading} />
                         </label>
                         <button
                             onClick={() => { closeForm(); setShowAddForm(true); }}
-                            className="btn-primary flex items-center gap-2 px-4 py-2 shadow-lg shadow-primary-500/20"
+                            className="btn-primary flex items-center gap-2 px-4 py-2 shadow-lg shadow-primary-500/20 flex-1 sm:flex-none justify-center"
                         >
                             <Plus className="w-4 h-4" /> Добавить
                         </button>
-                        <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors text-gray-400">
+                        <button onClick={onClose} className="btn-icon shrink-0">
                             <X className="w-6 h-6" />
                         </button>
                     </div>

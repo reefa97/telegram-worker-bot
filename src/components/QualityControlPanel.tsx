@@ -598,7 +598,7 @@ export default function QualityControlPanel() {
             </div>
 
             {/* Sub-tabs */}
-            <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg mb-6 w-fit border border-gray-200 dark:border-gray-700">
+            <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg mb-6 w-fit border border-gray-200 dark:border-gray-700 overflow-x-auto max-w-full">
                 <button
                     onClick={() => setActiveSubTab('checks')}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeSubTab === 'checks'
@@ -1060,145 +1060,147 @@ export default function QualityControlPanel() {
 
             {/* ===== DETAIL MODAL ===== */}
             {showDetailModal && detailCheck && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDetailModal(false)}>
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-2">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Детали проверки</h3>
+                <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
+                    <div className="modal-content sm:max-w-lg" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="text-lg font-bold text-main">Детали проверки</h3>
                             <div className="flex items-center gap-1">
                                 {isSuperAdmin && (
                                     <button
                                         onClick={handleDeleteCheck}
-                                        className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                        className="btn-icon text-danger hover:text-danger hover:bg-red-50 dark:hover:bg-red-900/10"
                                         title="Удалить проверку"
                                     >
                                         <Trash2 className="w-5 h-5" />
                                     </button>
                                 )}
-                                <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                                <button onClick={() => setShowDetailModal(false)} className="btn-icon">
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>
+                        <div className="modal-body">
 
-                        {/* Header info */}
-                        <div className="bg-gray-50 dark:bg-gray-700/30 rounded-xl p-4 mb-5">
-                            <h4 className="font-bold text-gray-900 dark:text-white">{getObjectName(detailCheck.object_id)}</h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
-                                <MapPin className="w-3.5 h-3.5" /> {getObjectAddress(detailCheck.object_id)}
-                            </p>
-                            <div className="flex items-center gap-4 mt-3 flex-wrap">
-                                <span className="text-sm text-gray-500 flex items-center gap-1">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    {new Date(detailCheck.check_date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                                <span className="text-sm text-gray-500 flex items-center gap-1">
-                                    <Shield className="w-3.5 h-3.5" />
-                                    Опекун: {(() => {
-                                        const obj = objects.find(o => o.id === detailCheck.object_id);
-                                        if (obj?.owner_ids && obj.owner_ids.length > 0) {
-                                            return getAdminName(obj.owner_ids[0]);
-                                        }
-                                        return obj?.created_by ? getAdminName(obj.created_by) : '—';
-                                    })()}
-                                </span>
-                                <span className="text-sm text-gray-500 flex items-center gap-1">
-                                    <User className="w-3.5 h-3.5" />
-                                    Проверяющий: {getAdminName(detailCheck.manager_id)}
-                                </span>
+                            {/* Header info */}
+                            <div className="bg-gray-50 dark:bg-gray-700/30 rounded-xl p-4 mb-5">
+                                <h4 className="font-bold text-gray-900 dark:text-white">{getObjectName(detailCheck.object_id)}</h4>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                                    <MapPin className="w-3.5 h-3.5" /> {getObjectAddress(detailCheck.object_id)}
+                                </p>
+                                <div className="flex items-center gap-4 mt-3 flex-wrap">
+                                    <span className="text-sm text-gray-500 flex items-center gap-1">
+                                        <Calendar className="w-3.5 h-3.5" />
+                                        {new Date(detailCheck.check_date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                    <span className="text-sm text-gray-500 flex items-center gap-1">
+                                        <Shield className="w-3.5 h-3.5" />
+                                        Опекун: {(() => {
+                                            const obj = objects.find(o => o.id === detailCheck.object_id);
+                                            if (obj?.owner_ids && obj.owner_ids.length > 0) {
+                                                return getAdminName(obj.owner_ids[0]);
+                                            }
+                                            return obj?.created_by ? getAdminName(obj.created_by) : '—';
+                                        })()}
+                                    </span>
+                                    <span className="text-sm text-gray-500 flex items-center gap-1">
+                                        <User className="w-3.5 h-3.5" />
+                                        Проверяющий: {getAdminName(detailCheck.manager_id)}
+                                    </span>
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Score */}
-                        <div className="text-center mb-5">
-                            <div className={`text-5xl font-black ${detailCheck.score_percentage >= 90 ? 'text-green-500' : detailCheck.score_percentage >= 70 ? 'text-yellow-500' : 'text-red-500'}`}>
-                                {detailCheck.score_percentage}%
+                            {/* Score */}
+                            <div className="text-center mb-5">
+                                <div className={`text-5xl font-black ${detailCheck.score_percentage >= 90 ? 'text-green-500' : detailCheck.score_percentage >= 70 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                    {detailCheck.score_percentage}%
+                                </div>
+                                <p className={`text-sm mt-1 font-medium ${detailCheck.score_percentage >= 90 ? 'text-green-600 dark:text-green-400' :
+                                    detailCheck.score_percentage >= 70 ? 'text-yellow-600 dark:text-yellow-400' :
+                                        'text-red-600 dark:text-red-400'
+                                    }`}>
+                                    {detailCheck.score_percentage >= 90 ? '✅ Отлично' : detailCheck.score_percentage >= 70 ? '⚠️ Нужно улучшить' : '❌ Требует внимания'}
+                                </p>
                             </div>
-                            <p className={`text-sm mt-1 font-medium ${detailCheck.score_percentage >= 90 ? 'text-green-600 dark:text-green-400' :
-                                detailCheck.score_percentage >= 70 ? 'text-yellow-600 dark:text-yellow-400' :
-                                    'text-red-600 dark:text-red-400'
-                                }`}>
-                                {detailCheck.score_percentage >= 90 ? '✅ Отлично' : detailCheck.score_percentage >= 70 ? '⚠️ Нужно улучшить' : '❌ Требует внимания'}
-                            </p>
-                        </div>
 
-                        {/* Points */}
-                        {detailPoints !== 0 && (
-                            <div className={`text-center mb-5 py-2 px-4 rounded-lg text-sm font-medium ${detailPoints > 0
-                                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                                }`}>
-                                {detailPoints > 0 ? `+${detailPoints}` : detailPoints} баллов работникам
-                            </div>
-                        )}
+                            {/* Points */}
+                            {detailPoints !== 0 && (
+                                <div className={`text-center mb-5 py-2 px-4 rounded-lg text-sm font-medium ${detailPoints > 0
+                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                                    }`}>
+                                    {detailPoints > 0 ? `+${detailPoints}` : detailPoints} баллов работникам
+                                </div>
+                            )}
 
-                        {/* Checklist items */}
-                        {detailItems.length > 0 && (
-                            <div className="mb-5">
-                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Чек-лист ({detailItems.filter(i => i.is_passed).length}/{detailItems.length})</h4>
-                                <div className="space-y-2">
-                                    {detailItems.map(item => (
-                                        <div key={item.id}>
-                                            <div
-                                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${item.is_passed
-                                                    ? 'bg-green-50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200'
-                                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-medium'
-                                                    }`}
-                                            >
-                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
-                                                    ? 'bg-green-500 text-white'
-                                                    : 'bg-red-500 text-white'
-                                                    }`}>
-                                                    {item.is_passed ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                            {/* Checklist items */}
+                            {detailItems.length > 0 && (
+                                <div className="mb-5">
+                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Чек-лист ({detailItems.filter(i => i.is_passed).length}/{detailItems.length})</h4>
+                                    <div className="space-y-2">
+                                        {detailItems.map(item => (
+                                            <div key={item.id}>
+                                                <div
+                                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${item.is_passed
+                                                        ? 'bg-green-50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200'
+                                                        : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-medium'
+                                                        }`}
+                                                >
+                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
+                                                        ? 'bg-green-500 text-white'
+                                                        : 'bg-red-500 text-white'
+                                                        }`}>
+                                                        {item.is_passed ? <Check className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                                    </div>
+                                                    <span className="flex-1">{item.task_name}</span>
+                                                    {item.photo_urls && item.photo_urls.length > 0 && (
+                                                        <span className="text-xs text-gray-400 flex items-center gap-1">
+                                                            <ImageIcon className="w-3 h-3" /> {item.photo_urls.length}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <span className="flex-1">{item.task_name}</span>
+                                                {/* Photo thumbnails */}
                                                 {item.photo_urls && item.photo_urls.length > 0 && (
-                                                    <span className="text-xs text-gray-400 flex items-center gap-1">
-                                                        <ImageIcon className="w-3 h-3" /> {item.photo_urls.length}
-                                                    </span>
+                                                    <div className="flex gap-2 mt-1.5 ml-9 flex-wrap">
+                                                        {item.photo_urls.map((url, pi) => (
+                                                            <img
+                                                                key={pi}
+                                                                src={url}
+                                                                alt=""
+                                                                onClick={() => setLightboxUrl(url)}
+                                                                className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
+                                                            />
+                                                        ))}
+                                                    </div>
                                                 )}
                                             </div>
-                                            {/* Photo thumbnails */}
-                                            {item.photo_urls && item.photo_urls.length > 0 && (
-                                                <div className="flex gap-2 mt-1.5 ml-9 flex-wrap">
-                                                    {item.photo_urls.map((url, pi) => (
-                                                        <img
-                                                            key={pi}
-                                                            src={url}
-                                                            alt=""
-                                                            onClick={() => setLightboxUrl(url)}
-                                                            className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
-                                                        />
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Notes */}
-                        {detailCheck.notes && (
-                            <div className="mb-5">
-                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Примечание</h4>
-                                <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 text-sm text-gray-700 dark:text-gray-300 italic">
-                                    💬 {detailCheck.notes}
+                            {/* Notes */}
+                            {detailCheck.notes && (
+                                <div className="mb-5">
+                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Примечание</h4>
+                                    <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 text-sm text-gray-700 dark:text-gray-300 italic">
+                                        💬 {detailCheck.notes}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Placeholder for future photos */}
-                        {/* <div className="mb-5">
+                            {/* Placeholder for future photos */}
+                            {/* <div className="mb-5">
                             <h4 className="text-sm font-semibold mb-2">Фотографии</h4>
                             <div className="grid grid-cols-3 gap-2">thumbnails here</div>
                         </div> */}
 
-                        <button
-                            onClick={() => setShowDetailModal(false)}
-                            className="w-full btn-secondary px-4 py-2.5 mt-2"
-                        >
-                            Закрыть
-                        </button>
+                            <button
+                                onClick={() => setShowDetailModal(false)}
+                                className="w-full btn-secondary px-4 py-2.5 mt-2"
+                            >
+                                Закрыть
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1226,80 +1228,81 @@ export default function QualityControlPanel() {
 
             {/* ===== SCHEDULE MODAL ===== */}
             {showScheduleModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowScheduleModal(false)}>
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-gray-700" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
+                    <div className="modal-content sm:max-w-md" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="text-lg font-bold text-main">
                                 {editingScheduleId ? 'Редактировать график' : 'Назначить график проверки'}
                             </h3>
-                            <button onClick={() => setShowScheduleModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                            <button onClick={() => setShowScheduleModal(false)} className="btn-icon">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
+                        <div className="modal-body">
 
-                        <div className="space-y-4">
-                            {/* Object */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Объект</label>
-                                <select
-                                    value={scheduleForm.object_id}
-                                    onChange={e => setScheduleForm({ ...scheduleForm, object_id: e.target.value })}
-                                    className="input w-full"
-                                >
-                                    <option value="">Выберите объект...</option>
-                                    {objects.filter(o => o.is_active !== false).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                                </select>
-                            </div>
+                            <div className="space-y-4">
+                                {/* Object */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Объект</label>
+                                    <select
+                                        value={scheduleForm.object_id}
+                                        onChange={e => setScheduleForm({ ...scheduleForm, object_id: e.target.value })}
+                                        className="input w-full"
+                                    >
+                                        <option value="">Выберите объект...</option>
+                                        {objects.filter(o => o.is_active !== false).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                                    </select>
+                                </div>
 
-                            {/* Manager */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Доп. проверяющий <span className="text-gray-400 font-normal">(необязательно)</span></label>
-                                <select
-                                    value={scheduleForm.manager_id}
-                                    onChange={e => setScheduleForm({ ...scheduleForm, manager_id: e.target.value })}
-                                    className="input w-full"
-                                >
-                                    <option value="">Нет (проверяет опекун объекта)</option>
-                                    {admins.map(a => <option key={a.id} value={a.id}>{a.name || a.email}</option>)}
-                                </select>
-                            </div>
+                                {/* Manager */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Доп. проверяющий <span className="text-gray-400 font-normal">(необязательно)</span></label>
+                                    <select
+                                        value={scheduleForm.manager_id}
+                                        onChange={e => setScheduleForm({ ...scheduleForm, manager_id: e.target.value })}
+                                        className="input w-full"
+                                    >
+                                        <option value="">Нет (проверяет опекун объекта)</option>
+                                        {admins.map(a => <option key={a.id} value={a.id}>{a.name || a.email}</option>)}
+                                    </select>
+                                </div>
 
-                            {/* Day of week */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">День недели</label>
-                                <div className="flex gap-1">
-                                    {[1, 2, 3, 4, 5, 6, 7].map(d => (
-                                        <button
-                                            key={d}
-                                            type="button"
-                                            onClick={() => setScheduleForm({ ...scheduleForm, day_of_week: d })}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${scheduleForm.day_of_week === d
-                                                ? 'bg-primary-600 text-white shadow-md'
-                                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                                                }`}
-                                        >
-                                            {DAY_LABELS[d]}
-                                        </button>
-                                    ))}
+                                {/* Day of week */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">День недели</label>
+                                    <div className="flex gap-1">
+                                        {[1, 2, 3, 4, 5, 6, 7].map(d => (
+                                            <button
+                                                key={d}
+                                                type="button"
+                                                onClick={() => setScheduleForm({ ...scheduleForm, day_of_week: d })}
+                                                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${scheduleForm.day_of_week === d
+                                                    ? 'bg-primary-600 text-white shadow-md'
+                                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                                    }`}
+                                            >
+                                                {DAY_LABELS[d]}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Frequency */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Частота</label>
+                                    <select
+                                        value={scheduleForm.frequency_weeks}
+                                        onChange={e => setScheduleForm({ ...scheduleForm, frequency_weeks: Number(e.target.value) as 1 | 2 | 3 | 4 })}
+                                        className="input w-full"
+                                    >
+                                        {Object.entries(FREQ_LABELS).map(([val, label]) => (
+                                            <option key={val} value={val}>{label}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
-
-                            {/* Frequency */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Частота</label>
-                                <select
-                                    value={scheduleForm.frequency_weeks}
-                                    onChange={e => setScheduleForm({ ...scheduleForm, frequency_weeks: Number(e.target.value) as 1 | 2 | 3 | 4 })}
-                                    className="input w-full"
-                                >
-                                    {Object.entries(FREQ_LABELS).map(([val, label]) => (
-                                        <option key={val} value={val}>{label}</option>
-                                    ))}
-                                </select>
-                            </div>
                         </div>
-
-                        <div className="flex gap-3 mt-6">
+                        <div className="modal-footer">
                             <button onClick={() => setShowScheduleModal(false)} className="flex-1 btn-secondary px-4 py-2.5">
                                 Отмена
                             </button>
@@ -1317,138 +1320,138 @@ export default function QualityControlPanel() {
 
             {/* ===== CHECK MODAL ===== */}
             {showCheckModal && checkObject && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowCheckModal(false)}>
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-2">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Проверка качества</h3>
-                            <button onClick={() => setShowCheckModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                <div className="modal-overlay" onClick={() => setShowCheckModal(false)}>
+                    <div className="modal-content sm:max-w-lg" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="text-lg font-bold text-main">Проверка качества</h3>
+                            <button onClick={() => setShowCheckModal(false)} className="btn-icon">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{checkObject.name} — {checkObject.address}</p>
+                        <div className="modal-body">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{checkObject.name} — {checkObject.address}</p>
 
-                        {/* Score preview */}
-                        <div className="text-center mb-6 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
-                            <div className={`text-4xl font-black ${getScoreColor(getScore())}`}>
-                                {getScore()}%
-                            </div>
-                            <p className="text-xs text-gray-400 mt-1">Оценка чистоты</p>
-                        </div>
-
-                        {/* Check items */}
-                        <div className="space-y-2 mb-4">
-                            {checkItems.map((item, idx) => (
-                                <div key={idx}>
-                                    <div
-                                        className={`flex items-center gap-3 pl-4 pr-2 py-3 rounded-xl border transition-all cursor-pointer ${item.is_passed
-                                            ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700'
-                                            : 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
-                                            }`}
-                                        onClick={() => {
-                                            const updated = [...checkItems];
-                                            updated[idx].is_passed = !updated[idx].is_passed;
-                                            setCheckItems(updated);
-                                        }}
-                                    >
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-red-500 text-white'
-                                            }`}>
-                                            {item.is_passed ? <Check className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
-                                        </div>
-                                        <span className="flex-1 text-sm font-medium text-gray-900 dark:text-white">{item.task_name}</span>
-                                        {/* Camera button */}
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                fileInputRefs.current[idx]?.click();
-                                            }}
-                                            className="text-gray-400 hover:text-primary-500 p-1.5 transition-colors relative"
-                                            title="Добавить фото"
-                                        >
-                                            <Camera className="w-4 h-4" />
-                                            {item.photos.length > 0 && (
-                                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary-500 text-white rounded-full text-[10px] flex items-center justify-center">
-                                                    {item.photos.length}
-                                                </span>
-                                            )}
-                                        </button>
-                                        <input
-                                            ref={el => { fileInputRefs.current[idx] = el; }}
-                                            type="file"
-                                            accept="image/*"
-                                            multiple
-                                            capture="environment"
-                                            className="hidden"
-                                            onChange={(e) => {
-                                                handlePhotoSelect(idx, e.target.files);
-                                                e.target.value = '';
-                                            }}
-                                        />
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); removeCheckItem(idx); }}
-                                            className="text-gray-300 hover:text-red-500 p-1 transition-colors"
-                                        >
-                                            <X className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                    {/* Photo thumbnails */}
-                                    {item.photos.length > 0 && (
-                                        <div className="flex gap-2 mt-1.5 ml-14 flex-wrap">
-                                            {item.photos.map((photo, pi) => (
-                                                <div key={pi} className="relative group/photo">
-                                                    <img
-                                                        src={URL.createObjectURL(photo)}
-                                                        alt=""
-                                                        className="w-14 h-14 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
-                                                    />
-                                                    <button
-                                                        onClick={() => removePhoto(idx, pi)}
-                                                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity"
-                                                    >
-                                                        <X className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                            {/* Score preview */}
+                            <div className="text-center mb-6 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
+                                <div className={`text-4xl font-black ${getScoreColor(getScore())}`}>
+                                    {getScore()}%
                                 </div>
-                            ))}
-                        </div>
+                                <p className="text-xs text-gray-400 mt-1">Оценка чистоты</p>
+                            </div>
 
-                        {/* Add custom item */}
-                        <div className="flex gap-2 mb-6">
-                            <input
-                                type="text"
-                                placeholder="Добавить пункт..."
-                                value={newItemName}
-                                onChange={e => setNewItemName(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && addCheckItem()}
-                                className="input flex-1"
-                            />
-                            <button
-                                onClick={addCheckItem}
-                                disabled={!newItemName.trim()}
-                                className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-400 transition-colors disabled:opacity-50"
-                            >
-                                <Plus className="w-4 h-4" />
-                            </button>
-                        </div>
+                            {/* Check items */}
+                            <div className="space-y-2 mb-4">
+                                {checkItems.map((item, idx) => (
+                                    <div key={idx}>
+                                        <div
+                                            className={`flex items-center gap-3 pl-4 pr-2 py-3 rounded-xl border transition-all cursor-pointer ${item.is_passed
+                                                ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700'
+                                                : 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
+                                                }`}
+                                            onClick={() => {
+                                                const updated = [...checkItems];
+                                                updated[idx].is_passed = !updated[idx].is_passed;
+                                                setCheckItems(updated);
+                                            }}
+                                        >
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.is_passed
+                                                ? 'bg-green-500 text-white'
+                                                : 'bg-red-500 text-white'
+                                                }`}>
+                                                {item.is_passed ? <Check className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+                                            </div>
+                                            <span className="flex-1 text-sm font-medium text-gray-900 dark:text-white">{item.task_name}</span>
+                                            {/* Camera button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    fileInputRefs.current[idx]?.click();
+                                                }}
+                                                className="text-gray-400 hover:text-primary-500 p-1.5 transition-colors relative"
+                                                title="Добавить фото"
+                                            >
+                                                <Camera className="w-4 h-4" />
+                                                {item.photos.length > 0 && (
+                                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary-500 text-white rounded-full text-[10px] flex items-center justify-center">
+                                                        {item.photos.length}
+                                                    </span>
+                                                )}
+                                            </button>
+                                            <input
+                                                ref={el => { fileInputRefs.current[idx] = el; }}
+                                                type="file"
+                                                accept="image/*"
+                                                multiple
+                                                capture="environment"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    handlePhotoSelect(idx, e.target.files);
+                                                    e.target.value = '';
+                                                }}
+                                            />
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); removeCheckItem(idx); }}
+                                                className="text-gray-300 hover:text-red-500 p-1 transition-colors"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                        {/* Photo thumbnails */}
+                                        {item.photos.length > 0 && (
+                                            <div className="flex gap-2 mt-1.5 ml-14 flex-wrap">
+                                                {item.photos.map((photo, pi) => (
+                                                    <div key={pi} className="relative group/photo">
+                                                        <img
+                                                            src={URL.createObjectURL(photo)}
+                                                            alt=""
+                                                            className="w-14 h-14 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
+                                                        />
+                                                        <button
+                                                            onClick={() => removePhoto(idx, pi)}
+                                                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity"
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
 
-                        {/* Notes */}
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Заметки</label>
-                            <textarea
-                                value={checkNotes}
-                                onChange={e => setCheckNotes(e.target.value)}
-                                placeholder="Дополнительные комментарии..."
-                                rows={3}
-                                className="input w-full resize-none"
-                            />
-                        </div>
+                            {/* Add custom item */}
+                            <div className="flex gap-2 mb-6">
+                                <input
+                                    type="text"
+                                    placeholder="Добавить пункт..."
+                                    value={newItemName}
+                                    onChange={e => setNewItemName(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && addCheckItem()}
+                                    className="input flex-1"
+                                />
+                                <button
+                                    onClick={addCheckItem}
+                                    disabled={!newItemName.trim()}
+                                    className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-400 transition-colors disabled:opacity-50"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                            </div>
 
-                        {/* Actions */}
-                        <div className="flex gap-3">
+                            {/* Notes */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Заметки</label>
+                                <textarea
+                                    value={checkNotes}
+                                    onChange={e => setCheckNotes(e.target.value)}
+                                    placeholder="Дополнительные комментарии..."
+                                    rows={3}
+                                    className="input w-full resize-none"
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer">
                             <button onClick={() => setShowCheckModal(false)} className="flex-1 btn-secondary px-4 py-2.5">
                                 Отмена
                             </button>
