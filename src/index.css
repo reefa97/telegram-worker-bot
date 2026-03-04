@@ -385,6 +385,8 @@ html:not(.dark) body {
 
     .modal-content {
       @apply max-w-none rounded-none h-full max-h-full flex flex-col;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
     }
 
     .modal-body {
