@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Search, Play, Square, Save, Loader2, Copy, Trash2 } from 'lucide-react';
+import { Search, Play, Square, Save, Loader2, Copy, Trash2, AlertTriangle, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+
+interface BalanceAlert {
+    id: string;
+    message: string;
+    created_at: string;
+}
 
 interface SearchJob {
     id: string;
@@ -28,13 +34,15 @@ export default function EmailSearchPanel() {
     const [results, setResults] = useState<SearchResult[]>([]);
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-
+    const [balanceAlerts, setBalanceAlerts] = useState<BalanceAlert[]>([]);
+    const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
     // Fetch initial data
     useEffect(() => {
         if (user) {
             fetchToken();
             fetchJobs();
+            fetchBalanceAlerts();
         }
     }, [user]);
 
@@ -53,6 +61,18 @@ export default function EmailSearchPanel() {
             supabase.removeChannel(jobsChannel);
         };
     }, [user, selectedJobId]);
+
+    const fetchBalanceAlerts = async () => {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data } = await supabase
+            .from('system_logs')
+            .select('id, message, created_at')
+            .eq('category', 'balance')
+            .eq('level', 'warn')
+            .gte('created_at', since)
+            .order('created_at', { ascending: false });
+        if (data) setBalanceAlerts(data);
+    };
 
     const fetchToken = async () => {
         try {
@@ -249,6 +269,17 @@ export default function EmailSearchPanel() {
                     Поиск Email
                 </h2>
             </div>
+
+            {/* Balance Alerts */}
+            {balanceAlerts.filter(a => !dismissedAlerts.has(a.id)).map(alert => (
+                <div key={alert.id} className="flex items-start gap-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300">
+                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <span className="flex-1 text-sm">{alert.message}</span>
+                    <button onClick={() => setDismissedAlerts(prev => new Set(prev).add(alert.id))} className="shrink-0 opacity-60 hover:opacity-100">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            ))}
 
             {/* Settings & Search Bar */}
             <div className="card p-4 md:p-6 flex flex-col gap-4 md:gap-6">

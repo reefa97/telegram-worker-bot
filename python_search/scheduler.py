@@ -109,18 +109,11 @@ async def check_api_balances():
                             data = await resp.json()
                             balance = data.get("balance", 0)
                             if balance < SERPER_LOW_BALANCE_THRESHOLD:
-                                msg = (
-                                    f"⚠️ <b>Мало кредитов Serper!</b>\n"
-                                    f"Остаток: <b>{balance}</b> кредитов\n"
-                                    f"Пожалуйста, пополни баланс на serper.dev"
-                                )
                                 logger.warning(f"Serper low balance for {admin['name']}: {balance}")
                                 await log_system_warning(
                                     f"Мало кредитов Serper для {admin['name']}: {balance}",
                                     {"balance": balance, "admin_id": admin["id"]}
                                 )
-                                if admin.get("telegram_chat_id"):
-                                    await send_telegram_message(session, admin["telegram_chat_id"], msg)
                         else:
                             logger.warning(f"Serper account check failed for {admin['name']}: HTTP {resp.status}")
                 except Exception as e:
@@ -147,27 +140,11 @@ async def check_api_balances():
                         data = await resp.json()
                         error_code = data.get("error", {}).get("code", "")
                         if error_code in ("insufficient_quota", "billing_hard_limit_reached"):
-                            msg = (
-                                "⚠️ <b>Закончились кредиты OpenAI!</b>\n"
-                                "Поиск email работает, но AI-фильтрация отключена.\n"
-                                "Пожалуйста, пополни баланс на platform.openai.com"
-                            )
                             logger.warning(f"OpenAI quota exceeded: {error_code}")
                             await log_system_warning(
                                 f"Закончились кредиты OpenAI: {error_code}",
                                 {"error_code": error_code}
                             )
-                            # Notify all admins with telegram_chat_id
-                            try:
-                                all_admins = supabase.table("admin_users")\
-                                    .select("telegram_chat_id")\
-                                    .not_.is_("telegram_chat_id", "null")\
-                                    .execute()
-                                for a in all_admins.data:
-                                    if a.get("telegram_chat_id"):
-                                        await send_telegram_message(session, a["telegram_chat_id"], msg)
-                            except Exception as e:
-                                logger.error(f"Failed to notify admins about OpenAI quota: {e}")
             except Exception as e:
                 logger.error(f"Error checking OpenAI balance: {e}")
 
