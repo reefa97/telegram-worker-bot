@@ -56,6 +56,122 @@ async def send_telegram_message(session, chat_id, text):
     except Exception as e:
         logger.error(f"Telegram send error: {e}")
 
+SERPER_LOW_BALANCE_THRESHOLD = int(os.getenv("SERPER_LOW_BALANCE_THRESHOLD", "100"))
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
+BALANCE_CHECK_INTERVAL_HOURS = 6
+_balance_check_state: dict = {"last_check": None}
+
+
+async def log_system_warning(message: str, metadata: dict | None = None):
+    """Write a warning to system_logs so it appears in the web panel."""
+    try:
+        supabase.table("system_logs").insert({
+            "level": "warn",
+            "category": "balance",
+            "message": message,
+            "metadata": metadata or {}
+        }).execute()
+    except Exception as e:
+        logger.error(f"Failed to write balance warning to system_logs: {e}")
+
+
+async def check_api_balances():
+    now = datetime.now(timezone.utc)
+    last_check = _balance_check_state["last_check"]
+
+    if last_check is not None:
+        hours_since = (now - last_check).total_seconds() / 3600
+        if hours_since < BALANCE_CHECK_INTERVAL_HOURS:
+            return
+
+    _balance_check_state["last_check"] = now
+    logger.info("Checking API balances...")
+
+    async with aiohttp.ClientSession() as session:
+        # --- Serper: check balance per admin ---
+        try:
+            admins = supabase.table("admin_users")\
+                .select("id, name, serper_token, telegram_chat_id")\
+                .not_.is_("serper_token", "null")\
+                .neq("serper_token", "")\
+                .execute()
+
+            for admin in admins.data:
+                token = admin.get("serper_token")
+                if not token:
+                    continue
+                try:
+                    async with session.get(
+                        "https://google.serper.dev/account",
+                        headers={"X-API-KEY": token}
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            balance = data.get("balance", 0)
+                            if balance < SERPER_LOW_BALANCE_THRESHOLD:
+                                msg = (
+                                    f"⚠️ <b>Мало кредитов Serper!</b>\n"
+                                    f"Остаток: <b>{balance}</b> кредитов\n"
+                                    f"Пожалуйста, пополни баланс на serper.dev"
+                                )
+                                logger.warning(f"Serper low balance for {admin['name']}: {balance}")
+                                await log_system_warning(
+                                    f"Мало кредитов Serper для {admin['name']}: {balance}",
+                                    {"balance": balance, "admin_id": admin["id"]}
+                                )
+                                if admin.get("telegram_chat_id"):
+                                    await send_telegram_message(session, admin["telegram_chat_id"], msg)
+                        else:
+                            logger.warning(f"Serper account check failed for {admin['name']}: HTTP {resp.status}")
+                except Exception as e:
+                    logger.error(f"Error checking Serper balance for {admin['name']}: {e}")
+        except Exception as e:
+            logger.error(f"Error fetching admins for Serper balance check: {e}")
+
+        # --- OpenAI: test call to detect quota errors ---
+        if OPENAI_API_KEY:
+            try:
+                async with session.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {OPENAI_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
+                        "messages": [{"role": "user", "content": "hi"}],
+                        "max_tokens": 1
+                    }
+                ) as resp:
+                    if resp.status in (429, 402):
+                        data = await resp.json()
+                        error_code = data.get("error", {}).get("code", "")
+                        if error_code in ("insufficient_quota", "billing_hard_limit_reached"):
+                            msg = (
+                                "⚠️ <b>Закончились кредиты OpenAI!</b>\n"
+                                "Поиск email работает, но AI-фильтрация отключена.\n"
+                                "Пожалуйста, пополни баланс на platform.openai.com"
+                            )
+                            logger.warning(f"OpenAI quota exceeded: {error_code}")
+                            await log_system_warning(
+                                f"Закончились кредиты OpenAI: {error_code}",
+                                {"error_code": error_code}
+                            )
+                            # Notify all admins with telegram_chat_id
+                            try:
+                                all_admins = supabase.table("admin_users")\
+                                    .select("telegram_chat_id")\
+                                    .not_.is_("telegram_chat_id", "null")\
+                                    .execute()
+                                for a in all_admins.data:
+                                    if a.get("telegram_chat_id"):
+                                        await send_telegram_message(session, a["telegram_chat_id"], msg)
+                            except Exception as e:
+                                logger.error(f"Failed to notify admins about OpenAI quota: {e}")
+            except Exception as e:
+                logger.error(f"Error checking OpenAI balance: {e}")
+
+
 async def check_task_notifications():
     if not TELEGRAM_BOT_TOKEN:
         return
@@ -136,6 +252,7 @@ async def scheduler_loop():
     while True:
         try:
             await check_task_notifications()
+            await check_api_balances()
             await asyncio.sleep(60)
         except KeyboardInterrupt:
             logger.info("Scheduler stopped by user.")
