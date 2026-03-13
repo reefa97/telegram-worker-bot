@@ -75,6 +75,55 @@ async def log_system_warning(message: str, metadata: dict | None = None):
         logger.error(f"Failed to write balance warning to system_logs: {e}")
 
 
+async def check_balances_for_job(serper_token: str, admin_id: str):
+    """Always runs before each job. Writes warnings to system_logs if balance is low."""
+    async with aiohttp.ClientSession() as session:
+        # Serper
+        try:
+            async with session.get(
+                "https://google.serper.dev/account",
+                headers={"X-API-KEY": serper_token}
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    balance = data.get("balance", 0)
+                    if balance < SERPER_LOW_BALANCE_THRESHOLD:
+                        logger.warning(f"Serper low balance before job: {balance}")
+                        await log_system_warning(
+                            f"⚠️ Мало кредитов Serper: осталось {balance}. Пополни баланс на serper.dev",
+                            {"balance": balance, "admin_id": admin_id}
+                        )
+        except Exception as e:
+            logger.error(f"Serper balance pre-check failed: {e}")
+
+        # OpenAI
+        if OPENAI_API_KEY:
+            try:
+                async with session.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {OPENAI_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
+                        "messages": [{"role": "user", "content": "hi"}],
+                        "max_tokens": 1
+                    }
+                ) as resp:
+                    if resp.status in (429, 402):
+                        data = await resp.json()
+                        error_code = data.get("error", {}).get("code", "")
+                        if error_code in ("insufficient_quota", "billing_hard_limit_reached"):
+                            logger.warning(f"OpenAI quota exceeded before job: {error_code}")
+                            await log_system_warning(
+                                "⚠️ Закончились кредиты OpenAI. AI-фильтрация отключена. Пополни баланс на platform.openai.com",
+                                {"error_code": error_code}
+                            )
+            except Exception as e:
+                logger.error(f"OpenAI balance pre-check failed: {e}")
+
+
 async def check_api_balances():
     now = datetime.now(timezone.utc)
     last_check = _balance_check_state["last_check"]

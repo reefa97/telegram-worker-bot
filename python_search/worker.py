@@ -10,6 +10,7 @@ from core.search import SearchManager
 from core.crawler import AsyncCrawler
 from core.supabase_manager import SupabaseManager
 from core.enrichment import BusinessAnalyzer
+from scheduler import check_balances_for_job
 
 # Load environment variables
 from pathlib import Path
@@ -75,7 +76,10 @@ async def process_job(job):
             return
     
         logger.info(f"Processing job {job_id}: {query}")
-    
+
+        # Check API balances before starting
+        await check_balances_for_job(serper_token, admin_id)
+
         # Update status to processing
         supabase.table("email_search_jobs").update({
             "status": "processing",
