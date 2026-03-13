@@ -225,16 +225,23 @@ async def process_job(job):
             if new_emails_count > 0:
                 total_emails += new_emails_count
                 # Update job progress
-                supabase.table("email_search_jobs").update({
-                    "total_emails_found": total_emails
-                }).eq("id", job_id).execute()
-            
+                try:
+                    supabase.table("email_search_jobs").update({
+                        "total_emails_found": total_emails
+                    }).eq("id", job_id).execute()
+                except Exception as update_err:
+                    logger.warning(f"Failed to update total_emails_found (job may have been deleted): {update_err}")
+
             page += 1
-            
+
             # Check if job was stopped by user
-            current_job = supabase.table("email_search_jobs").select("status").eq("id", job_id).single().execute()
-            if current_job.data and current_job.data['status'] == 'stopped':
-                logger.info("Job stopped by user.")
+            try:
+                current_job = supabase.table("email_search_jobs").select("status").eq("id", job_id).single().execute()
+                if current_job.data and current_job.data['status'] == 'stopped':
+                    logger.info("Job stopped by user.")
+                    return
+            except Exception as check_err:
+                logger.warning(f"Job status check failed (job may have been deleted): {check_err}. Stopping.")
                 return
     
         # Job Completed
