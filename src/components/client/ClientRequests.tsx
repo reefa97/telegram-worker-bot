@@ -1,7 +1,22 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Send, MessageSquare, Clock, CheckCircle2, Loader2, Building2, AlertCircle } from 'lucide-react';
+import { Send, MessageSquare, Clock, CheckCircle2, Loader2, Building2, AlertCircle, Sparkles } from 'lucide-react';
+
+const EXTRA_SERVICES = [
+    'Mycie okien',
+    'Czyszczenie dywanów i wykładzin',
+    'Czyszczenie tapicerki meblowej',
+    'Pranie firan i zasłon',
+    'Czyszczenie piekarnika i kuchenki',
+    'Sprzątanie balkonu / tarasu',
+    'Mycie lodówki',
+    'Mycie żyrandoli i lamp',
+    'Dezynfekcja pomieszczeń',
+    'Odplamianie ścian',
+    'Mycie elewacji / fasady',
+    'Sprzątanie po remoncie',
+];
 
 interface ClientRequest {
     id: string;
@@ -27,6 +42,8 @@ export default function ClientRequests() {
     const [submitting, setSubmitting] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [formData, setFormData] = useState({ object_id: '', message: '' });
+    const [selectedServices, setSelectedServices] = useState<string[]>([]);
+    const [customService, setCustomService] = useState('');
 
     const loadData = async () => {
         if (!adminUser?.id) return;
@@ -80,9 +97,31 @@ export default function ClientRequests() {
     // Used for refreshing after submit
     const loadRequests = loadData;
 
+    const toggleService = (s: string) => {
+        setSelectedServices(prev =>
+            prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
+        );
+    };
+
+    const resetForm = () => {
+        setFormData({ object_id: '', message: '' });
+        setSelectedServices([]);
+        setCustomService('');
+        setShowForm(false);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.object_id || !formData.message.trim()) return;
+        const allServices = customService.trim()
+            ? [...selectedServices, customService.trim()]
+            : selectedServices;
+        if (!formData.object_id || (allServices.length === 0 && !formData.message.trim())) return;
+
+        const servicesPart = allServices.length > 0
+            ? `Usługi dodatkowe:\n${allServices.map(s => `• ${s}`).join('\n')}`
+            : '';
+        const notePart = formData.message.trim();
+        const fullMessage = [servicesPart, notePart].filter(Boolean).join('\n\n');
 
         setSubmitting(true);
         try {
@@ -91,7 +130,7 @@ export default function ClientRequests() {
                 .insert({
                     client_id: adminUser!.id,
                     object_id: formData.object_id,
-                    message: formData.message.trim(),
+                    message: fullMessage,
                     status: 'new'
                 });
 
@@ -114,7 +153,7 @@ export default function ClientRequests() {
                             const res = await supabase.functions.invoke('send-telegram-notification', {
                                 body: {
                                     chat_id: parseInt(owner.telegram_chat_id),
-                                    message: `📋 <b>Nowa prośba od klienta</b>\n\n📍 Obiekt: <b>${objectName}</b>\n💬 ${formData.message.trim()}\n\n👤 Klient: ${adminUser?.email}`
+                                    message: `📋 <b>Nowa prośba od klienta</b>\n\n📍 Obiekt: <b>${objectName}</b>\n💬 ${fullMessage}\n\n👤 Klient: ${adminUser?.email}`
                                 }
                             });
 
@@ -131,8 +170,7 @@ export default function ClientRequests() {
                 // Don't block the request submission
             }
 
-            setFormData({ object_id: '', message: '' });
-            setShowForm(false);
+            resetForm();
             loadRequests();
         } catch (err) {
             console.error('Error submitting request:', err);
@@ -184,8 +222,8 @@ export default function ClientRequests() {
                     onClick={() => setShowForm(!showForm)}
                     className="btn-primary flex items-center gap-2"
                 >
-                    <Send className="w-4 h-4" />
-                    Nowa prośba
+                    <Sparkles className="w-4 h-4" />
+                    Zamów usługę
                 </button>
             </div>
 
@@ -193,10 +231,11 @@ export default function ClientRequests() {
             {showForm && (
                 <div className="card p-6 border-primary/30 animate-fadeIn">
                     <h3 className="font-bold text-main mb-4 flex items-center gap-2">
-                        <MessageSquare className="w-5 h-5 text-primary" />
-                        Nowa prośba
+                        <Sparkles className="w-5 h-5 text-primary" />
+                        Zamów usługę dodatkową
                     </h3>
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        {/* Object */}
                         <div>
                             <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
                                 Obiekt
@@ -213,35 +252,78 @@ export default function ClientRequests() {
                                 ))}
                             </select>
                         </div>
+
+                        {/* Predefined services */}
+                        <div>
+                            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+                                Usługi dodatkowe
+                            </label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {EXTRA_SERVICES.map(service => (
+                                    <label
+                                        key={service}
+                                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all select-none
+                                            ${selectedServices.includes(service)
+                                                ? 'border-primary bg-primary/5 text-main'
+                                                : 'border-border hover:border-primary/40 text-muted hover:text-main'
+                                            }`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedServices.includes(service)}
+                                            onChange={() => toggleService(service)}
+                                            className="rounded border-border text-primary focus:ring-primary"
+                                        />
+                                        <span className="text-sm font-medium">{service}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Custom service */}
                         <div>
                             <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
-                                Wiadomość
+                                Inna usługa (wpisz własną)
+                            </label>
+                            <input
+                                type="text"
+                                value={customService}
+                                onChange={(e) => setCustomService(e.target.value)}
+                                className="input"
+                                placeholder="Np. Mycie okien dachowych..."
+                            />
+                        </div>
+
+                        {/* Optional note */}
+                        <div>
+                            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
+                                Dodatkowe uwagi <span className="normal-case font-normal">(opcjonalnie)</span>
                             </label>
                             <textarea
                                 value={formData.message}
                                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                                className="input min-h-[100px] resize-y"
-                                placeholder="Np. Proszę o umycie okien w kuchni..."
-                                required
+                                className="input min-h-[80px] resize-y"
+                                placeholder="Np. Proszę o kontakt w celu ustalenia terminu..."
                             />
                         </div>
-                        <div className="flex gap-3 justify-end">
+
+                        <div className="flex gap-3 justify-end pt-1">
                             <button
                                 type="button"
-                                onClick={() => { setShowForm(false); setFormData({ object_id: '', message: '' }); }}
+                                onClick={resetForm}
                                 className="btn-secondary"
                             >
                                 Anuluj
                             </button>
                             <button
                                 type="submit"
-                                disabled={submitting}
+                                disabled={submitting || (!selectedServices.length && !customService.trim() && !formData.message.trim())}
                                 className="btn-primary flex items-center gap-2"
                             >
                                 {submitting ? (
                                     <><Loader2 className="w-4 h-4 animate-spin" />Wysyłanie...</>
                                 ) : (
-                                    <><Send className="w-4 h-4" />Wyślij</>
+                                    <><Send className="w-4 h-4" />Wyślij zapytanie</>
                                 )}
                             </button>
                         </div>
