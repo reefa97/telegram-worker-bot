@@ -459,12 +459,22 @@ export default function ObjectsPanel() {
     return (
         <div>
             {/* Header with Title, Search, View Toggle, Add Button */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Объекты работы</h2>
+            <div className="flex flex-col gap-3 mb-6">
+                {/* Row 1: Title + Add Button */}
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl sm:text-2xl font-bold text-main">Объекты работы</h2>
+                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_create) && (
+                        <button onClick={() => openModal()} className="btn-primary flex items-center gap-2 whitespace-nowrap">
+                            <Plus className="w-4 h-4" />
+                            <span className="hidden sm:inline">Добавить объект</span>
+                            <span className="sm:hidden">Добавить</span>
+                        </button>
+                    )}
+                </div>
 
-                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                    {/* Search Input */}
-                    <div className="relative flex-grow md:flex-grow-0 md:w-64">
+                {/* Row 2: Search + View Toggle */}
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
                         <input
                             type="text"
                             placeholder="Поиск по названию или адресу..."
@@ -476,7 +486,7 @@ export default function ObjectsPanel() {
                     </div>
 
                     {/* View Toggle */}
-                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700 shrink-0">
                         <button
                             onClick={() => setViewMode('grid')}
                             className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
@@ -486,7 +496,7 @@ export default function ObjectsPanel() {
                         </button>
                         <button
                             onClick={() => setViewMode('list')}
-                            className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                            className={`hidden sm:block p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
                             title="Список"
                         >
                             <List className="w-4 h-4" />
@@ -499,14 +509,6 @@ export default function ObjectsPanel() {
                             <Map className="w-4 h-4" />
                         </button>
                     </div>
-
-                    {/* Add Button */}
-                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_create) && (
-                        <button onClick={() => openModal()} className="btn-primary flex items-center gap-2 whitespace-nowrap">
-                            <Plus className="w-4 h-4" />
-                            <span className="hidden sm:inline">Добавить объект</span>
-                        </button>
-                    )}
                 </div>
             </div>
 
@@ -672,7 +674,7 @@ export default function ObjectsPanel() {
                         >
                             {/* Header: Name & Menu */}
                             <div className="flex justify-between items-start">
-                                <div className="pr-8">
+                                <div className="sm:pr-8">
                                     <div className="flex items-center gap-2 mb-2">
                                         <h3 className="text-base font-medium text-main group-hover:text-primary transition-colors">
                                             {object.name}
@@ -694,10 +696,10 @@ export default function ObjectsPanel() {
                                     ) : null}
                                 </div>
 
-                                {/* Action Menu (Stop Propagation) */}
+                                {/* Action Menu (Stop Propagation) — desktop only */}
                                 <div
                                     ref={menuRef}
-                                    className="absolute top-4 right-4"
+                                    className="absolute top-4 right-4 hidden sm:block"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     <div className="relative">
@@ -808,6 +810,34 @@ export default function ObjectsPanel() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Mobile action bar — visible only on small screens */}
+                            <div className="flex sm:hidden items-center gap-1 pt-3 border-t border-border" onClick={e => e.stopPropagation()}>
+                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
+                                    <>
+                                        <button
+                                            onClick={() => setManagingTasksFor(object)}
+                                            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-muted hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
+                                        >
+                                            <CheckSquare size={14} /> Задачи
+                                        </button>
+                                        <button
+                                            onClick={() => openModal(object)}
+                                            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-muted hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                                        >
+                                            <Edit2 size={14} /> Изменить
+                                        </button>
+                                    </>
+                                )}
+                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
+                                    <button
+                                        onClick={(e) => handleDelete(object.id, e)}
+                                        className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-danger hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 size={14} /> Удалить
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ))}
                     {filteredObjects.length === 0 && (
@@ -838,52 +868,54 @@ export default function ObjectsPanel() {
                             <p className="text-sm text-muted">Сумма всех активных объектов в текущем списке</p>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 w-full">
-                            <div className="bg-subtle/50 p-4 rounded-xl border border-border">
-                                <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Работники (Фикс)</div>
-                                <div className="text-xl font-bold text-main">
-                                    {salarySummary.fixedTotal.toLocaleString()} <span className="text-sm font-medium">zł</span>
-                                </div>
-                            </div>
-
-                            <div className="bg-subtle/50 p-4 rounded-xl border border-border">
-                                <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Работники (Час)</div>
-                                <div className="text-xl font-bold text-main">
-                                    {Math.round(salarySummary.hourlyTotal).toLocaleString()} <span className="text-sm font-medium">zł</span>
-                                </div>
-                            </div>
-
-                            <div className="bg-blue-500/5 p-4 rounded-xl border border-blue-500/20 ring-1 ring-blue-500/10">
-                                <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Опекуны (Мес)</div>
-                                <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                                    {Math.round(salarySummary.guardiansTotal).toLocaleString()} <span className="text-sm font-medium">zł</span>
-                                </div>
-                            </div>
-
-                            <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 ring-1 ring-primary/10">
-                                <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Всего расходы</div>
-                                <div className="text-2xl font-bold text-primary">
-                                    {Math.round(salarySummary.totalExpenses).toLocaleString()} <span className="text-base font-medium">zł</span>
-                                </div>
-                            </div>
-
-                            {canSeeClientRates && (
-                                <div className="bg-green-500/5 p-4 rounded-xl border border-green-500/20 ring-1 ring-green-500/10">
-                                    <div className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Выручка (клиент)</div>
-                                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                        {Math.round(salarySummary.clientRatesTotal).toLocaleString()} <span className="text-base font-medium">zł</span>
+                        <div className="overflow-x-auto -mx-6 sm:mx-0 px-6 sm:px-0 pb-1 sm:pb-0">
+                            <div className="flex sm:grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 w-full">
+                                <div className="min-w-[140px] sm:min-w-0 bg-subtle/50 p-4 rounded-xl border border-border">
+                                    <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Работники (Фикс)</div>
+                                    <div className="text-xl font-bold text-main">
+                                        {salarySummary.fixedTotal.toLocaleString()} <span className="text-sm font-medium">zł</span>
                                     </div>
                                 </div>
-                            )}
 
-                            {canSeeClientRates && (
-                                <div className="bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/20 ring-1 ring-emerald-500/10">
-                                    <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Прибыль</div>
-                                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                                        {Math.round(salarySummary.profit).toLocaleString()} <span className="text-base font-medium">zł</span>
+                                <div className="min-w-[140px] sm:min-w-0 bg-subtle/50 p-4 rounded-xl border border-border">
+                                    <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Работники (Час)</div>
+                                    <div className="text-xl font-bold text-main">
+                                        {Math.round(salarySummary.hourlyTotal).toLocaleString()} <span className="text-sm font-medium">zł</span>
                                     </div>
                                 </div>
-                            )}
+
+                                <div className="min-w-[140px] sm:min-w-0 bg-blue-500/5 p-4 rounded-xl border border-blue-500/20 ring-1 ring-blue-500/10">
+                                    <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Опекуны (Мес)</div>
+                                    <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                                        {Math.round(salarySummary.guardiansTotal).toLocaleString()} <span className="text-sm font-medium">zł</span>
+                                    </div>
+                                </div>
+
+                                <div className="min-w-[140px] sm:min-w-0 bg-primary/5 p-4 rounded-xl border border-primary/20 ring-1 ring-primary/10">
+                                    <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Всего расходы</div>
+                                    <div className="text-2xl font-bold text-primary">
+                                        {Math.round(salarySummary.totalExpenses).toLocaleString()} <span className="text-base font-medium">zł</span>
+                                    </div>
+                                </div>
+
+                                {canSeeClientRates && (
+                                    <div className="min-w-[140px] sm:min-w-0 bg-green-500/5 p-4 rounded-xl border border-green-500/20 ring-1 ring-green-500/10">
+                                        <div className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Выручка (клиент)</div>
+                                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                            {Math.round(salarySummary.clientRatesTotal).toLocaleString()} <span className="text-base font-medium">zł</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {canSeeClientRates && (
+                                    <div className="min-w-[140px] sm:min-w-0 bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/20 ring-1 ring-emerald-500/10">
+                                        <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Прибыль</div>
+                                        <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                            {Math.round(salarySummary.profit).toLocaleString()} <span className="text-base font-medium">zł</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
