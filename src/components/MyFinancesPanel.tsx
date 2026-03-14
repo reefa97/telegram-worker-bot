@@ -554,7 +554,32 @@ export default function MyFinancesPanel() {
                             <h3 className="font-bold text-main flex items-center gap-2"><Receipt size={16} className="text-rose-500" /> Расходы и закупки</h3>
                             <button onClick={() => setShowExpenseModal(true)} className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5"><Plus size={14} /> <span className="hidden sm:inline">Добавить</span></button>
                         </div>
-                        <div className="overflow-x-auto touch-pan-x">
+                        {/* Mobile cards */}
+                        <div className="flex flex-col gap-2 p-3 sm:hidden">
+                            {expenses.map(exp => (
+                                <div key={exp.id} className="flex items-center justify-between p-3 bg-subtle/30 rounded-lg border border-border">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-main text-sm flex items-center gap-1.5 truncate">
+                                            {exp.title}
+                                            {exp.receipt_url && <a href={exp.receipt_url} target="_blank" rel="noopener noreferrer" className="text-primary shrink-0"><FileText size={12} /></a>}
+                                        </div>
+                                        <div className="text-xs text-muted mt-0.5 flex items-center gap-2">
+                                            <span>{new Date(exp.expense_date).toLocaleDateString()}</span>
+                                            {exp.is_reimbursement
+                                                ? <span className="text-green-600 font-medium">Возврат</span>
+                                                : <span className="text-slate-500">Фирма</span>}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 ml-3 shrink-0">
+                                        <span className="font-bold text-rose-500 text-sm">-{exp.amount} zł</span>
+                                        <button onClick={() => handleDeleteExpense(exp.id)} className="text-muted hover:text-red-500 p-1"><Trash2 size={14} /></button>
+                                    </div>
+                                </div>
+                            ))}
+                            {expenses.length === 0 && <p className="text-center text-muted italic text-sm py-4">Нет записанных расходов</p>}
+                        </div>
+                        {/* Desktop table */}
+                        <div className="hidden sm:block overflow-x-auto touch-pan-x">
                             <table className="w-full text-left min-w-[600px]">
                                 <thead className="bg-subtle/50 text-xs font-bold text-muted uppercase tracking-wider border-b border-border">
                                     <tr>
@@ -595,7 +620,27 @@ export default function MyFinancesPanel() {
                             <h3 className="font-bold text-main flex items-center gap-2"><Clock size={16} className="text-violet-500" /> Переработки</h3>
                             <button onClick={() => setShowHoursModal(true)} className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5"><Plus size={14} /> <span className="hidden sm:inline">Лог работы</span></button>
                         </div>
-                        <div className="overflow-x-auto touch-pan-x">
+                        {/* Mobile cards */}
+                        <div className="flex flex-col gap-2 p-3 sm:hidden">
+                            {extraHours.map(h => (
+                                <div key={h.id} className="flex items-center justify-between p-3 bg-subtle/30 rounded-lg border border-border">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-main text-sm truncate">{h.object_name || 'Без объекта'}</div>
+                                        <div className="text-xs text-muted mt-0.5 flex items-center gap-2">
+                                            <span>{new Date(h.work_date).toLocaleDateString()}</span>
+                                            <span className="text-zinc-400">{h.hours}ч · {h.rate} zł/ч</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 ml-3 shrink-0">
+                                        <span className="font-bold text-emerald-500 text-sm">{(h.hours * h.rate).toLocaleString()} zł</span>
+                                        <button onClick={() => handleDeleteHours(h.id)} className="text-muted hover:text-red-500 p-1"><Trash2 size={14} /></button>
+                                    </div>
+                                </div>
+                            ))}
+                            {extraHours.length === 0 && <p className="text-center text-muted italic text-sm py-4">Нет записей о часах</p>}
+                        </div>
+                        {/* Desktop table */}
+                        <div className="hidden sm:block overflow-x-auto touch-pan-x">
                             <table className="w-full text-left min-w-[600px]">
                                 <thead className="bg-subtle/50 text-xs font-bold text-muted uppercase tracking-wider border-b border-border">
                                     <tr>
@@ -636,7 +681,26 @@ export default function MyFinancesPanel() {
                                 </button>
                             )}
                         </div>
-                        <div className="overflow-x-auto touch-pan-x">
+                        {/* Mobile cards */}
+                        <div className="flex flex-col gap-2 p-3 sm:hidden">
+                            {extraIncomes.map((inc) => (
+                                <div key={inc.id} className="flex items-center justify-between p-3 bg-subtle/30 rounded-lg border border-border">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-main text-sm truncate">{inc.title}</div>
+                                        <div className="text-xs text-muted mt-0.5">{new Date(inc.income_date).toLocaleDateString()}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2 ml-3 shrink-0">
+                                        <span className="font-bold text-emerald-500 text-sm">+{inc.amount} zł</span>
+                                        {adminUser?.role === 'super_admin' && (
+                                            <button onClick={() => handleDeleteIncome(inc.id)} className="text-muted hover:text-red-500 p-1"><Trash2 size={14} /></button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {extraIncomes.length === 0 && <p className="text-center text-muted italic text-sm py-4">Нет дополнительных начислений</p>}
+                        </div>
+                        {/* Desktop table */}
+                        <div className="hidden sm:block overflow-x-auto touch-pan-x">
                             <table className="w-full text-left min-w-[500px]">
                                 <thead className="bg-subtle/50 text-xs font-bold text-muted uppercase tracking-wider border-b border-border">
                                     <tr>

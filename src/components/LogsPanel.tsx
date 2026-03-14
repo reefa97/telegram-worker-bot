@@ -191,7 +191,42 @@ export default function LogsPanel() {
 
             {/* Logs Table */}
             <div className="card p-0 overflow-hidden">
-                <div className="overflow-x-auto">
+                {/* Mobile cards */}
+                <div className="flex flex-col divide-y divide-border sm:hidden">
+                    {logs.length === 0 ? (
+                        <div className="text-center py-10 text-muted">
+                            <Terminal className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                            <p>Логов не найдено</p>
+                        </div>
+                    ) : (
+                        logs.map((log) => (
+                            <div
+                                key={log.id}
+                                className="p-3 cursor-pointer hover:bg-subtle/50 transition-colors"
+                                onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
+                            >
+                                <div className="flex items-center justify-between mb-1">
+                                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${getLevelColor(log.level)}`}>
+                                        {getLevelIcon(log.level)}
+                                        {log.level.toUpperCase()}
+                                    </div>
+                                    <span className="text-[10px] text-muted font-mono">{formatTime(log.created_at)}</span>
+                                </div>
+                                <div className="text-sm text-main font-medium truncate">{log.message}</div>
+                                <div className="text-xs text-muted mt-0.5">
+                                    <span className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-[10px]">{log.category}</span>
+                                </div>
+                                {expandedRow === log.id && log.metadata && (
+                                    <pre className="mt-2 bg-white dark:bg-gray-900 border border-border p-2 rounded text-[10px] font-mono overflow-x-auto">
+                                        {JSON.stringify(log.metadata, null, 2)}
+                                    </pre>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block overflow-x-auto">
                     <table className="table w-full">
                         <thead>
                             <tr>

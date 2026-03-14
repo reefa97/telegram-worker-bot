@@ -403,6 +403,27 @@ export default function EmailSearchPanel() {
                         </div>
                         <div className="overflow-y-auto flex-1 p-0">
                             {selectedJobId ? (
+                                <>
+                                {/* Mobile cards */}
+                                <div className="flex flex-col divide-y divide-border sm:hidden">
+                                    {results.length === 0 ? (
+                                        <p className="p-8 text-center text-muted">Email не найдены по этому запросу.</p>
+                                    ) : results.map((res: any) => (
+                                        <div key={res.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-main text-sm select-all font-medium truncate">{res.email}</div>
+                                                <div className="text-xs text-muted mt-0.5 truncate">
+                                                    <a href={res.source_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{res.source_url}</a>
+                                                </div>
+                                            </div>
+                                            <span className={`shrink-0 text-[10px] uppercase px-1.5 py-0.5 rounded font-bold ${res.source_type === 'maps' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                                                {res.source_type === 'maps' ? 'Карты' : 'Поиск'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Desktop table */}
+                                <div className="hidden sm:block">
                                 <table className="table">
                                     <thead className="bg-subtle text-muted sticky top-0">
                                         <tr>
@@ -439,6 +460,8 @@ export default function EmailSearchPanel() {
                                         )}
                                     </tbody>
                                 </table>
+                                </div>
+                                </>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full text-muted gap-2">
                                     <Search className="w-8 h-8 opacity-20" />

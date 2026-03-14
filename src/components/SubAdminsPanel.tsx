@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { UserPlus2, Plus, Trash2, Edit2, Shield, User, Smartphone, Layout, X } from 'lucide-react';
@@ -246,7 +247,42 @@ export default function SubAdminsPanel() {
             </div>
 
             <div className="card overflow-hidden p-0">
-                <div className="overflow-x-auto">
+                {/* Mobile cards */}
+                <div className="flex flex-col gap-3 p-4 sm:hidden">
+                    {subAdmins.map((admin) => {
+                        const canEditThis = adminUser?.role === 'super_admin' || admin.created_by === adminUser?.id;
+                        return (
+                            <div key={admin.id} className="flex items-center justify-between p-3 bg-subtle/30 rounded-xl border border-border">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 flex items-center justify-center shrink-0">
+                                        <User className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="font-medium text-main text-sm truncate">{admin.name || 'Без имени'}</div>
+                                        <div className="text-xs text-muted truncate">{admin.email}</div>
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium mt-1 ${admin.role === 'manager' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                                            {admin.role === 'manager' ? 'Менеджер' : 'Sub Admin'}
+                                        </span>
+                                    </div>
+                                </div>
+                                {canEditThis && (
+                                    <div className="flex gap-1 ml-2 shrink-0">
+                                        <button onClick={() => openModal(admin)} className="p-1.5 text-muted hover:text-primary rounded-lg"><Edit2 className="w-4 h-4" /></button>
+                                        <button onClick={() => handleDelete(admin.id)} className="p-1.5 text-muted hover:text-red-600 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                    {subAdmins.length === 0 && (
+                        <div className="text-center text-muted py-8">
+                            <UserPlus2 className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                            <p>Нет пользователей</p>
+                        </div>
+                    )}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block overflow-x-auto">
                     <table className="table w-full">
                         <thead>
                             <tr>
@@ -334,8 +370,8 @@ export default function SubAdminsPanel() {
             </div>
 
             {/* Modal */}
-            {showModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+            {showModal && createPortal(
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-fadeIn">
                     <div className="bg-white dark:bg-zinc-950 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
                         <div className="p-6">
                             <div className="flex justify-between items-center mb-6">
@@ -486,7 +522,8 @@ export default function SubAdminsPanel() {
                             </form>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

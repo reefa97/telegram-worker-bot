@@ -466,6 +466,48 @@ export default function ReportsPanel() {
                 <div className="px-6 py-4 border-b border-border">
                     <h3 className="text-lg font-semibold text-main">История смен</h3>
                 </div>
+
+                {/* Mobile cards */}
+                <div className="flex flex-col gap-3 p-4 sm:hidden">
+                    {sessions.map((session) => (
+                        <div
+                            key={session.id}
+                            className="p-3 bg-subtle/30 rounded-xl border border-border cursor-pointer"
+                            onClick={() => setSelectedSessionDetails(session)}
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="font-medium text-main text-sm">
+                                    {session.workers ? `${session.workers.first_name} ${session.workers.last_name}` : 'Неизвестный'}
+                                </div>
+                                {session.end_time ? (
+                                    <span className="text-xs font-medium text-muted">{formatDuration(session.duration_minutes)}</span>
+                                ) : (
+                                    <span className="badge-warning text-[10px]">В процессе</span>
+                                )}
+                            </div>
+                            <div className="text-xs text-muted flex items-center gap-1.5">
+                                <MapPin className="w-3 h-3" />
+                                <span className="truncate">{session.cleaning_objects?.name || 'Объект не указан'}</span>
+                            </div>
+                            <div className="text-xs text-muted mt-1">{formatDate(session.start_time)} · {formatTime(session.start_time)}</div>
+                            <div className="flex items-center justify-end gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
+                                {session.shift_photos && session.shift_photos[0]?.count > 0 && (
+                                    <button onClick={() => setViewingPhotos(session.id)} className="btn-icon text-purple-500"><Camera size={14} /></button>
+                                )}
+                                {!session.end_time && (
+                                    <button onClick={() => handleFinishSession(session.id, session.start_time)} className="btn-icon text-danger"><StopCircle size={14} /></button>
+                                )}
+                                <button onClick={() => handleDeleteSession(session.id)} className="btn-icon text-danger"><Trash2 size={14} /></button>
+                            </div>
+                        </div>
+                    ))}
+                    {sessions.length === 0 && (
+                        <div className="text-center text-muted py-8 italic">Нет смен за выбранный период</div>
+                    )}
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden sm:block">
                 <table className="table">
                     <thead>
                         <tr>
@@ -648,6 +690,7 @@ export default function ReportsPanel() {
                         ))}
                     </tbody>
                 </table>
+                </div>
             </div>
 
             {sessions.length === 0 && (

@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Plus, Trash2, Building2, Search, ChevronDown, ChevronUp, X, Check, Mail } from 'lucide-react';
@@ -344,7 +345,7 @@ export default function ClientsPanel() {
             )}
 
             {/* Create Client Modal */}
-            {showModal && (
+            {showModal && createPortal(
                 <div className="modal-overlay animate-fadeIn">
                     <div className="modal-content animate-scaleIn max-h-[90vh] flex flex-col">
                         <div className="modal-header">
@@ -444,7 +445,7 @@ export default function ClientsPanel() {
                         </form>
                     </div>
                 </div>
-            )}
+            , document.body)}
         </div>
     );
 }

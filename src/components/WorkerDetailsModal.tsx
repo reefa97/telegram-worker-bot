@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { X, Calendar, MapPin, Phone, User, Shield, MessageCircle, Coins, ChevronDown, TrendingUp, Plus, Minus, Save } from 'lucide-react';
@@ -145,7 +146,7 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
         });
     };
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content sm:max-w-lg" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
@@ -397,5 +398,5 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
                 </div>
             </div>
         </div>
-    );
+    , document.body);
 }

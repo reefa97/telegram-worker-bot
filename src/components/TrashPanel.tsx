@@ -137,7 +137,45 @@ export default function TrashPanel() {
             )}
 
             <div className="card overflow-hidden p-0">
-                <div className="overflow-x-auto">
+                {/* Mobile cards */}
+                <div className="flex flex-col gap-3 p-4 sm:hidden">
+                    {loading && items.length === 0 ? (
+                        <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-gray-200 border-t-primary-500 rounded-full animate-spin"></div></div>
+                    ) : items.length === 0 ? (
+                        <div className="text-center py-8 text-muted">
+                            <Trash2 className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                            <p>Корзина пуста</p>
+                        </div>
+                    ) : (
+                        items.map((item) => (
+                            <div key={item.id} className="flex items-center justify-between p-3 bg-subtle/30 rounded-xl border border-border">
+                                <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-main text-sm truncate">{item.name}</div>
+                                    <div className="text-xs text-muted mt-0.5 truncate">{item.info}</div>
+                                    <div className="text-xs text-muted mt-0.5">{new Date(item.deleted_at).toLocaleString('ru-RU')}</div>
+                                </div>
+                                <div className="flex gap-1.5 ml-3 shrink-0">
+                                    <button
+                                        onClick={() => handleRestore(item.id)}
+                                        disabled={!!processingId}
+                                        className="p-1.5 bg-green-50 dark:bg-green-900/20 text-green-600 rounded-lg disabled:opacity-50"
+                                    >
+                                        {processingId === item.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                                    </button>
+                                    <button
+                                        onClick={() => handlePermanentDelete(item.id)}
+                                        disabled={!!processingId}
+                                        className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg disabled:opacity-50"
+                                    >
+                                        {processingId === item.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block overflow-x-auto">
                     <table className="table w-full">
                         <thead>
                             <tr>

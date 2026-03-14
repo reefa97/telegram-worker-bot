@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye, AlertTriangle, SkipForward, CalendarClock, Camera, Image as ImageIcon, Shield, Trash2, Edit2 } from 'lucide-react';
@@ -700,6 +701,23 @@ export default function QualityControlPanel() {
                         <div>
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">История проверок</h3>
                             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                {/* Mobile cards */}
+                                <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700 sm:hidden">
+                                    {checks.map(c => (
+                                        <div key={c.id} className="flex items-center justify-between px-4 py-3">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-medium text-gray-900 dark:text-white text-sm truncate">{getObjectName(c.object_id)}</div>
+                                                <div className="text-xs text-gray-500 mt-0.5">{new Date(c.check_date).toLocaleDateString('pl-PL')}</div>
+                                                {c.notes && <div className="text-xs text-gray-400 mt-0.5 truncate">{c.notes}</div>}
+                                            </div>
+                                            <span className={`ml-3 shrink-0 inline-block px-2.5 py-1 rounded-full text-xs font-bold ${getScoreBg(c.score_percentage)}`}>
+                                                {c.score_percentage}%
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Desktop table */}
+                                <div className="hidden sm:block">
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -740,6 +758,7 @@ export default function QualityControlPanel() {
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1059,7 +1078,7 @@ export default function QualityControlPanel() {
             )}
 
             {/* ===== DETAIL MODAL ===== */}
-            {showDetailModal && detailCheck && (
+            {showDetailModal && detailCheck && createPortal(
                 <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
                     <div className="modal-content sm:max-w-lg" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
@@ -1203,7 +1222,7 @@ export default function QualityControlPanel() {
                         </div>
                     </div>
                 </div>
-            )}
+            , document.body)}
 
             {/* ===== LIGHTBOX ===== */}
             {lightboxUrl && (
@@ -1227,7 +1246,7 @@ export default function QualityControlPanel() {
             )}
 
             {/* ===== SCHEDULE MODAL ===== */}
-            {showScheduleModal && (
+            {showScheduleModal && createPortal(
                 <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
                     <div className="modal-content sm:max-w-md" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
@@ -1316,10 +1335,10 @@ export default function QualityControlPanel() {
                         </div>
                     </div>
                 </div>
-            )}
+            , document.body)}
 
             {/* ===== CHECK MODAL ===== */}
-            {showCheckModal && checkObject && (
+            {showCheckModal && checkObject && createPortal(
                 <div className="modal-overlay" onClick={() => setShowCheckModal(false)}>
                     <div className="modal-content sm:max-w-lg" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
@@ -1465,7 +1484,7 @@ export default function QualityControlPanel() {
                         </div>
                     </div>
                 </div>
-            )}
+            , document.body)}
         </div>
     );
 }

@@ -516,7 +516,49 @@ export default function ObjectsPanel() {
             {/* List View (Table) */}
             {viewMode === 'list' && (
                 <div className="table-container animate-fadeIn">
-                    <div className="overflow-x-auto">
+                    {/* Mobile cards */}
+                    <div className="flex flex-col gap-3 p-4 sm:hidden">
+                        {filteredObjects.map(object => (
+                            <div
+                                key={object.id}
+                                className="p-3 rounded-xl border border-border bg-card hover:bg-subtle cursor-pointer transition-colors"
+                                onClick={() => setViewingObject(object)}
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-main text-sm">{object.name}</div>
+                                        <div className="text-xs text-muted mt-0.5 flex items-center gap-1">
+                                            <MapPin className="w-3 h-3 shrink-0" />
+                                            <span className="truncate">{object.address}</span>
+                                        </div>
+                                    </div>
+                                    <div className="ml-3 shrink-0 text-right">
+                                        {(object.hourly_rate || object.monthly_rate) ? (
+                                            <span className="text-xs font-bold text-primary">
+                                                {object.salary_type === 'hourly' ? `${object.hourly_rate} zł/ч` : `${object.monthly_rate} zł/мес`}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-end gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
+                                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
+                                        <>
+                                            <button onClick={(e) => { e.stopPropagation(); setManagingTasksFor(object); }} className="p-1.5 text-muted hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg" title="Задачи"><CheckSquare size={14} /></button>
+                                            <button onClick={(e) => { e.stopPropagation(); openModal(object); }} className="p-1.5 text-muted hover:text-primary hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg" title="Редактировать"><Edit2 size={14} /></button>
+                                        </>
+                                    )}
+                                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
+                                        <button onClick={(e) => { e.stopPropagation(); handleDelete(object.id, e); }} className="p-1.5 text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg" title="Удалить"><Trash2 size={14} /></button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {filteredObjects.length === 0 && (
+                            <div className="text-center text-muted italic py-8">Объекты не найдены</div>
+                        )}
+                    </div>
+                    {/* Desktop table */}
+                    <div className="hidden sm:block overflow-x-auto">
                         <table className="table">
                             <thead>
                                 <tr>

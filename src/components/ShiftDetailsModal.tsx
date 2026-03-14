@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { X, MapPin, Save, History, Phone, User, Edit2, ExternalLink } from 'lucide-react';
 
@@ -133,7 +134,7 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
         return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
     };
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content sm:max-w-4xl" onClick={e => e.stopPropagation()}>
 
@@ -244,40 +245,63 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                                         <p className="text-sm">Истории нет</p>
                                     </div>
                                 ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-500 font-semibold uppercase">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-left">Работник</th>
-                                                    <th className="px-4 py-3 text-left">Дата</th>
-                                                    <th className="px-4 py-3 text-right">Время</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                                {history.map(item => (
-                                                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                                        <td className="px-4 py-3">
-                                                            <div className="font-medium text-gray-900 dark:text-white">
-                                                                {item.workers?.first_name} {item.workers?.last_name}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                                                            {formatDate(item.start_time)}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right">
-                                                            {item.duration_minutes ? (
-                                                                <span className="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-xs">
-                                                                    {formatDuration(item.duration_minutes)}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-amber-500 text-xs">В процессе</span>
-                                                            )}
-                                                        </td>
+                                    <>
+                                        {/* Mobile cards */}
+                                        <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800 sm:hidden">
+                                            {history.map(item => (
+                                                <div key={item.id} className="flex items-center justify-between px-4 py-3">
+                                                    <div>
+                                                        <div className="font-medium text-gray-900 dark:text-white text-sm">
+                                                            {item.workers?.first_name} {item.workers?.last_name}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">{formatDate(item.start_time)}</div>
+                                                    </div>
+                                                    <div>
+                                                        {item.duration_minutes ? (
+                                                            <span className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{formatDuration(item.duration_minutes)}</span>
+                                                        ) : (
+                                                            <span className="text-amber-500 text-xs">В процессе</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {/* Desktop table */}
+                                        <div className="hidden sm:block overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-500 font-semibold uppercase">
+                                                    <tr>
+                                                        <th className="px-4 py-3 text-left">Работник</th>
+                                                        <th className="px-4 py-3 text-left">Дата</th>
+                                                        <th className="px-4 py-3 text-right">Время</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                                    {history.map(item => (
+                                                        <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                                            <td className="px-4 py-3">
+                                                                <div className="font-medium text-gray-900 dark:text-white">
+                                                                    {item.workers?.first_name} {item.workers?.last_name}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                                                                {formatDate(item.start_time)}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right">
+                                                                {item.duration_minutes ? (
+                                                                    <span className="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-xs">
+                                                                        {formatDuration(item.duration_minutes)}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-amber-500 text-xs">В процессе</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -286,6 +310,6 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                 </div>
             </div>
         </div>
-    );
+    , document.body);
 }
 

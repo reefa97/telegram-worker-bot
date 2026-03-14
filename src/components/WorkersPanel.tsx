@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Edit2, Trash2, Send, Copy, Check, Users, History, Search, RefreshCw } from 'lucide-react';
@@ -491,6 +492,47 @@ export default function WorkersPanel() {
             {activeTab === 'salaries' && <SalariesTab />}
 
             {activeTab === 'list' && <div className="table-container">
+                {/* Mobile cards */}
+                <div className="flex flex-col gap-3 p-4 sm:hidden">
+                    {filteredWorkers.map((worker) => (
+                        <div
+                            key={worker.id}
+                            className={`p-3 rounded-xl border cursor-pointer transition-colors ${selectedWorkers.has(worker.id) ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' : 'border-border bg-card hover:bg-subtle'}`}
+                            onClick={() => setViewingWorker(worker)}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3 min-w-0" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedWorkers.has(worker.id)}
+                                        onChange={() => toggleSelectWorker(worker.id)}
+                                        className="rounded border-border text-main focus:ring-1 focus:ring-main shrink-0"
+                                    />
+                                    <div className="min-w-0">
+                                        <div className="font-medium text-main text-sm truncate">{worker.first_name} {worker.last_name}</div>
+                                        <div className="text-xs text-muted">{worker.worker_roles?.name || worker.role || '-'}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1 ml-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    {!worker.telegram_user_id ? (
+                                        <span className="badge-danger text-[10px]"><span className="badge-dot" />Неактивен</span>
+                                    ) : (
+                                        <span className={`text-[10px] ${worker.is_active ? 'badge-success' : 'badge-neutral'}`}><span className="badge-dot" />{worker.is_active ? 'Активен' : 'Неактивен'}</span>
+                                    )}
+                                    <button onClick={() => setHistoryWorker(worker)} className="btn-icon" title="История"><History size={15} /></button>
+                                    {canWrite && (adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_edit) && (
+                                        <button onClick={() => openModal(worker)} className="btn-icon" title="Редактировать"><Edit2 size={15} /></button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {filteredWorkers.length === 0 && (
+                        <div className="text-center text-muted py-8">Работники не найдены</div>
+                    )}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block">
                 <table className="table">
                     <thead>
                         <tr>
@@ -621,10 +663,11 @@ export default function WorkersPanel() {
                         ))}
                     </tbody>
                 </table>
+                </div>
             </div>}
 
             {/* Modal */}
-            {showModal && (
+            {showModal && createPortal(
                 <div className="modal-overlay" onClick={closeModal}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
@@ -787,10 +830,10 @@ export default function WorkersPanel() {
                         </form>
                     </div>
                 </div>
-            )}
+            , document.body)}
 
             {/* Bulk Message Modal */}
-            {showBulkModal && (
+            {showBulkModal && createPortal(
                 <div className="modal-overlay" onClick={() => setShowBulkModal(false)}>
                     <div className="modal-content max-w-md" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
@@ -833,7 +876,7 @@ export default function WorkersPanel() {
                         </div>
                     </div>
                 </div>
-            )}
+            , document.body)}
 
             {historyWorker && (
                 <WorkSessionsModal

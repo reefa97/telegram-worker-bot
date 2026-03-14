@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { X, MapPin, Clock, Edit2, Trash2, Save, History } from 'lucide-react';
 
@@ -146,7 +147,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
         return `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
     };
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content sm:max-w-5xl" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
@@ -175,7 +176,49 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                             <p>История смен пуста</p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <>
+                        {/* Mobile cards */}
+                        <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800 sm:hidden">
+                            {sessions.map((session) => (
+                                <div key={session.id} className="p-4">
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div>
+                                            <div className="font-medium text-gray-900 dark:text-white text-sm">
+                                                {session.cleaning_objects?.name || 'Объект не указан'}
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-0.5">{formatDate(session.start_time)}</div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {editingSession === session.id ? (
+                                                <>
+                                                    <button onClick={() => handleUpdateSession(session.id)} className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg"><Save className="w-4 h-4" /></button>
+                                                    <button onClick={() => setEditingSession(null)} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X className="w-4 h-4" /></button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <button onClick={() => startEditing(session)} className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"><Edit2 className="w-4 h-4" /></button>
+                                                    <button onClick={() => handleDeleteSession(session.id)} className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {editingSession === session.id ? (
+                                        <div className="space-y-2 mt-2">
+                                            <input type="datetime-local" value={editForm.start_time} onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })} className="input py-1 px-2 text-xs w-full" />
+                                            <input type="datetime-local" value={editForm.end_time} onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })} className="input py-1 px-2 text-xs w-full" />
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{session.duration_minutes ? formatDuration(session.duration_minutes) : <span className="text-green-500">В процессе</span>}</span>
+                                            {session.tasks_completed === true && <span className="text-green-600">✅</span>}
+                                            {session.tasks_completed === false && <span className="text-red-600 font-bold">⚠️</span>}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        {/* Desktop table */}
+                        <div className="hidden sm:block overflow-x-auto">
                             <table className="table w-full">
                                 <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
                                     <tr>
@@ -324,9 +367,10 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                                 </tbody>
                             </table>
                         </div>
+                        </>
                     )}
                 </div>
             </div>
         </div>
-    );
+    , document.body);
 }
