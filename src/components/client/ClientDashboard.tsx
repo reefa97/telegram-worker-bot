@@ -24,7 +24,7 @@ export default function ClientDashboard() {
 
     const tabs: { id: ClientTab; label: string; icon: any }[] = [
         { id: 'calendar', label: 'Harmonogram', icon: Calendar },
-        { id: 'requests', label: 'Prośby', icon: Send },
+        { id: 'requests', label: 'Wiadomości', icon: Send },
         { id: 'contact', label: 'Kontakt', icon: Phone },
     ];
 
