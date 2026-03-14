@@ -1020,12 +1020,13 @@ export default function ObjectsPanel() {
 
                                     {/* Owners Selection (Super Admin Only) */}
                                     {(adminUser?.role === 'super_admin') && (
+                                        <>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                                 Владельцы (Опекуны) и их ставки
                                             </label>
                                             <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-56 overflow-y-auto border border-gray-200 dark:border-gray-700 space-y-2">
-                                                {adminsList.map((admin) => (
+                                                {adminsList.filter(a => a.role !== 'client').map((admin) => (
                                                     <div key={admin.id} className="flex flex-col gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
                                                         <label className="flex items-center gap-2 cursor-pointer">
                                                             <input
@@ -1077,6 +1078,35 @@ export default function ObjectsPanel() {
                                                 ))}
                                             </div>
                                         </div>
+
+                                        {/* Client accounts */}
+                                        {adminsList.some(a => a.role === 'client') && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    Клиенты (аккаунты)
+                                                </label>
+                                                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 space-y-1">
+                                                    {adminsList.filter(a => a.role === 'client').map((client) => (
+                                                        <label key={client.id} className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={formData.owner_ids.includes(client.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setFormData({ ...formData, owner_ids: [...formData.owner_ids, client.id] });
+                                                                    } else {
+                                                                        setFormData({ ...formData, owner_ids: formData.owner_ids.filter(id => id !== client.id) });
+                                                                    }
+                                                                }}
+                                                                className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                            />
+                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{client.name}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        </>
                                     )}
 
                                     {/* Worker Salary (Super Admin Only) */}
