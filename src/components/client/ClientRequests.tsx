@@ -40,7 +40,7 @@ export default function ClientRequests() {
     const [objects, setObjects] = useState<ClientObject[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [showForm, setShowForm] = useState(false);
+    const [showForm, setShowForm] = useState<null | 'message' | 'services'>(null);
     const [formData, setFormData] = useState({ object_id: '', message: '' });
     const [selectedServices, setSelectedServices] = useState<string[]>([]);
     const [customService, setCustomService] = useState('');
@@ -107,7 +107,7 @@ export default function ClientRequests() {
         setFormData({ object_id: '', message: '' });
         setSelectedServices([]);
         setCustomService('');
-        setShowForm(false);
+        setShowForm(null);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -213,22 +213,73 @@ export default function ClientRequests() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between gap-3">
                 <div>
                     <h2 className="text-2xl font-bold text-main">Wiadomości</h2>
-                    <p className="text-sm text-muted mt-1">Wyślij prośbę do opiekuna obiektu</p>
+                    <p className="text-sm text-muted mt-1">Wyślij wiadomość lub zamów usługę dodatkową</p>
                 </div>
-                <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="btn-primary flex items-center gap-2"
-                >
-                    <Sparkles className="w-4 h-4" />
-                    Zamów usługę
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                    <button
+                        onClick={() => setShowForm(showForm === 'message' ? null : 'message')}
+                        className="btn-secondary flex items-center gap-2 text-sm"
+                    >
+                        <MessageSquare className="w-4 h-4" />
+                        Wyślij wiadomość
+                    </button>
+                    <button
+                        onClick={() => setShowForm(showForm === 'services' ? null : 'services')}
+                        className="btn-primary flex items-center gap-2 text-sm"
+                    >
+                        <Sparkles className="w-4 h-4" />
+                        Zamów usługę
+                    </button>
+                </div>
             </div>
 
-            {/* New Request Form */}
-            {showForm && (
+            {/* Simple message form */}
+            {showForm === 'message' && (
+                <div className="card p-6 border-border animate-fadeIn">
+                    <h3 className="font-bold text-main mb-4 flex items-center gap-2">
+                        <MessageSquare className="w-5 h-5 text-primary" />
+                        Wyślij wiadomość
+                    </h3>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Obiekt</label>
+                            <select
+                                value={formData.object_id}
+                                onChange={(e) => setFormData({ ...formData, object_id: e.target.value })}
+                                className="input"
+                                required
+                            >
+                                <option value="">Wybierz obiekt...</option>
+                                {objects.map(obj => (
+                                    <option key={obj.object_id} value={obj.object_id}>{obj.object_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Wiadomość</label>
+                            <textarea
+                                value={formData.message}
+                                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                                className="input min-h-[100px] resize-y"
+                                placeholder="Np. Proszę o kontakt w sprawie..."
+                                required
+                            />
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                            <button type="button" onClick={resetForm} className="btn-secondary">Anuluj</button>
+                            <button type="submit" disabled={submitting} className="btn-primary flex items-center gap-2">
+                                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />Wysyłanie...</> : <><Send className="w-4 h-4" />Wyślij wiadomość</>}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* Extra services form */}
+            {showForm === 'services' && (
                 <div className="card p-6 border-primary/30 animate-fadeIn">
                     <h3 className="font-bold text-main mb-4 flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-primary" />
