@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, Search, LayoutGrid, List, Map } from 'lucide-react';
@@ -47,6 +47,15 @@ export default function ObjectsPanel() {
     const [editingObject, setEditingObject] = useState<CleaningObject | null>(null);
     const [viewingObject, setViewingObject] = useState<CleaningObject | null>(null);
     const [managingTasksFor, setManagingTasksFor] = useState<CleaningObject | null>(null);
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handleOutsideClick = () => setOpenMenuId(null);
+        document.addEventListener('click', handleOutsideClick);
+        return () => document.removeEventListener('click', handleOutsideClick);
+    }, []);
 
     // View & Search State
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>(() => {
@@ -687,44 +696,50 @@ export default function ObjectsPanel() {
 
                                 {/* Action Menu (Stop Propagation) */}
                                 <div
+                                    ref={menuRef}
                                     className="absolute top-4 right-4"
                                     onClick={(e) => e.stopPropagation()}
                                 >
-                                    <div className="relative group/menu">
-                                        <button className="btn-icon relative z-10">
+                                    <div className="relative">
+                                        <button
+                                            className="btn-icon relative z-10"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setOpenMenuId(openMenuId === object.id ? null : object.id);
+                                            }}
+                                        >
                                             <MoreVertical size={18} />
                                         </button>
-                                        <div className="absolute right-0 top-full pt-1 w-40 hidden group-hover/menu:block z-50 animate-scaleIn origin-top-right">
-                                            <div className="popover-content py-1 p-0 overflow-hidden">
-                                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
-                                                    <>
+                                        {openMenuId === object.id && (
+                                            <div className="absolute right-0 top-full pt-1 w-40 z-50 animate-scaleIn origin-top-right">
+                                                <div className="popover-content py-1 p-0 overflow-hidden">
+                                                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
+                                                        <>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setManagingTasksFor(object); }}
+                                                                className="w-full text-left px-4 py-2.5 hover:bg-subtle flex items-center gap-2 text-main transition-colors"
+                                                            >
+                                                                <CheckSquare size={14} className="text-muted" /> Задачи
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); openModal(object); }}
+                                                                className="w-full text-left px-4 py-2 text-sm text-main hover:bg-subtle flex items-center gap-2"
+                                                            >
+                                                                <Edit2 size={16} className="text-muted" /> Редактировать
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
                                                         <button
-                                                            onClick={(e) => { e.stopPropagation(); setManagingTasksFor(object); }}
-                                                            className="w-full text-left px-4 py-2.5 hover:bg-subtle flex items-center gap-2 text-main transition-colors"
+                                                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); handleDelete(object.id, e); }}
+                                                            className="w-full text-left px-4 py-2.5 hover:bg-red-500/10 flex items-center gap-2 text-danger"
                                                         >
-                                                            <CheckSquare size={14} className="text-muted" /> Задачи
+                                                            <Trash2 size={14} /> Удалить
                                                         </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                openModal(object);
-                                                            }}
-                                                            className="w-full text-left px-4 py-2 text-sm text-main hover:bg-subtle flex items-center gap-2"
-                                                        >
-                                                            <Edit2 size={16} className="text-muted" /> Редактировать
-                                                        </button>
-                                                    </>
-                                                )}
-                                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleDelete(object.id, e); }}
-                                                        className="w-full text-left px-4 py-2.5 hover:bg-red-500/10 flex items-center gap-2 text-danger"
-                                                    >
-                                                        <Trash2 size={14} /> Удалить
-                                                    </button>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1617,8 +1632,12 @@ function ObjectDetailsModal({ object, onClose, creators, adminUser }: { object: 
                                 <CheckSquare size={14} /> Есть задачи
                             </span>
                         )}
-
                     </div>
+                </div>
+                <div className="modal-footer">
+                    <button onClick={onClose} className="btn-secondary w-full sm:w-auto">
+                        Закрыть
+                    </button>
                 </div>
             </div>
         </div>
