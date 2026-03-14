@@ -372,31 +372,31 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content sm:max-w-[95vw] sm:h-[90vh]" onClick={e => e.stopPropagation()}>
                 {/* Header */}
-                <div className="modal-header flex-col sm:flex-row gap-3">
-                    <div className="flex-1 min-w-0">
-                        <h3 className="text-lg sm:text-xl font-bold text-main flex items-center gap-2">
-                            <span className="bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 p-1.5 rounded-lg">
-                                <Calendar className="w-5 h-5" />
-                            </span>
-                            Планировщик задач
-                        </h3>
-                        <p className="text-sm text-muted mt-1 ml-10 truncate">
-                            Объект: <span className="font-semibold text-main">{objectName}</span>
-                        </p>
+                <div className="modal-header">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="bg-primary/10 text-primary p-1.5 rounded-lg shrink-0">
+                            <Calendar className="w-5 h-5" />
+                        </span>
+                        <div className="min-w-0">
+                            <h3 className="text-base sm:text-xl font-bold text-main leading-tight">Планировщик задач</h3>
+                            <p className="text-xs sm:text-sm text-muted truncate">
+                                <span className="font-semibold text-main">{objectName}</span>
+                            </p>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <label className="btn-secondary flex items-center gap-2 cursor-pointer shadow-sm relative px-3 py-2 text-sm flex-1 sm:flex-none justify-center">
-                            {loading ? <span className="animate-pulse">Загрузка...</span> : <><ScanText className="w-4 h-4" /> OCR</>}
+                    <div className="flex items-center gap-2 shrink-0">
+                        <label className="btn-secondary flex items-center gap-1.5 cursor-pointer relative px-2.5 py-1.5 text-sm">
+                            {loading ? <span className="animate-pulse text-xs">...</span> : <><ScanText className="w-4 h-4" /><span className="hidden sm:inline">OCR</span></>}
                             <input type="file" accept="image/*" className="hidden" onChange={handleOcrUpload} disabled={loading} />
                         </label>
                         <button
                             onClick={() => { closeForm(); setShowAddForm(true); }}
-                            className="btn-primary flex items-center gap-2 px-4 py-2 shadow-lg shadow-primary-500/20 flex-1 sm:flex-none justify-center"
+                            className="btn-primary flex items-center gap-1.5 px-3 py-1.5 text-sm"
                         >
-                            <Plus className="w-4 h-4" /> Добавить
+                            <Plus className="w-4 h-4" /><span className="hidden sm:inline">Добавить</span><span className="sm:hidden">Задача</span>
                         </button>
                         <button onClick={onClose} className="btn-icon shrink-0">
-                            <X className="w-6 h-6" />
+                            <X className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
@@ -556,7 +556,48 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                             <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
                         </div>
                     ) : (
-                        <div className="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar bg-gray-50/50 dark:bg-black/20 p-4">
+                        <>
+                        {/* Mobile: simple task list */}
+                        <div className="sm:hidden flex-1 overflow-y-auto p-4 space-y-2">
+                            {tasks.length === 0 ? (
+                                <div className="text-center py-12 text-muted text-sm italic">
+                                    <Calendar className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                                    Нет задач — нажмите «Задача» чтобы добавить
+                                </div>
+                            ) : (
+                                tasks.map(task => {
+                                    const scheduleLabel = task.frequency === 'weekly' && task.scheduled_days?.length
+                                        ? task.scheduled_days.map(d => dayNames[d].substring(0, 2)).join(', ')
+                                        : task.frequency === 'monthly' && task.scheduled_days?.length
+                                        ? `${task.scheduled_days.join(', ')}-е число`
+                                        : task.frequency === 'one_time' && task.scheduled_dates?.length
+                                        ? task.scheduled_dates.slice(0, 2).map(d => new Date(d).toLocaleDateString('ru', { day: 'numeric', month: 'short' })).join(', ')
+                                        : 'Без расписания';
+                                    return (
+                                        <div
+                                            key={task.id}
+                                            onClick={() => openEditForm(task)}
+                                            className="card p-3 flex items-start gap-3 cursor-pointer"
+                                        >
+                                            {task.is_special_task && <Star className="w-4 h-4 text-amber-500 fill-current shrink-0 mt-0.5" />}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-medium text-main text-sm">{task.title}</div>
+                                                <div className="text-xs text-muted mt-0.5">{scheduleLabel}</div>
+                                            </div>
+                                            <button
+                                                onClick={(e) => handleDeleteTask(task.id, e)}
+                                                className="p-1.5 text-muted hover:text-danger hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors shrink-0"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        {/* Desktop: Kanban board */}
+                        <div className="hidden sm:block flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar bg-gray-50/50 dark:bg-black/20 p-4">
                             <div className="flex h-full gap-4 min-w-max pb-2">
                                 {/* Unscheduled Column (Weekly only) */}
                                 <div
@@ -690,6 +731,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                 )}
                             </div>
                         </div>
+                        </>
                     )}
                 </div>
             </div>
