@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, Search, LayoutGrid, List, Map } from 'lucide-react';
@@ -930,7 +931,7 @@ export default function ObjectsPanel() {
 
             {/* Modal */}
             {
-                showModal && (
+                showModal && createPortal(
                     <div className="modal-overlay" onClick={closeModal}>
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <div className="modal-header">
@@ -1419,7 +1420,8 @@ export default function ObjectsPanel() {
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 )
             }
 
@@ -1475,7 +1477,7 @@ function ObjectDetailsModal({ object, onClose, creators, adminUser }: { object: 
         fetchData();
     }, [object.id]);
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content sm:max-w-2xl" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
@@ -1672,6 +1674,7 @@ function ObjectDetailsModal({ object, onClose, creators, adminUser }: { object: 
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

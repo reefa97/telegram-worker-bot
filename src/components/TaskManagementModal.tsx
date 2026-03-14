@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { Plus, Trash2, Calendar, Star, X, ScanText, RotateCw } from 'lucide-react';
 
@@ -368,7 +369,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
     const getSpecificDateTasks = () => tasks.filter(t => t.frequency === 'one_time');
     const getMonthlyTasks = () => tasks.filter(t => t.frequency === 'monthly');
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content sm:max-w-[95vw] sm:h-[90vh]" onClick={e => e.stopPropagation()}>
                 {/* Header */}
@@ -735,7 +736,8 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 
