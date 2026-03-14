@@ -742,22 +742,26 @@ serve(async (req) => {
       } else if (data.startsWith("procurement_object_")) {
         const objectId = data.replace("procurement_object_", "");
 
-        const { data: worker } = await supabase
+        // Find the specific worker profile that owns this object
+        const { data: procWorkers } = await supabase
           .from("workers")
-          .select("id")
-          .eq("telegram_user_id", userId.toString())
-          .single();
+          .select("id, worker_objects(object_id)")
+          .eq("telegram_user_id", userId.toString());
 
-        if (worker) {
+        let targetWorker = procWorkers?.find((w: any) =>
+          w.worker_objects?.some((wo: any) => wo.object_id === objectId)
+        ) || procWorkers?.[0];
+
+        if (targetWorker) {
           await supabase
             .from("workers")
             .update({
               bot_state: 'procurement_enter_name',
               temp_procurement_data: { object_id: objectId }
             })
-            .eq("id", worker.id);
+            .eq("id", targetWorker.id);
 
-          const keyboard = await getWorkerKeyboard(worker.id);
+          const keyboard = await getWorkerKeyboard(targetWorker.id);
           await sendTelegramMessage(botToken, chatId, "✍️ Напишите название товара, который нужно закупить (или список товаров).\n\n💡 <b>Пожалуйста, укажите количество для каждого товара!</b>", {
             keyboard: keyboard,
             resize_keyboard: true,
@@ -765,15 +769,17 @@ serve(async (req) => {
           });
         }
       } else if (data === "procurement_cancel") {
-        const { data: worker } = await supabase
+        // Clear procurement state on ALL profiles for this user
+        const { data: cancelWorkers } = await supabase
           .from("workers")
           .select("id")
-          .eq("telegram_user_id", userId.toString())
-          .single();
+          .eq("telegram_user_id", userId.toString());
 
-        if (worker) {
-          await supabase.from("workers").update({ bot_state: null, temp_procurement_data: null }).eq("id", worker.id);
-          const keyboard = await getWorkerKeyboard(worker.id);
+        if (cancelWorkers && cancelWorkers.length > 0) {
+          for (const w of cancelWorkers) {
+            await supabase.from("workers").update({ bot_state: null, temp_procurement_data: null }).eq("id", w.id);
+          }
+          const keyboard = await getWorkerKeyboard(cancelWorkers[0].id);
           await sendTelegramMessage(botToken, chatId, "❌ Закупка отменена.", {
             keyboard: keyboard,
             resize_keyboard: true
@@ -781,14 +787,15 @@ serve(async (req) => {
         }
       }
       else if (data === "procurement_skip_photo") {
-        const { data: worker } = await supabase
+        // Find the profile with active procurement state
+        const { data: skipWorkers } = await supabase
           .from("workers")
-          .select("id")
-          .eq("telegram_user_id", userId.toString())
-          .single();
+          .select("id, bot_state")
+          .eq("telegram_user_id", userId.toString());
 
-        if (worker) {
-          const keyboard = await getWorkerKeyboard(worker.id);
+        const skipWorker = skipWorkers?.find((w: any) => w.bot_state?.includes('procurement')) || skipWorkers?.[0];
+        if (skipWorker) {
+          const keyboard = await getWorkerKeyboard(skipWorker.id);
           await sendTelegramMessage(botToken, chatId, "✅ Фото пропущено. Теперь нажмите кнопку «🚀 Отправить заказ» ниже для отправки заявки.", {
             keyboard,
             resize_keyboard: true
@@ -1011,15 +1018,32 @@ serve(async (req) => {
 
 
       // --- PROCUREMENT LOGIC ---
-      const { data: currentWorker } = await supabase
+      // Fetch ALL worker profiles for this telegram user (handles multiple profiles)
+      const { data: currentWorkerProfiles } = await supabase
         .from("workers")
         .select("id, bot_state, temp_procurement_data, worker_objects(object_id, cleaning_objects(id, name))")
-        .eq("telegram_user_id", userId.toString())
-        .maybeSingle();
+        .eq("telegram_user_id", userId.toString());
+
+      // Find the worker with active procurement state, or fall back to first profile
+      const currentWorker = currentWorkerProfiles?.find(w => w.bot_state?.includes('procurement')) || currentWorkerProfiles?.[0] || null;
+
+      // Aggregate all objects from all profiles
+      const allProcurementObjects: any[] = [];
+      if (currentWorkerProfiles) {
+        for (const w of currentWorkerProfiles) {
+          if (w.worker_objects) {
+            for (const wo of w.worker_objects as any[]) {
+              if (wo.cleaning_objects) {
+                allProcurementObjects.push(wo);
+              }
+            }
+          }
+        }
+      }
 
       if (text === "🛍 Заказать закупку") {
-        if (currentWorker && currentWorker.worker_objects && currentWorker.worker_objects.length > 0) {
-          const buttons = currentWorker.worker_objects.map((wo: any) => {
+        if (allProcurementObjects.length > 0) {
+          const buttons = allProcurementObjects.map((wo: any) => {
             return [{ text: wo.cleaning_objects.name, callback_data: `procurement_object_${wo.cleaning_objects.id}` }];
           });
 
@@ -1168,7 +1192,8 @@ serve(async (req) => {
         }
 
         // Check if worker already activated with this telegram user (re-click of old link)
-        const { data: existingWorker } = await supabase.from("workers").select("id, first_name, last_name").eq("telegram_user_id", userId.toString()).maybeSingle();
+        const { data: existingWorkers } = await supabase.from("workers").select("id, first_name, last_name").eq("telegram_user_id", userId.toString()).limit(1);
+        const existingWorker = existingWorkers?.[0];
         if (existingWorker) {
           console.log(`[activation] User ${userId} already activated as worker ${existingWorker.id}`);
           const keyboard = await getWorkerKeyboard(existingWorker.id);
@@ -1821,12 +1846,13 @@ serve(async (req) => {
       const userId = from.id;
       const chatId = chat.id;
 
-      // Check if user is in 'replying_to_email' state
-      const { data: worker } = await supabase
+      // Check if user is in 'replying_to_email' state (handles multiple profiles)
+      const { data: emailWorkers } = await supabase
         .from("workers")
         .select("id, bot_state, email_reply_data")
-        .eq("telegram_user_id", userId.toString())
-        .maybeSingle();
+        .eq("telegram_user_id", userId.toString());
+
+      const worker = emailWorkers?.find((w: any) => w.bot_state === 'replying_to_email' && w.email_reply_data) || null;
 
       if (worker && worker.bot_state === 'replying_to_email' && worker.email_reply_data) {
         // Send the email
