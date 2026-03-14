@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Plus, Edit2, Trash2, Send, Copy, Check, Users, History, Search, RefreshCw } from 'lucide-react';
 import WorkSessionsModal from './WorkSessionsModal';
 import WorkerDetailsModal from './WorkerDetailsModal';
+import SalariesTab from './SalariesTab';
 
 interface Worker {
     id: string;
@@ -62,6 +63,7 @@ export default function WorkersPanel() {
         selectedObjects: [] as string[],
     });
 
+    const [activeTab, setActiveTab] = useState<'list' | 'salaries'>('list');
     const [searchQuery, setSearchQuery] = useState('');
     const [isAddingRole, setIsAddingRole] = useState(false);
     const [newRoleName, setNewRoleName] = useState('');
@@ -430,19 +432,21 @@ export default function WorkersPanel() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div className="flex items-center gap-4 flex-1 w-full">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white shrink-0">Работники</h2>
-                    <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Поиск по имени, роли, телефону..."
-                            className="input pl-10 h-10 w-full"
-                        />
-                    </div>
+                    {activeTab === 'list' && (
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Поиск по имени, роли, телефону..."
+                                className="input pl-10 h-10 w-full"
+                            />
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-2 w-full md:w-auto">
-                    {selectedWorkers.size > 0 && (
+                    {activeTab === 'list' && selectedWorkers.size > 0 && (
                         <button
                             onClick={() => setShowBulkModal(true)}
                             className="btn-primary flex items-center gap-2"
@@ -451,7 +455,7 @@ export default function WorkersPanel() {
                             Написать ({selectedWorkers.size})
                         </button>
                     )}
-                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_create) && (
+                    {activeTab === 'list' && (adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_create) && (
                         <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
                             <Plus className="w-4 h-4" />
                             Добавить работника
@@ -460,7 +464,33 @@ export default function WorkersPanel() {
                 </div>
             </div>
 
-            <div className="table-container">
+            {/* Sub-tabs */}
+            <div className="flex gap-1 mb-4 border-b border-border">
+                <button
+                    onClick={() => setActiveTab('list')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                        activeTab === 'list'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-muted hover:text-main'
+                    }`}
+                >
+                    Список
+                </button>
+                <button
+                    onClick={() => setActiveTab('salaries')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                        activeTab === 'salaries'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-muted hover:text-main'
+                    }`}
+                >
+                    Зарплаты
+                </button>
+            </div>
+
+            {activeTab === 'salaries' && <SalariesTab />}
+
+            {activeTab === 'list' && <div className="table-container">
                 <table className="table">
                     <thead>
                         <tr>
@@ -591,7 +621,7 @@ export default function WorkersPanel() {
                         ))}
                     </tbody>
                 </table>
-            </div>
+            </div>}
 
             {/* Modal */}
             {showModal && (

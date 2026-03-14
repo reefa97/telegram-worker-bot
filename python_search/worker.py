@@ -80,9 +80,9 @@ async def process_job(job):
         # Check API balances before starting
         await check_balances_for_job(serper_token, admin_id)
 
-        # Update status to processing
+        # Update status to running
         supabase.table("email_search_jobs").update({
-            "status": "processing",
+            "status": "running",
             "started_at": datetime.now(timezone.utc).isoformat()
         }).eq("id", job_id).execute()
     
@@ -275,7 +275,23 @@ from scheduler import scheduler_loop
 
 async def worker_loop():
     logger.info("Email Search Worker started. Polling for jobs...")
-    
+
+    # On startup, reset any jobs stuck in running/processing to pending
+    try:
+        stuck = supabase.table("email_search_jobs")\
+            .select("id, query")\
+            .in_("status", ["running", "processing"])\
+            .execute()
+        if stuck.data:
+            for j in stuck.data:
+                logger.warning(f"Resetting stuck job {j['id']} ({j['query']}) to pending...")
+                supabase.table("email_search_jobs").update({
+                    "status": "pending",
+                    "started_at": None
+                }).eq("id", j['id']).execute()
+    except Exception as e:
+        logger.error(f"Failed to reset stuck jobs: {e}")
+
     # Start Scheduler in background
     asyncio.create_task(scheduler_loop())
     

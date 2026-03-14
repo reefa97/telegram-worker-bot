@@ -28,7 +28,7 @@ async def ainvoke_llm(
         logger.error("No OpenAI API key found in environment variables.")
         return None
 
-    client = AsyncOpenAI(api_key=api_key)
+    client = AsyncOpenAI(api_key=api_key, timeout=60.0)
 
     try:
         messages = []
