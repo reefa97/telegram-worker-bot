@@ -1401,7 +1401,6 @@ export default function QualityControlPanel() {
                                                 type="file"
                                                 accept="image/*"
                                                 multiple
-                                                capture="environment"
                                                 className="hidden"
                                                 onChange={(e) => {
                                                     handlePhotoSelect(idx, e.target.files);
