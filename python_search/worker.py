@@ -81,10 +81,13 @@ async def process_job(job):
         await check_balances_for_job(serper_token, admin_id)
 
         # Update status to running
-        supabase.table("email_search_jobs").update({
-            "status": "running",
-            "started_at": datetime.now(timezone.utc).isoformat()
-        }).eq("id", job_id).execute()
+        try:
+            supabase.table("email_search_jobs").update({
+                "status": "running",
+                "started_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", job_id).execute()
+        except Exception as start_err:
+            logger.warning(f"Failed to mark job {job_id} as running: {start_err}")
     
         # Initialize Managers
         search_mgr = SearchManager(api_key=serper_token)
@@ -249,11 +252,14 @@ async def process_job(job):
                 return
     
         # Job Completed
-        supabase.table("email_search_jobs").update({
-            "status": "completed",
-            "stopped_at": datetime.now(timezone.utc).isoformat()
-        }).eq("id", job_id).execute()
-        logger.info(f"Job {job_id} completed. Total emails: {total_emails}")
+        try:
+            supabase.table("email_search_jobs").update({
+                "status": "completed",
+                "stopped_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", job_id).execute()
+            logger.info(f"Job {job_id} completed. Total emails: {total_emails}")
+        except Exception as complete_err:
+            logger.warning(f"Failed to mark job {job_id} as completed (may have been deleted): {complete_err}")
 
     except Exception as e:
         logger.error(f"Job failed: {e}", exc_info=True)

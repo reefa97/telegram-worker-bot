@@ -860,7 +860,35 @@ serve(async (req) => {
             const endTime = new Date();
             const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / 60000);
 
-            // First check if tasks are required
+            // Check for pending client request tasks first
+            const { data: pendingCRTasks } = await supabase
+              .from("client_requests")
+              .select("id, message")
+              .eq("object_id", activeSession.object_id)
+              .eq("assigned_worker_id", worker.id)
+              .eq("worker_task_status", "pending");
+
+            if (pendingCRTasks && pendingCRTasks.length > 0) {
+              const taskDesc = pendingCRTasks.map((t: any, i: number) => `${i + 1}. ${t.message}`).join('\n');
+              await sendTelegramMessage(
+                botToken,
+                chatId,
+                `📋 <b>Подтвердите выполнение задания от клиента:</b>\n\n${taskDesc}`,
+                {
+                  inline_keyboard: [
+                    [
+                      { text: "✅ Да, выполнено", callback_data: `cr_confirm_${activeSession.id}` },
+                    ],
+                    [
+                      { text: "❌ Нет, не выполнено", callback_data: `cr_fail_${activeSession.id}` },
+                    ]
+                  ]
+                }
+              );
+              return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+            }
+
+            // Check if regular daily tasks are required
             const { data: objectData } = await supabase
               .from("cleaning_objects")
               .select("requires_tasks")
@@ -929,6 +957,117 @@ serve(async (req) => {
         } catch (err) {
           console.error(`[finish_work] CRITICAL ERROR:`, err);
           await sendTelegramMessage(botToken, chatId, "❌ Произошла ошибка при завершении смены. Попробуйте еще раз.");
+        }
+      } else if (data.startsWith("cr_confirm_") || data.startsWith("cr_fail_")) {
+        const isConfirmed = data.startsWith("cr_confirm_");
+        const sessionId = data.replace(isConfirmed ? "cr_confirm_" : "cr_fail_", "");
+
+        try {
+          // Get the active session to find worker and object
+          const { data: session } = await supabase
+            .from("work_sessions")
+            .select("*, workers(*), cleaning_objects(name)")
+            .eq("id", sessionId)
+            .single();
+
+          if (!session) {
+            await sendTelegramMessage(botToken, chatId, "⚠️ Сессия не найдена.");
+          } else {
+            // Update all pending client requests for this worker+object
+            const { data: crTasks } = await supabase
+              .from("client_requests")
+              .select("id")
+              .eq("object_id", session.object_id)
+              .eq("assigned_worker_id", session.worker_id)
+              .eq("worker_task_status", "pending");
+
+            if (crTasks && crTasks.length > 0) {
+              const ids = crTasks.map((t: any) => t.id);
+              await supabase
+                .from("client_requests")
+                .update({ worker_task_status: isConfirmed ? "confirmed" : "failed" })
+                .in("id", ids);
+
+              if (!isConfirmed) {
+                // Notify guardians that task was NOT completed
+                try {
+                  const workerName = `${session.workers?.first_name} ${session.workers?.last_name}`;
+                  const objectName = session.cleaning_objects?.name;
+                  const alertMsg = `⚠️ <b>Задание не выполнено!</b>\n\n👤 Работник <b>${workerName}</b> был на объекте <b>${objectName}</b> и не подтвердил выполнение задания клиента.\n\n🔴 Требуется вмешательство!`;
+                  const recipients = await getNotificationRecipients(session.object_id, session.worker_id);
+                  for (const recipientChatId of recipients) {
+                    await sendTelegramMessage(botToken, parseInt(recipientChatId), alertMsg);
+                  }
+                } catch (err) {
+                  console.error("Failed to notify guardians about unconfirmed CR task:", err);
+                }
+              }
+            }
+
+            // Now check if we still need to handle requires_tasks
+            const { data: objectData } = await supabase
+              .from("cleaning_objects")
+              .select("requires_tasks")
+              .eq("id", session.object_id)
+              .single();
+
+            if (objectData?.requires_tasks && session.end_time === null) {
+              await sendTelegramMessage(
+                botToken,
+                chatId,
+                "📋 <b>Вы выполнили все поставленные задачи?</b>",
+                {
+                  inline_keyboard: [
+                    [{ text: "✅ Да, все выполнено", callback_data: `tasks_confirmed_${sessionId}` }],
+                    [{ text: "❌ Нет, не все выполнено", callback_data: `tasks_failed_${sessionId}` }]
+                  ]
+                }
+              );
+              return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+            }
+
+            // End the session
+            if (session.end_time === null) {
+              const startTime = new Date(session.start_time);
+              const endTime = new Date();
+              const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / 60000);
+
+              await supabase
+                .from("work_sessions")
+                .update({
+                  end_time: endTime.toISOString(),
+                  duration_minutes: durationMinutes,
+                  tasks_completed: isConfirmed
+                })
+                .eq("id", sessionId);
+
+              const keyboard = await getWorkerKeyboard(session.worker_id);
+              await sendTelegramMessage(
+                botToken,
+                chatId,
+                `✅ Смена завершена!\n⏱ Длительность: ${Math.floor(durationMinutes / 60)}ч ${durationMinutes % 60}м\n📋 Задание клиента: ${isConfirmed ? "✅ Выполнено" : "❌ Не выполнено"}`,
+                { keyboard, resize_keyboard: true }
+              );
+
+              try {
+                sendLocationToManagers(
+                  botToken,
+                  `${session.workers?.first_name} ${session.workers?.last_name}`,
+                  "end",
+                  session.end_location,
+                  session.cleaning_objects?.name,
+                  durationMinutes,
+                  session.object_id,
+                  session.worker_id
+                ).catch(err => console.error("Background notification error:", err));
+              } catch (err) {
+                console.error("Failed to trigger manager notifications:", err);
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error handling cr_confirm/cr_fail:", err);
+          await sendTelegramMessage(botToken, chatId, "❌ Ошибка при обработке подтверждения.");
         }
       } else if (data.startsWith("tasks_confirmed_") || data.startsWith("tasks_failed_")) {
         const isConfirmed = data.startsWith("tasks_confirmed_");
@@ -1619,6 +1758,21 @@ serve(async (req) => {
               });
             } else {
               message += `\nЗадач на сегодня нет.`;
+            }
+
+            // Check for pending client request tasks
+            const { data: pendingClientTasks } = await supabase
+              .from("client_requests")
+              .select("id, message")
+              .eq("object_id", objectFull?.id)
+              .eq("assigned_worker_id", worker.id)
+              .eq("worker_task_status", "pending");
+
+            if (pendingClientTasks && pendingClientTasks.length > 0) {
+              message += `\n\n⚠️ <b>Задания от клиента (${pendingClientTasks.length}):</b>\n`;
+              pendingClientTasks.forEach((task: any, index: number) => {
+                message += `${index + 1}. ${task.message}\n`;
+              });
             }
 
             message += `\nНе забудьте завершить работу в конце смены.`;

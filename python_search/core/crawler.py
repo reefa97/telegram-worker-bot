@@ -78,7 +78,12 @@ class AsyncCrawler:
 
         # Extract all links for categorization
         soup = BeautifulSoup(html, 'html.parser')
-        links = [urljoin(url, a['href']) for a in soup.find_all('a', href=True)]
+        def safe_urljoin(base, href):
+            try:
+                return urljoin(base, href)
+            except ValueError:
+                return None
+        links = [l for l in (safe_urljoin(url, a['href']) for a in soup.find_all('a', href=True)) if l]
         
         platform_links = EmailExtractor.extract_social_links(links)
         for plat, plat_links in platform_links.items():

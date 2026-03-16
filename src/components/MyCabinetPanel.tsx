@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Plus, Clock,
-    CheckCircle2, User, Trash2, X, Briefcase, MessageSquare, Building2, Loader2
+    CheckCircle2, User, Trash2, X, Briefcase, MessageSquare, Building2, Loader2, UserCheck, ClipboardCopy
 } from 'lucide-react';
 import CrmPipeline from './crm/CrmPipeline';
 
@@ -46,6 +47,11 @@ export default function MyCabinetPanel() {
     const [leads, setLeads] = useState<{ id: string; title: string }[]>([]);
     const [selectedLeadId, setSelectedLeadId] = useState('');
     const [clientRequests, setClientRequests] = useState<any[]>([]);
+    const [assignModal, setAssignModal] = useState<{ req: any } | null>(null);
+    const [assignWorkers, setAssignWorkers] = useState<any[]>([]);
+    const [assignWorkerId, setAssignWorkerId] = useState('');
+    const [assignMessage, setAssignMessage] = useState('');
+    const [assignSubmitting, setAssignSubmitting] = useState(false);
 
     useEffect(() => {
         if (adminUser) {
@@ -77,11 +83,58 @@ export default function MyCabinetPanel() {
         try {
             const { data } = await supabase
                 .from('client_requests')
-                .select('*, cleaning_objects(name), client:admin_users!client_id(email)')
+                .select('*, cleaning_objects(name), client:admin_users!client_id(email), assigned_worker:workers!assigned_worker_id(id, first_name, last_name)')
                 .order('created_at', { ascending: false });
             if (data) setClientRequests(data);
         } catch (err) {
             console.error('Error loading client requests:', err);
+        }
+    };
+
+    const openAssignModal = async (req: any) => {
+        setAssignModal({ req });
+        setAssignMessage(req.worker_message || req.message);
+        setAssignWorkerId(req.assigned_worker_id || '');
+        // Load workers for this object
+        const { data } = await supabase
+            .from('worker_objects')
+            .select('worker_id, workers(id, first_name, last_name, telegram_chat_id)')
+            .eq('object_id', req.object_id);
+        if (data) setAssignWorkers(data.map((wo: any) => wo.workers).filter(Boolean));
+    };
+
+    const submitAssignment = async () => {
+        if (!assignModal || !assignWorkerId || !assignMessage.trim()) return;
+        setAssignSubmitting(true);
+        try {
+            const { error } = await supabase.from('client_requests').update({
+                assigned_worker_id: assignWorkerId,
+                worker_message: assignMessage.trim(),
+                worker_task_status: 'pending',
+                status: 'in_progress'
+            }).eq('id', assignModal.req.id);
+
+            if (error) throw error;
+
+            // Send Telegram notification to worker
+            const worker = assignWorkers.find(w => w.id === assignWorkerId);
+            if (worker?.telegram_chat_id) {
+                const objectName = assignModal.req.cleaning_objects?.name || 'Obiekt';
+                await supabase.functions.invoke('send-telegram-notification', {
+                    body: {
+                        chat_id: worker.telegram_chat_id,
+                        message: `📋 <b>Nowe zadanie od klienta</b>\n\n📍 Obiekt: <b>${objectName}</b>\n💬 ${assignMessage.trim()}\n\n⚠️ Pamiętaj o wykonaniu tego zadania podczas następnej zmiany!`
+                    }
+                });
+            }
+
+            setAssignModal(null);
+            loadClientRequests();
+        } catch (err) {
+            console.error('Error assigning worker:', err);
+            alert('Ошибка при назначении работника');
+        } finally {
+            setAssignSubmitting(false);
         }
     };
 
@@ -250,20 +303,30 @@ export default function MyCabinetPanel() {
                                             {req.status === 'in_progress' && <span className="badge-info text-[10px] flex items-center gap-1"><Loader2 size={10} className="animate-spin" />В работе</span>}
                                         </div>
                                         <p className="text-main font-medium text-sm">{req.message}</p>
-                                    </div>
-                                    <div className="flex gap-1 flex-shrink-0">
-                                        {req.status === 'new' && (
-                                            <button
-                                                onClick={() => updateRequestStatus(req.id, 'in_progress')}
-                                                className="btn-secondary text-xs px-2 py-1"
-                                                title="Взять в работу"
-                                            >
-                                                В работу
-                                            </button>
+                                        {req.assigned_worker && (
+                                            <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+                                                <UserCheck size={11} className="text-emerald-500" />
+                                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                                    Назначен: {req.assigned_worker.first_name} {req.assigned_worker.last_name}
+                                                </span>
+                                                {req.worker_task_status === 'pending' && <span className="badge-warning text-[10px]">Ожидает</span>}
+                                                {req.worker_task_status === 'confirmed' && <span className="badge-success text-[10px]">Выполнено ✅</span>}
+                                                {req.worker_task_status === 'failed' && <span className="badge-error text-[10px]">Не выполнено ❌</span>}
+                                            </div>
                                         )}
+                                    </div>
+                                    <div className="flex gap-1 flex-shrink-0 flex-wrap justify-end">
+                                        <button
+                                            onClick={() => openAssignModal(req)}
+                                            className="btn-secondary text-xs px-2 py-1 flex items-center gap-1"
+                                            title="Назначить работнику"
+                                        >
+                                            <UserCheck size={12} />
+                                            {req.assigned_worker_id ? 'Переназначить' : 'Назначить'}
+                                        </button>
                                         <button
                                             onClick={() => updateRequestStatus(req.id, 'done')}
-                                            className="btn-primary text-xs px-2 py-1"
+                                            className="btn-primary text-xs px-2 py-1 flex items-center gap-1"
                                             title="Выполнено"
                                         >
                                             <CheckCircle2 size={12} />
@@ -275,6 +338,81 @@ export default function MyCabinetPanel() {
                         ))}
                     </div>
                 </div>
+            )}
+
+            {/* Assign to Worker Modal */}
+            {assignModal && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-md">
+                        <div className="flex items-center justify-between p-5 border-b border-border">
+                            <h3 className="font-bold text-main flex items-center gap-2">
+                                <UserCheck className="w-5 h-5 text-primary" />
+                                Назначить работнику
+                            </h3>
+                            <button onClick={() => setAssignModal(null)} className="text-muted hover:text-main">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div className="p-3 bg-subtle rounded-xl text-sm text-muted">
+                                <span className="font-semibold text-main">Просьба клиента:</span>
+                                <p className="mt-1">{assignModal.req.message}</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Работник</label>
+                                <select
+                                    value={assignWorkerId}
+                                    onChange={e => setAssignWorkerId(e.target.value)}
+                                    className="input"
+                                >
+                                    <option value="">Выберите работника...</option>
+                                    {assignWorkers.map(w => (
+                                        <option key={w.id} value={w.id}>
+                                            {w.first_name} {w.last_name}{!w.telegram_chat_id ? ' (нет Telegram)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                {assignWorkers.length === 0 && (
+                                    <p className="text-xs text-muted mt-1">Нет работников, привязанных к этому объекту</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Сообщение для работника</label>
+                                <div className="relative">
+                                    <textarea
+                                        value={assignMessage}
+                                        onChange={e => setAssignMessage(e.target.value)}
+                                        className="input min-h-[100px] resize-y pr-10"
+                                        placeholder="Опишите задание..."
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setAssignMessage(assignModal.req.message)}
+                                        className="absolute top-2 right-2 p-1.5 rounded-lg text-muted hover:text-primary hover:bg-subtle transition-colors"
+                                        title="Использовать сообщение клиента"
+                                    >
+                                        <ClipboardCopy size={14} />
+                                    </button>
+                                </div>
+                                <p className="text-xs text-muted mt-1 flex items-center gap-1">
+                                    <ClipboardCopy size={10} /> — вставить сообщение клиента
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 p-5 pt-0 justify-end">
+                            <button onClick={() => setAssignModal(null)} className="btn-secondary">Отмена</button>
+                            <button
+                                onClick={submitAssignment}
+                                disabled={assignSubmitting || !assignWorkerId || !assignMessage.trim()}
+                                className="btn-primary flex items-center gap-2"
+                            >
+                                {assignSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck size={16} />}
+                                Назначить и уведомить
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
 
             <div className="border-t border-border mx-2"></div>
