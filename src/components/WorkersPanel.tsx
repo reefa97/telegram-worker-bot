@@ -491,7 +491,7 @@ export default function WorkersPanel() {
 
             {activeTab === 'salaries' && <SalariesTab />}
 
-            {activeTab === 'list' && <div className="table-container">
+            {activeTab === 'list' && <>
                 {/* Mobile cards */}
                 <div className="flex flex-col gap-3 p-4 sm:hidden">
                     {filteredWorkers.map((worker) => (
@@ -532,7 +532,7 @@ export default function WorkersPanel() {
                     )}
                 </div>
                 {/* Desktop table */}
-                <div className="hidden sm:block">
+                <div className="table-container hidden sm:block">
                 <table className="table">
                     <thead>
                         <tr>
@@ -664,7 +664,7 @@ export default function WorkersPanel() {
                     </tbody>
                 </table>
                 </div>
-            </div>}
+            </>}
 
             {/* Modal */}
             {showModal && createPortal(
