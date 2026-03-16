@@ -272,10 +272,13 @@ async def process_job(job):
         except:
             pass # fallback if file write fails
         
-        supabase.table("email_search_jobs").update({
-            "status": "failed",
-            "stopped_at": datetime.utcnow().isoformat()
-        }).eq("id", job_id).execute()
+        try:
+            supabase.table("email_search_jobs").update({
+                "status": "failed",
+                "stopped_at": datetime.utcnow().isoformat()
+            }).eq("id", job_id).execute()
+        except Exception as fail_err:
+            logger.warning(f"Failed to mark job {job_id} as failed (may have been deleted): {fail_err}")
 
 from scheduler import scheduler_loop
 
