@@ -46,81 +46,94 @@ class AsyncCrawler:
             logger.warning(f"Error fetching {url} with Playwright: {e}")
             return None, None, url
 
+    def _empty_results(self):
+        return {
+            'emails': set(),
+            'social': {'facebook': [], 'instagram': [], 'twitter': [], 'linkedin': [], 'youtube': []},
+            'contacts': []
+        }
+
     async def process_url(self, url, keyword, db_manager, username, current_depth=0, source_type="organic"):
         """
         Process a single URL: fetch, extract emails, finding contact links.
         Returns a dict of found data: {emails: [], social: {}, contacts: []}
         """
-        results = {
-            'emails': set(),
-            'social': {'facebook': [], 'instagram': [], 'twitter': [], 'linkedin': [], 'youtube': []},
-            'contacts': []
-        }
-        if url in self.seen_urls:
+        try:
+            results = self._empty_results()
+            if url in self.seen_urls:
+                return results
+            self.seen_urls.add(url)
+
+            logger.info(f"Scanning: {url} (Depth: {current_depth})")
+            html, markdown, final_url = await self.fetch_page(url)
+            if not html:
+                return results
+
+            # Extract emails from markdown (refined) and html (fallback)
+            emails = EmailExtractor.extract_emails_from_markdown(markdown)
+            if not emails:
+                emails = EmailExtractor.extract_emails(html)
+
+            for email in emails:
+                is_new = db_manager.save_email(email, final_url, keyword, username, source_type=source_type)
+                if is_new:
+                    results['emails'].add(email)
+                    logger.info(f"Found email: {email} on {final_url} (Source: {source_type})")
+
+            # Extract all links for categorization — guard against malformed IPv6 hrefs
+            soup = BeautifulSoup(html, 'html.parser')
+            links = []
+            for a in soup.find_all('a', href=True):
+                try:
+                    links.append(urljoin(url, a['href']))
+                except ValueError:
+                    pass
+
+            platform_links = EmailExtractor.extract_social_links(links)
+            for plat, plat_links in platform_links.items():
+                results['social'][plat].extend(plat_links)
+
+            # Deep scan logic
+            if self.deep_scan and current_depth < self.max_depth:
+                contact_links_candidates = EmailExtractor.extract_contact_links(links)
+
+                contact_links = []
+                for full_url in contact_links_candidates:
+                    # Validation
+                    if not EmailExtractor.is_valid_url(full_url):
+                        continue
+
+                    # Check if internal link — guard against malformed IPv6 in urlparse
+                    try:
+                        if urlparse(full_url).netloc != urlparse(url).netloc:
+                            continue
+                    except ValueError:
+                        continue
+
+                    if full_url not in self.seen_urls:
+                        contact_links.append(full_url)
+                        results['contacts'].append(full_url)
+
+                # Process contact links recursively — return_exceptions so one bad URL doesn't kill the batch
+                tasks = []
+                for link in contact_links:
+                    tasks.append(self.process_url(link, keyword, db_manager, username, current_depth + 1, source_type=source_type))
+
+                if tasks:
+                    sub_results = await asyncio.gather(*tasks, return_exceptions=True)
+                    for res in sub_results:
+                        if isinstance(res, Exception):
+                            logger.warning(f"Sub-task failed: {res}")
+                            continue
+                        results['emails'].update(res['emails'])
+                        for plat, plat_links in res['social'].items():
+                            results['social'][plat].extend(plat_links)
+                        results['contacts'].extend(res['contacts'])
+
             return results
-        self.seen_urls.add(url)
-        
-        logger.info(f"Scanning: {url} (Depth: {current_depth})")
-        html, markdown, final_url = await self.fetch_page(url)
-        if not html:
-            return results
-
-        # Extract emails from markdown (refined) and html (fallback)
-        emails = EmailExtractor.extract_emails_from_markdown(markdown)
-        if not emails:
-            emails = EmailExtractor.extract_emails(html)
-        
-        for email in emails:
-            is_new = db_manager.save_email(email, final_url, keyword, username, source_type=source_type)
-            if is_new:
-                results['emails'].add(email)
-                logger.info(f"Found email: {email} on {final_url} (Source: {source_type})")
-
-        # Extract all links for categorization
-        soup = BeautifulSoup(html, 'html.parser')
-        def safe_urljoin(base, href):
-            try:
-                return urljoin(base, href)
-            except ValueError:
-                return None
-        links = [l for l in (safe_urljoin(url, a['href']) for a in soup.find_all('a', href=True)) if l]
-        
-        platform_links = EmailExtractor.extract_social_links(links)
-        for plat, plat_links in platform_links.items():
-            results['social'][plat].extend(plat_links)
-
-        # Deep scan logic
-        if self.deep_scan and current_depth < self.max_depth:
-            contact_links_candidates = EmailExtractor.extract_contact_links(links)
-            
-            contact_links = []
-            for full_url in contact_links_candidates:
-                # Validation
-                if not EmailExtractor.is_valid_url(full_url):
-                    continue
-                    
-                # Check if internal link
-                if urlparse(full_url).netloc != urlparse(url).netloc:
-                    continue
-
-                if full_url not in self.seen_urls:
-                    contact_links.append(full_url)
-                    results['contacts'].append(full_url)
-
-            # Process contact links recursively
-            tasks = []
-            for link in contact_links:
-                tasks.append(self.process_url(link, keyword, db_manager, username, current_depth + 1, source_type=source_type))
-            
-            if tasks:
-                sub_results = await asyncio.gather(*tasks)
-                for res in sub_results:
-                    results['emails'].update(res['emails'])
-                    for plat, plat_links in res['social'].items():
-                        results['social'][plat].extend(plat_links)
-                    results['contacts'].extend(res['contacts'])
-
-        return results
+        except Exception as e:
+            logger.warning(f"process_url failed for {url}: {e}")
+            return self._empty_results()
 
     async def crawl_urls(self, urls, keyword, db_manager, username, source_type="organic"):
         """Main entry point to crawl a list of URLs."""
@@ -128,9 +141,10 @@ class AsyncCrawler:
         for url in urls:
             if EmailExtractor.is_valid_url(url):
                  tasks.append(self.process_url(url, keyword, db_manager, username, source_type=source_type))
-        
-        # Run all top-level URL tasks
-        results = await asyncio.gather(*tasks)
+
+        # Run all top-level URL tasks — return_exceptions so one bad URL never kills the whole batch
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        results = [r for r in results if not isinstance(r, Exception)]
         
         # Aggregate and deduplicate
         final_data = {
