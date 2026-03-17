@@ -59,6 +59,7 @@ serve(async (req: Request) => {
                 phone,
                 telegram_chat_id: telegram_chat_id || null,
                 is_active: userRole === 'client' ? true : !!telegram_chat_id,
+                ...(userRole === 'client' ? { plain_password: password } : {}),
             })
             .select()
             .single();

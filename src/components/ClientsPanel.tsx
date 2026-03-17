@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Plus, Trash2, Building2, Search, ChevronDown, ChevronUp, X, Check, Mail } from 'lucide-react';
+import { User, Plus, Trash2, Building2, Search, ChevronDown, ChevronUp, X, Check, Mail, Eye, EyeOff, Edit2 } from 'lucide-react';
 
 interface ClientUser {
     id: string;
@@ -11,6 +11,7 @@ interface ClientUser {
     name?: string | null;
     role: string;
     created_at: string;
+    plain_password?: string | null;
     objects?: { object_id: string; object_name: string }[];
 }
 
@@ -36,6 +37,46 @@ export default function ClientsPanel() {
     });
 
     const canManageClients = adminUser?.role === 'super_admin';
+
+    const [editingClient, setEditingClient] = useState<ClientUser | null>(null);
+    const [editForm, setEditForm] = useState({ name: '', email: '', password: '' });
+    const [editSaving, setEditSaving] = useState(false);
+    const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+
+    const togglePasswordVisible = (clientId: string) => {
+        setVisiblePasswords(prev => {
+            const next = new Set(prev);
+            next.has(clientId) ? next.delete(clientId) : next.add(clientId);
+            return next;
+        });
+    };
+
+    const openEditModal = (client: ClientUser) => {
+        setEditingClient(client);
+        setEditForm({ name: client.name || '', email: client.email, password: '' });
+    };
+
+    const handleEditSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingClient) return;
+        setEditSaving(true);
+        try {
+            const body: Record<string, string> = { clientId: editingClient.id, name: editForm.name };
+            if (editForm.email && editForm.email !== editingClient.email) body.email = editForm.email;
+            if (editForm.password) body.password = editForm.password;
+
+            const response = await supabase.functions.invoke('update-client-credentials', { body });
+            if (response.error) throw new Error(response.error.message);
+            if (response.data?.error) throw new Error(response.data.error);
+
+            setEditingClient(null);
+            loadClients();
+        } catch (err: any) {
+            alert(`Ошибка: ${err.message}`);
+        } finally {
+            setEditSaving(false);
+        }
+    };
 
     useEffect(() => {
         if (canManageClients) {
@@ -275,13 +316,40 @@ export default function ClientsPanel() {
                                     </div>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => handleDelete(client.id, client.name || client.email)}
-                                className="text-muted hover:text-danger p-1 rounded-md transition-colors shrink-0"
-                                title="Удалить клиента"
-                            >
-                                <Trash2 size={16} />
-                            </button>
+                            <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                    onClick={() => openEditModal(client)}
+                                    className="text-muted hover:text-primary p-1 rounded-md transition-colors"
+                                    title="Редактировать"
+                                >
+                                    <Edit2 size={16} />
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(client.id, client.name || client.email)}
+                                    className="text-muted hover:text-danger p-1 rounded-md transition-colors"
+                                    title="Удалить клиента"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Login/password row */}
+                        <div className="flex items-center gap-2 mb-4 p-2.5 rounded-lg bg-subtle/50 border border-border text-xs">
+                            <span className="text-muted shrink-0">Пароль:</span>
+                            <span className="font-mono text-main flex-1 truncate">
+                                {visiblePasswords.has(client.id)
+                                    ? (client.plain_password || '—')
+                                    : (client.plain_password ? '••••••••' : '—')}
+                            </span>
+                            {client.plain_password && (
+                                <button
+                                    onClick={() => togglePasswordVisible(client.id)}
+                                    className="text-muted hover:text-main transition-colors shrink-0"
+                                >
+                                    {visiblePasswords.has(client.id) ? <EyeOff size={14} /> : <Eye size={14} />}
+                                </button>
+                            )}
                         </div>
 
                         <div className="pt-4 border-t border-border">
@@ -343,6 +411,61 @@ export default function ClientsPanel() {
                     )}
                 </div>
             )}
+
+            {/* Edit Client Modal */}
+            {editingClient && createPortal(
+                <div className="modal-overlay animate-fadeIn">
+                    <div className="modal-content animate-scaleIn">
+                        <div className="modal-header">
+                            <h3 className="text-xl font-bold text-main">Редактировать клиента</h3>
+                            <button onClick={() => setEditingClient(null)} className="btn-icon"><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleEditSubmit}>
+                            <div className="modal-body space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Имя</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.name}
+                                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                        className="input"
+                                        placeholder="Название компании"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Email (логин)</label>
+                                    <input
+                                        type="email"
+                                        value={editForm.email}
+                                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                        className="input"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
+                                        Новый пароль <span className="normal-case font-normal text-muted">(оставьте пустым, чтобы не менять)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editForm.password}
+                                        onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                                        className="input font-mono"
+                                        placeholder="Минимум 6 символов"
+                                        minLength={editForm.password ? 6 : undefined}
+                                    />
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" onClick={() => setEditingClient(null)} className="btn-secondary">Отмена</button>
+                                <button type="submit" className="btn-primary" disabled={editSaving}>
+                                    {editSaving ? 'Сохранение...' : 'Сохранить'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            , document.body)}
 
             {/* Create Client Modal */}
             {showModal && createPortal(
