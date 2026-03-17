@@ -69,12 +69,29 @@ export default function ClientsPanel() {
 
     const loadRequests = async (clientId: string) => {
         setRequestsLoading(true);
-        const { data } = await supabase
+        const { data: reqData } = await supabase
             .from('client_requests')
-            .select('id, message, status, created_at, object_id, cleaning_objects(name)')
+            .select('id, message, status, created_at, object_id')
             .eq('client_id', clientId)
             .order('created_at', { ascending: false });
-        setRequests((data as any) || []);
+
+        if (!reqData) { setRequestsLoading(false); return; }
+
+        // Enrich with object names
+        const objectIds = [...new Set(reqData.map(r => r.object_id).filter(Boolean))];
+        let objectNames: Record<string, string> = {};
+        if (objectIds.length > 0) {
+            const { data: objs } = await supabase
+                .from('cleaning_objects')
+                .select('id, name')
+                .in('id', objectIds);
+            (objs || []).forEach((o: any) => { objectNames[o.id] = o.name; });
+        }
+
+        setRequests(reqData.map(r => ({
+            ...r,
+            cleaning_objects: r.object_id ? { name: objectNames[r.object_id] || '—' } : null
+        })));
         setRequestsLoading(false);
     };
 
@@ -98,7 +115,7 @@ export default function ClientsPanel() {
             if (response.data?.error) throw new Error(response.data.error);
 
             // Refresh list and update detailClient
-            await loadClients();
+            await loadClients(true);
             setEditForm(prev => ({ ...prev, password: '' }));
             alert('Сохранено');
         } catch (err: any) {
@@ -130,15 +147,15 @@ export default function ClientsPanel() {
         if (data) setAllObjects(data);
     };
 
-    const loadClients = async () => {
-        setLoading(true);
+    const loadClients = async (silent = false) => {
+        if (!silent) setLoading(true);
         const { data: clientsData, error } = await supabase
             .from('admin_users')
             .select('*')
             .eq('role', 'client')
             .order('created_at', { ascending: false });
 
-        if (error) { setLoading(false); return; }
+        if (error) { if (!silent) setLoading(false); return; }
 
         const { data: links } = await supabase
             .from('client_objects')
@@ -152,12 +169,13 @@ export default function ClientsPanel() {
         }));
 
         setClients(enrichedClients);
-        // Sync detailClient if open
-        if (detailClient) {
-            const updated = enrichedClients.find(c => c.id === detailClient.id);
-            if (updated) setDetailClient(updated);
-        }
-        setLoading(false);
+        // Sync detailClient if open (use functional update to get fresh state)
+        setDetailClient(prev => {
+            if (!prev) return prev;
+            const updated = enrichedClients.find(c => c.id === prev.id);
+            return updated || prev;
+        });
+        if (!silent) setLoading(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -199,7 +217,7 @@ export default function ClientsPanel() {
                 );
             }
 
-            loadClients();
+            loadClients(true);
             setShowCreateModal(false);
             setFormData({ name: '', email: '', password: '', selectedObjects: [] });
             alert('Клиент создан успешно');
@@ -217,7 +235,7 @@ export default function ClientsPanel() {
             });
             if (response.error) throw response.error;
             if (detailClient?.id === id) setDetailClient(null);
-            loadClients();
+            loadClients(true);
         } catch (error) {
             alert('Ошибка при удалении');
         }
@@ -231,7 +249,7 @@ export default function ClientsPanel() {
                     newObjects.map(objectId => ({ client_id: clientId, object_id: objectId }))
                 );
             }
-            loadClients();
+            loadClients(true);
         } catch { alert('Ошибка при обновлении объектов'); }
     };
 
