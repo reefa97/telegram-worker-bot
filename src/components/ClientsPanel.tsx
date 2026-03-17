@@ -465,31 +465,42 @@ export default function ClientsPanel() {
                                             required
                                         />
                                     </div>
+                                    {/* Current password display */}
                                     <div>
                                         <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
-                                            Пароль
+                                            Текущий пароль
                                         </label>
-                                        <div className="relative">
-                                            <input
-                                                type={showPassword ? 'text' : 'password'}
-                                                value={showPassword && !editForm.password ? (detailClient.plain_password || '') : editForm.password}
-                                                onChange={e => setEditForm({ ...editForm, password: e.target.value })}
-                                                onFocus={() => { if (!editForm.password) setEditForm(f => ({ ...f, password: '' })); }}
-                                                className="input pr-10 font-mono"
-                                                placeholder={detailClient.plain_password ? '••••••••  (текущий)' : 'Новый пароль (мин. 6 символов)'}
-                                                minLength={editForm.password ? 6 : undefined}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPassword(p => !p)}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-main"
-                                            >
-                                                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                                            </button>
+                                        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border bg-subtle/50">
+                                            <span className="font-mono text-sm text-main flex-1 select-all">
+                                                {showPassword
+                                                    ? (detailClient.plain_password || '—')
+                                                    : (detailClient.plain_password ? '••••••••' : '—')}
+                                            </span>
+                                            {detailClient.plain_password && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPassword(p => !p)}
+                                                    className="text-muted hover:text-main transition-colors shrink-0"
+                                                >
+                                                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                                </button>
+                                            )}
                                         </div>
-                                        {detailClient.plain_password && !editForm.password && (
-                                            <p className="text-xs text-muted mt-1">Оставьте пустым, чтобы не менять пароль</p>
-                                        )}
+                                    </div>
+
+                                    {/* Change password */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
+                                            Новый пароль <span className="normal-case font-normal">(оставьте пустым, чтобы не менять)</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={editForm.password}
+                                            onChange={e => setEditForm({ ...editForm, password: e.target.value })}
+                                            className="input font-mono"
+                                            placeholder="Минимум 6 символов"
+                                            minLength={editForm.password ? 6 : undefined}
+                                        />
                                     </div>
 
                                     {/* Objects */}
