@@ -4,9 +4,10 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
-    User, Plus, Trash2, Building2, Search, ChevronDown, ChevronUp,
+    User, Plus, Trash2, Building2, Search,
     X, Check, Mail, Eye, EyeOff, MessageSquare, Save, Loader2
 } from 'lucide-react';
+import ClientRequestsTab from './ClientRequestsTab';
 
 interface ClientUser {
     id: string;
@@ -38,7 +39,6 @@ export default function ClientsPanel() {
     const [allObjects, setAllObjects] = useState<CleaningObject[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [expandedClient, setExpandedClient] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
 
     const [formData, setFormData] = useState({
@@ -78,7 +78,7 @@ export default function ClientsPanel() {
         if (!reqData) { setRequestsLoading(false); return; }
 
         // Enrich with object names
-        const objectIds = [...new Set(reqData.map(r => r.object_id).filter(Boolean))];
+        const objectIds = [...new Set((reqData as any[]).map((r: any) => r.object_id).filter(Boolean))];
         let objectNames: Record<string, string> = {};
         if (objectIds.length > 0) {
             const { data: objs } = await supabase
@@ -88,7 +88,7 @@ export default function ClientsPanel() {
             (objs || []).forEach((o: any) => { objectNames[o.id] = o.name; });
         }
 
-        setRequests(reqData.map(r => ({
+        setRequests((reqData as any[]).map((r: any) => ({
             ...r,
             cleaning_objects: r.object_id ? { name: objectNames[r.object_id] || '—' } : null
         })));
@@ -172,7 +172,7 @@ export default function ClientsPanel() {
         // Sync detailClient if open (use functional update to get fresh state)
         setDetailClient(prev => {
             if (!prev) return prev;
-            const updated = enrichedClients.find(c => c.id === prev.id);
+            const updated = enrichedClients.find((c: ClientUser) => c.id === prev.id);
             return updated || prev;
         });
         if (!silent) setLoading(false);
@@ -298,20 +298,43 @@ export default function ClientsPanel() {
         );
     }
 
+    const [activeTab, setActiveTab] = useState<'clients' | 'requests'>('clients');
+
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-main">Клиенты</h2>
-                    <p className="text-sm text-muted">Управление учетными записями клиентов ({clients.length})</p>
+                    <p className="text-sm text-muted">Управление учетными записями клиентов</p>
                 </div>
-                <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    Добавить клиента
+                {activeTab === 'clients' && (
+                    <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" />
+                        Добавить клиента
+                    </button>
+                )}
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-border">
+                <button
+                    onClick={() => setActiveTab('clients')}
+                    className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${activeTab === 'clients' ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-main'}`}
+                >
+                    <User size={14} /> Клиенты ({clients.length})
+                </button>
+                <button
+                    onClick={() => setActiveTab('requests')}
+                    className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${activeTab === 'requests' ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-main'}`}
+                >
+                    <MessageSquare size={14} /> Просьбы
                 </button>
             </div>
 
+            {activeTab === 'requests' && <ClientRequestsTab />}
+
+            {activeTab === 'clients' && <>
             {/* Search */}
             {clients.length > 0 && (
                 <div className="relative">
@@ -380,6 +403,7 @@ export default function ClientsPanel() {
                     )}
                 </div>
             )}
+            </>}
 
             {/* ── Client Detail Modal ── */}
             {detailClient && createPortal(
