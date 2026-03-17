@@ -40,6 +40,7 @@ export default function ClientsPanel() {
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState<'clients' | 'requests'>('clients');
 
     const [formData, setFormData] = useState({
         name: '',
@@ -297,8 +298,6 @@ export default function ClientsPanel() {
             </div>
         );
     }
-
-    const [activeTab, setActiveTab] = useState<'clients' | 'requests'>('clients');
 
     return (
         <div className="space-y-6">
