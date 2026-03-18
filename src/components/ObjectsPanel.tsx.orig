@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, Search, LayoutGrid, List, Map, UserCheck, UserMinus } from 'lucide-react';
+import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, Search, LayoutGrid, List, Map } from 'lucide-react';
 import ObjectsMap from './ObjectsMap';
 import AddressAutocomplete from './AddressAutocomplete';
 import TaskManagementModal from './TaskManagementModal';
@@ -50,12 +50,6 @@ export default function ObjectsPanel() {
     const [managingTasksFor, setManagingTasksFor] = useState<CleaningObject | null>(null);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
-
-    // Bulk guardian management
-    const [bulkMode, setBulkMode] = useState(false);
-    const [selectedObjectIds, setSelectedObjectIds] = useState<Set<string>>(new Set());
-    const [showGuardianModal, setShowGuardianModal] = useState<'assign' | 'remove' | null>(null);
-    const [bulkSaving, setBulkSaving] = useState(false);
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -455,68 +449,6 @@ export default function ObjectsPanel() {
     const canSeeClientRates = adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_view_client_rates;
     const canEditClientRates = adminUser?.role === 'super_admin';
 
-    const toggleObjectSelection = (id: string) => {
-        setSelectedObjectIds(prev => {
-            const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
-            return next;
-        });
-    };
-
-    const toggleBulkMode = () => {
-        setBulkMode(v => !v);
-        setSelectedObjectIds(new Set());
-    };
-
-    const handleBulkAssignGuardian = async (adminId: string) => {
-        setBulkSaving(true);
-        try {
-            const ids = Array.from(selectedObjectIds);
-            // Add guardian to selected objects (skip if already exists)
-            const rows = ids.map(objectId => ({ object_id: objectId, admin_id: adminId }));
-            await supabase.from('object_owners').upsert(rows, { onConflict: 'object_id,admin_id' });
-            await loadObjects();
-            setShowGuardianModal(null);
-            setSelectedObjectIds(new Set());
-        } catch (e) {
-            alert('Ошибка при назначении опекуна');
-        } finally {
-            setBulkSaving(false);
-        }
-    };
-
-    const handleBulkRemoveGuardian = async (adminId: string) => {
-        setBulkSaving(true);
-        try {
-            const ids = Array.from(selectedObjectIds);
-            for (const objectId of ids) {
-                await supabase.from('object_owners').delete()
-                    .eq('object_id', objectId).eq('admin_id', adminId);
-            }
-            await loadObjects();
-            setShowGuardianModal(null);
-            setSelectedObjectIds(new Set());
-        } catch (e) {
-            alert('Ошибка при снятии опекуна');
-        } finally {
-            setBulkSaving(false);
-        }
-    };
-
-    // Guardians present in all selected objects (for remove modal)
-    const guardiansInSelected = (() => {
-        const ids = Array.from(selectedObjectIds);
-        if (ids.length === 0) return [];
-        const allGuardianIds = new Set<string>();
-        ids.forEach(objectId => {
-            const obj = objects.find(o => o.id === objectId);
-            (obj?.owner_ids || []).forEach(gid => allGuardianIds.add(gid));
-        });
-        return Array.from(allGuardianIds)
-            .map(id => adminsList.find(a => a.id === id))
-            .filter(Boolean) as { id: string; name: string; role: string }[];
-    })();
-
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -532,25 +464,13 @@ export default function ObjectsPanel() {
                 {/* Row 1: Title + Add Button */}
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl sm:text-2xl font-bold text-main">Объекты работы</h2>
-                    <div className="flex items-center gap-2">
-                        {adminUser?.role === 'super_admin' && (
-                            <button
-                                onClick={toggleBulkMode}
-                                className={`btn-secondary flex items-center gap-2 whitespace-nowrap ${bulkMode ? 'ring-2 ring-primary' : ''}`}
-                                title="Управление опекунами"
-                            >
-                                <Users className="w-4 h-4" />
-                                <span className="hidden sm:inline">{bulkMode ? 'Отмена' : 'Опекуны'}</span>
-                            </button>
-                        )}
-                        {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_create) && (
-                            <button onClick={() => openModal()} className="btn-primary flex items-center gap-2 whitespace-nowrap">
-                                <Plus className="w-4 h-4" />
-                                <span className="hidden sm:inline">Добавить объект</span>
-                                <span className="sm:hidden">Добавить</span>
-                            </button>
-                        )}
-                    </div>
+                    {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_create) && (
+                        <button onClick={() => openModal()} className="btn-primary flex items-center gap-2 whitespace-nowrap">
+                            <Plus className="w-4 h-4" />
+                            <span className="hidden sm:inline">Добавить объект</span>
+                            <span className="sm:hidden">Добавить</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* Row 2: Search + View Toggle */}
@@ -783,6 +703,7 @@ export default function ObjectsPanel() {
                             </tbody>
                         </table>
                     </div>
+                    </div>
                 </div>
             )}
 
@@ -792,16 +713,9 @@ export default function ObjectsPanel() {
                     {filteredObjects.map((object) => (
                         <div
                             key={object.id}
-                            onClick={() => bulkMode ? toggleObjectSelection(object.id) : setViewingObject(object)}
-                            className={`card-interactive relative group p-5 flex flex-col gap-4 ${bulkMode && selectedObjectIds.has(object.id) ? 'ring-2 ring-primary border-primary' : ''}`}
+                            onClick={() => setViewingObject(object)}
+                            className="card-interactive relative group p-5 flex flex-col gap-4"
                         >
-                            {bulkMode && (
-                                <div className="absolute top-3 left-3 z-10" onClick={e => { e.stopPropagation(); toggleObjectSelection(object.id); }}>
-                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${selectedObjectIds.has(object.id) ? 'bg-primary border-primary' : 'border-border bg-card'}`}>
-                                        {selectedObjectIds.has(object.id) && <CheckSquare size={12} className="text-white" />}
-                                    </div>
-                                </div>
-                            )}
                             {/* Header: Name & Menu */}
                             <div className="flex justify-between items-start">
                                 <div className="sm:pr-8">
@@ -980,90 +894,6 @@ export default function ObjectsPanel() {
             }
 
 
-            {/* Bulk Guardian Action Bar */}
-            {bulkMode && (
-                <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-200 ${selectedObjectIds.size > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
-                    <div className="flex items-center gap-3 bg-card border border-border rounded-2xl shadow-2xl px-5 py-3">
-                        <span className="text-sm font-medium text-main whitespace-nowrap">
-                            Выбрано: <b>{selectedObjectIds.size}</b>
-                        </span>
-                        <div className="w-px h-5 bg-border" />
-                        <button
-                            onClick={() => setShowGuardianModal('assign')}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
-                        >
-                            <UserCheck size={15} /> Назначить опекуна
-                        </button>
-                        <button
-                            onClick={() => setShowGuardianModal('remove')}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-danger/10 text-danger text-sm font-medium hover:bg-danger/20 transition-colors"
-                        >
-                            <UserMinus size={15} /> Снять опекуна
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Guardian Modal */}
-            {showGuardianModal && createPortal(
-                <div className="modal-overlay animate-fadeIn" onClick={() => setShowGuardianModal(null)}>
-                    <div className="modal-content animate-scaleIn max-w-sm w-full" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3 className="text-lg font-bold text-main">
-                                {showGuardianModal === 'assign' ? '👤 Назначить опекуна' : '🔴 Снять опекуна'}
-                            </h3>
-                            <button onClick={() => setShowGuardianModal(null)} className="btn-icon"><X size={18} /></button>
-                        </div>
-                        <div className="modal-body">
-                            <p className="text-sm text-muted mb-3">
-                                {showGuardianModal === 'assign'
-                                    ? `Выберите опекуна для ${selectedObjectIds.size} объект${selectedObjectIds.size === 1 ? 'а' : 'ов'}:`
-                                    : `Выберите опекуна, которого нужно снять с ${selectedObjectIds.size} объект${selectedObjectIds.size === 1 ? 'а' : 'ов'}:`}
-                            </p>
-                            <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                                {showGuardianModal === 'assign'
-                                    ? adminsList.filter(a => a.role !== 'client').map(admin => (
-                                        <button
-                                            key={admin.id}
-                                            onClick={() => handleBulkAssignGuardian(admin.id)}
-                                            disabled={bulkSaving}
-                                            className="w-full flex items-center gap-3 p-3 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-left"
-                                        >
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-                                                {(admin.name || '?')[0].toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-main text-sm">{admin.name}</div>
-                                                <div className="text-xs text-muted capitalize">{admin.role}</div>
-                                            </div>
-                                        </button>
-                                    ))
-                                    : guardiansInSelected.length === 0
-                                        ? <p className="text-sm text-muted text-center py-4">Нет опекунов на выбранных объектах</p>
-                                        : guardiansInSelected.map(admin => (
-                                            <button
-                                                key={admin.id}
-                                                onClick={() => handleBulkRemoveGuardian(admin.id)}
-                                                disabled={bulkSaving}
-                                                className="w-full flex items-center gap-3 p-3 rounded-xl border border-border hover:border-danger/40 hover:bg-danger/5 transition-all text-left"
-                                            >
-                                                <div className="w-8 h-8 rounded-full bg-danger/10 flex items-center justify-center text-danger font-bold text-sm shrink-0">
-                                                    {(admin.name || '?')[0].toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <div className="font-medium text-main text-sm">{admin.name}</div>
-                                                    <div className="text-xs text-muted capitalize">{admin.role}</div>
-                                                </div>
-                                            </button>
-                                        ))
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
-
             {/* Map View */}
             {
                 viewMode === 'map' && (
@@ -1191,13 +1021,12 @@ export default function ObjectsPanel() {
 
                                     {/* Owners Selection (Super Admin Only) */}
                                     {(adminUser?.role === 'super_admin') && (
-                                        <>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                                 Владельцы (Опекуны) и их ставки
                                             </label>
                                             <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-56 overflow-y-auto border border-gray-200 dark:border-gray-700 space-y-2">
-                                                {adminsList.filter(a => a.role !== 'client').map((admin) => (
+                                                {adminsList.map((admin) => (
                                                     <div key={admin.id} className="flex flex-col gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
                                                         <label className="flex items-center gap-2 cursor-pointer">
                                                             <input
@@ -1249,35 +1078,6 @@ export default function ObjectsPanel() {
                                                 ))}
                                             </div>
                                         </div>
-
-                                        {/* Client accounts */}
-                                        {adminsList.some(a => a.role === 'client') && (
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Клиенты (аккаунты)
-                                                </label>
-                                                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 space-y-1">
-                                                    {adminsList.filter(a => a.role === 'client').map((client) => (
-                                                        <label key={client.id} className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={formData.owner_ids.includes(client.id)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        setFormData({ ...formData, owner_ids: [...formData.owner_ids, client.id] });
-                                                                    } else {
-                                                                        setFormData({ ...formData, owner_ids: formData.owner_ids.filter(id => id !== client.id) });
-                                                                    }
-                                                                }}
-                                                                className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                                                            />
-                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{client.name}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                        </>
                                     )}
 
                                     {/* Worker Salary (Super Admin Only) */}

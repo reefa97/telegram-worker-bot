@@ -33,16 +33,16 @@ serve(async (req: Request) => {
             );
         }
 
-        // Verify target is a super admin
+        // Verify target exists
         const { data: target } = await supabaseAdmin
             .from("admin_users")
             .select("role")
             .eq("id", adminId)
             .single();
 
-        if (!target || target.role !== "super_admin") {
+        if (!target) {
             return new Response(
-                JSON.stringify({ error: "Target user is not a super admin" }),
+                JSON.stringify({ error: "User not found" }),
                 { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
