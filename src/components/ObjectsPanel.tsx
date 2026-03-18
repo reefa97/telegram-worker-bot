@@ -795,16 +795,18 @@ export default function ObjectsPanel() {
                             onClick={() => bulkMode ? toggleObjectSelection(object.id) : setViewingObject(object)}
                             className={`card-interactive relative group p-5 flex flex-col gap-4 ${bulkMode && selectedObjectIds.has(object.id) ? 'ring-2 ring-primary border-primary' : ''}`}
                         >
-                            {bulkMode && (
-                                <div className="absolute top-3 left-3 z-10" onClick={e => { e.stopPropagation(); toggleObjectSelection(object.id); }}>
-                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${selectedObjectIds.has(object.id) ? 'bg-primary border-primary' : 'border-border bg-card'}`}>
-                                        {selectedObjectIds.has(object.id) && <CheckSquare size={12} className="text-white" />}
-                                    </div>
-                                </div>
-                            )}
                             {/* Header: Name & Menu */}
                             <div className="flex justify-between items-start">
-                                <div className="sm:pr-8">
+                                <div className={`flex items-start gap-3 min-w-0 flex-1 ${bulkMode ? '' : 'sm:pr-8'}`}>
+                                    {bulkMode && (
+                                        <div
+                                            className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${selectedObjectIds.has(object.id) ? 'bg-primary border-primary' : 'border-border bg-card'}`}
+                                            onClick={e => { e.stopPropagation(); toggleObjectSelection(object.id); }}
+                                        >
+                                            {selectedObjectIds.has(object.id) && <CheckSquare size={12} className="text-white" />}
+                                        </div>
+                                    )}
+                                <div className="min-w-0 flex-1 sm:pr-8">
                                     <div className="flex items-center gap-2 mb-2">
                                         <h3 className="text-base font-medium text-main group-hover:text-primary transition-colors">
                                             {object.name}
@@ -825,6 +827,7 @@ export default function ObjectsPanel() {
                                         </div>
                                     ) : null}
                                 </div>
+                                </div>{/* end flex items-start wrapper */}
 
                                 {/* Action Menu (Stop Propagation) — desktop only */}
                                 <div
