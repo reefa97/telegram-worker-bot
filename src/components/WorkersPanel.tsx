@@ -80,7 +80,7 @@ export default function WorkersPanel() {
     }, []);
 
     const loadCreators = async () => {
-        const { data } = await supabase.from('admin_users').select('id, name');
+        const { data } = await supabase.from('admin_users').select('id, name').neq('role', 'client');
         if (data) {
             const lookup: Record<string, string> = {};
             data.forEach((user: any) => {

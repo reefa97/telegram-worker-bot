@@ -141,7 +141,7 @@ export default function MyFinancesPanel() {
     };
 
     const loadAdmins = async () => {
-        const { data } = await supabase.from('admin_users').select('id, email, name').order('email');
+        const { data } = await supabase.from('admin_users').select('id, email, name').neq('role', 'client').order('email');
         if (data) setAdminsList(data.map((u: any) => ({ id: u.id, email: u.email, name: u.name || u.email })));
     };
 

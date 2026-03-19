@@ -74,7 +74,7 @@ export default function MyCabinetPanel() {
 
     // Add function to load admins
     const loadAdmins = async () => {
-        const { data } = await supabase.from('admin_users').select('id, name, email');
+        const { data } = await supabase.from('admin_users').select('id, name, email').neq('role', 'client');
         if (data) setAdmins(data);
     };
 
