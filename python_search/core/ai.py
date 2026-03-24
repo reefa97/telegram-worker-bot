@@ -2,7 +2,6 @@ import os
 import json
 from typing import Type, TypeVar, Optional, Any
 from pydantic import BaseModel
-from openai import AsyncOpenAI
 from .utils import logger
 
 T = TypeVar("T", bound=BaseModel)
@@ -15,43 +14,47 @@ async def ainvoke_llm(
     temperature: float = 0.1
 ) -> Any:
     """
-    Invokes LLM and returns response, optionally parsed into a Pydantic model.
+    Invokes Claude (Anthropic) LLM and returns response, optionally parsed into a Pydantic model.
     """
+    import anthropic
+
     if not model:
-        model = os.getenv("LLM_MODEL", "gpt-4o-mini")
-    api_key = os.getenv("OPENAI_API_KEY")
+        model = os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        # Try to find in other env vars if exists
-        api_key = os.getenv("LLM_API_KEY") or os.getenv("VITE_OPENAI_API_KEY")
-    
-    if not api_key:
-        logger.error("No OpenAI API key found in environment variables.")
+        logger.error("No ANTHROPIC_API_KEY found in environment variables.")
         return None
 
-    client = AsyncOpenAI(api_key=api_key, timeout=60.0)
+    client = anthropic.AsyncAnthropic(api_key=api_key, timeout=60.0)
 
     try:
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": user_message})
-
         params = {
             "model": model,
-            "messages": messages,
+            "max_tokens": 4096,
             "temperature": temperature,
+            "messages": [{"role": "user", "content": user_message}],
         }
+        if system_prompt:
+            params["system"] = system_prompt
+
+        response = await client.messages.create(**params)
+
+        raw_text = response.content[0].text
 
         if response_format:
-            # Use OpenAI Structured Outputs if supported
-            response = await client.beta.chat.completions.parse(
-                **params,
-                response_format=response_format,
-            )
-            return response.choices[0].message.parsed
+            # Parse JSON from response into Pydantic model
+            # Claude may wrap JSON in ```json ... ``` blocks
+            text = raw_text.strip()
+            if text.startswith("```"):
+                # Remove markdown code block
+                lines = text.split("\n")
+                text = "\n".join(lines[1:-1])
+
+            data = json.loads(text)
+            return response_format(**data)
         else:
-            response = await client.chat.completions.create(**params)
-            return response.choices[0].message.content
+            return raw_text
 
     except Exception as e:
         logger.error(f"LLM invocation failed: {e}")

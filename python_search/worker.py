@@ -9,6 +9,7 @@ from supabase import create_client, Client
 from core.search import SearchManager
 from core.crawler import AsyncCrawler
 from core.supabase_manager import SupabaseManager
+from core.enrichment import BusinessAnalyzer
 
 from scheduler import check_balances_for_job
 
@@ -147,12 +148,27 @@ async def process_job(job):
             all_emails = list(set(valid_emails))
             logger.info(f"Page {page}: {len(all_emails)} emails passed validation (from {len(raw_found_emails)} raw)")
 
-            # Remove emails that failed validation from database
+            # AI enrichment with Claude Haiku
+            best_emails = all_emails
+            if all_emails:
+                logger.info(f"Filtering {len(all_emails)} emails with Claude Haiku...")
+                ai_result = await BusinessAnalyzer.analyze_emails(all_emails, query, "")
+                if ai_result is None:
+                    logger.warning("AI filter failed (returned None). Keeping all emails.")
+                    best_emails = all_emails
+                elif not ai_result and all_emails:
+                    logger.warning("AI returned empty list. Keeping all emails.")
+                    best_emails = all_emails
+                else:
+                    best_emails = ai_result
+                    logger.info(f"Page {page}: Claude kept {len(best_emails)}/{len(all_emails)} emails")
+
+            # Remove invalid + AI-rejected emails from database
             found_total = list(set(organic_data['emails'] + maps_data['emails']))
-            emails_to_remove = [e for e in found_total if e not in all_emails]
+            emails_to_remove = [e for e in found_total if e not in best_emails]
 
             if emails_to_remove:
-                logger.info(f"Removing {len(emails_to_remove)} invalid emails...")
+                logger.info(f"Removing {len(emails_to_remove)} invalid/filtered emails...")
                 try:
                     supabase.table("email_search_results")\
                         .delete()\
