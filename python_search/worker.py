@@ -9,7 +9,7 @@ from supabase import create_client, Client
 from core.search import SearchManager
 from core.crawler import AsyncCrawler
 from core.supabase_manager import SupabaseManager
-from core.enrichment import BusinessAnalyzer
+
 from scheduler import check_balances_for_job
 
 # Load environment variables
@@ -146,46 +146,14 @@ async def process_job(job):
             # Deduplicate within this batch only (same page may return same email twice)
             all_emails = list(set(valid_emails))
             logger.info(f"Page {page}: {len(all_emails)} emails passed validation (from {len(raw_found_emails)} raw)")
-            best_emails = []
 
-            if all_emails:
-                logger.info(f"Enriching {len(all_emails)} emails with AI...")
-                
-                # Analyze emails as a batch
-                best_emails = await BusinessAnalyzer.analyze_emails(all_emails, query, "")
-                
-                # Update database for recognized business emails
-                if best_emails:
-                    for email in best_emails:
-                        db_manager.save_email(
-                            email, "", query, job_id=job_id, 
-                            is_business_email=True
-                        )
-            
-            # Remove invalid/AI-rejected emails from database
+            # Remove emails that failed validation from database
             found_total = list(set(organic_data['emails'] + maps_data['emails']))
-            # Emails that failed validation
             emails_to_remove = [e for e in found_total if e not in all_emails]
-            
-            # 2. Emails that AI rejected (if AI enrichment ran)
-            if best_emails is None:
-                logger.warning("AI enrichment failed (returned None). Keeping all emails.")
-                best_emails = all_emails
-            elif not best_emails and all_emails:
-                # AI returned empty list — likely a mistake, keep all
-                logger.warning("AI returned empty list but emails exist. Keeping all emails.")
-                best_emails = all_emails
-            elif all_emails:
-                ai_rejected = [e for e in all_emails if e not in best_emails]
-                emails_to_remove.extend(ai_rejected)
-            
-            if best_emails and all_emails:
-                logger.info(f"Page {page}: AI kept {len(best_emails)}/{len(all_emails)} emails")
 
             if emails_to_remove:
-                logger.info(f"Removing {len(emails_to_remove)} invalid/AI-rejected emails...")
+                logger.info(f"Removing {len(emails_to_remove)} invalid emails...")
                 try:
-                    # Supabase 'in' operator has limits, but for 50-100 emails it's fine.
                     supabase.table("email_search_results")\
                         .delete()\
                         .eq("job_id", job_id)\
@@ -194,26 +162,6 @@ async def process_job(job):
                 except Exception as e:
                     logger.error(f"Failed to delete rejected emails: {e}")
 
-            # Social Link Enrichment
-            combined_social = {}
-            for plat in ['facebook', 'instagram', 'twitter', 'linkedin']:
-                combined_social[plat] = list(set(organic_data['social'][plat] + maps_data['social'][plat]))
-            
-            if any(combined_social.values()):
-                logger.info("Analyzing social links with AI...")
-                links_info = await BusinessAnalyzer.analyze_links(combined_social, query, "")
-                
-                # Update found (kept) emails with social metadata
-                for email in best_emails:
-                    db_manager.save_email(
-                        email, "", query, job_id=job_id,
-                        facebook=links_info.facebook,
-                        instagram=links_info.instagram,
-                        twitter=links_info.twitter,
-                        linkedin=links_info.linkedin,
-                        contact_page=links_info.contact
-                    )
-    
             new_emails_count = len(all_emails)
 
             if new_emails_count > 0:
