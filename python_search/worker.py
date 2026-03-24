@@ -102,7 +102,7 @@ async def process_job(job):
         CRAWL_DEPTH = int(os.getenv("CRAWL_DEPTH", "1"))
 
         crawler = AsyncCrawler(deep_scan=True, max_depth=CRAWL_DEPTH)
-        consecutive_empty = 0  # Stop after 5 consecutive pages with no new results
+        consecutive_empty = 0  # Stop after 30 consecutive pages with no new results
 
         while True:
             logger.info(f"Searching Serper (Organic + Maps) page {page} for '{query}'...")
@@ -196,9 +196,9 @@ async def process_job(job):
                 consecutive_empty = 0
             else:
                 consecutive_empty += 1
-                logger.info(f"Page {page}: no emails found (consecutive empty: {consecutive_empty}/5)")
-                if consecutive_empty >= 5:
-                    logger.info(f"5 consecutive pages with no new emails from crawler. Stopping search at page {page}.")
+                logger.info(f"Page {page}: no emails found (consecutive empty: {consecutive_empty}/30)")
+                if consecutive_empty >= 30:
+                    logger.info(f"30 consecutive pages with no new emails from crawler. Stopping search at page {page}.")
                     break
 
             page += 1
