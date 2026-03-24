@@ -9,8 +9,8 @@ EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 # Domains to block (News, Aggregators, Generic Junk)
 BLOCKED_DOMAINS = {
     "polskapress.pl", "gazetakrakowska.pl", "naszemiasto.pl", "gazeta.pl",
-    "onet.pl", "wp.pl", "interia.pl", "o2.pl",
-    # Note: gmail.com/yahoo/outlook NOT blocked — many small businesses use free email providers
+    # Note: free email providers (gmail, wp, onet, interia, o2) NOT blocked —
+    # many small businesses in Poland use them (e.g. medycynachalupnik@wp.pl)
 }
 
 # Specific prefixes to block if domain is generic (e.g. contact@gmail is ok? actually business@gmail is common)

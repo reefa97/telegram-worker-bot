@@ -65,12 +65,13 @@ Twoje zadanie: z podanej listy e-maili wybierz TYLKO te, które są prawdziwymi 
 
 4. **E-maile na darmowych domenach** (gmail.com, wp.pl, o2.pl, interia.pl, onet.pl) — ZACHOWAJ jeśli wyglądają jak kontakt małej firmy (np. firmakowalski@gmail.com), USUŃ jeśli wyglądają na prywatne (np. kasia123@wp.pl).
 
-## ZASADY USUWANIA:
+## ZASADY USUWANIA (usuwaj TYLKO te kategorie):
 
-- **USUŃ** e-maile techniczne: webmaster@, admin@, postmaster@, abuse@, noreply@, newsletter@, privacy@, unsubscribe@
-- **USUŃ** e-maile mediowe/prasowe: redakcja@, news@, prasa@, press@ (CHYBA ŻE zapytanie dotyczy mediów)
+- **USUŃ** e-maile techniczne: webmaster@, postmaster@, abuse@, noreply@, newsletter@, privacy@, unsubscribe@, it@
 - **USUŃ** e-maile z losowymi ciągami znaków lub hashami (np. x7f2k@..., 234sdf@...)
-- **USUŃ** e-maile ewidentnie niezwiązane z zapytaniem (np. dla "usługi sprzątania" e-mail restauracji)
+- **USUŃ** e-maile które EWIDENTNIE nie mają nic wspólnego z branżą z zapytania
+
+**NIE USUWAJ** jeśli e-mail jest z tej samej firmy ale z innego miasta/oddziału — to wciąż wartościowy kontakt.
 
 ## KLUCZOWE ZASADY:
 
