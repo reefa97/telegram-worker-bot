@@ -57,7 +57,7 @@ async def send_telegram_message(session, chat_id, text):
         logger.error(f"Telegram send error: {e}")
 
 SERPER_LOW_BALANCE_THRESHOLD = int(os.getenv("SERPER_LOW_BALANCE_THRESHOLD", "100"))
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 BALANCE_CHECK_INTERVAL_HOURS = 6
 _balance_check_state: dict = {"last_check": None}
 
@@ -96,32 +96,6 @@ async def check_balances_for_job(serper_token: str, admin_id: str):
         except Exception as e:
             logger.error(f"Serper balance pre-check failed: {e}")
 
-        # OpenAI
-        if OPENAI_API_KEY:
-            try:
-                async with session.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {OPENAI_API_KEY}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
-                        "messages": [{"role": "user", "content": "hi"}],
-                        "max_tokens": 1
-                    }
-                ) as resp:
-                    if resp.status in (429, 402):
-                        data = await resp.json()
-                        error_code = data.get("error", {}).get("code", "")
-                        if error_code in ("insufficient_quota", "billing_hard_limit_reached"):
-                            logger.warning(f"OpenAI quota exceeded before job: {error_code}")
-                            await log_system_warning(
-                                "⚠️ Закончились кредиты OpenAI. AI-фильтрация отключена. Пополни баланс на platform.openai.com",
-                                {"error_code": error_code}
-                            )
-            except Exception as e:
-                logger.error(f"OpenAI balance pre-check failed: {e}")
 
 
 async def check_api_balances():
@@ -170,32 +144,6 @@ async def check_api_balances():
         except Exception as e:
             logger.error(f"Error fetching admins for Serper balance check: {e}")
 
-        # --- OpenAI: test call to detect quota errors ---
-        if OPENAI_API_KEY:
-            try:
-                async with session.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {OPENAI_API_KEY}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
-                        "messages": [{"role": "user", "content": "hi"}],
-                        "max_tokens": 1
-                    }
-                ) as resp:
-                    if resp.status in (429, 402):
-                        data = await resp.json()
-                        error_code = data.get("error", {}).get("code", "")
-                        if error_code in ("insufficient_quota", "billing_hard_limit_reached"):
-                            logger.warning(f"OpenAI quota exceeded: {error_code}")
-                            await log_system_warning(
-                                f"Закончились кредиты OpenAI: {error_code}",
-                                {"error_code": error_code}
-                            )
-            except Exception as e:
-                logger.error(f"Error checking OpenAI balance: {e}")
 
 
 async def check_task_notifications():
