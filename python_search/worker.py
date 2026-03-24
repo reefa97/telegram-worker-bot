@@ -141,32 +141,8 @@ async def process_job(job):
                 else:
                     logger.info(f"Skipping invalid/blocked email: {email}")
 
-            # Deduplicate against DB (Global check for this admin)
-            unique_emails = valid_emails
-            if valid_emails:
-                try:
-                    # Check if emails exist in any OTHER job belonging to this admin
-                    response = supabase.table("email_search_results")\
-                        .select("""
-                            email,
-                            email_search_jobs!inner(admin_id)
-                        """)\
-                        .eq("email_search_jobs.admin_id", admin_id)\
-                        .neq("job_id", job_id)\
-                        .in_("email", valid_emails)\
-                        .execute()
-                    
-                    existing_set = {row['email'] for row in response.data}
-                    
-                    if existing_set:
-                        logger.info(f"Skipping {len(existing_set)} duplicates found in other jobs.")
-                        unique_emails = [e for e in valid_emails if e not in existing_set]
-                        
-                except Exception as e:
-                    logger.error(f"Deduplication check failed: {e}")
-                    unique_emails = valid_emails
-            
-            all_emails = unique_emails
+            # Deduplicate within this batch only (same page may return same email twice)
+            all_emails = list(set(valid_emails))
             best_emails = []
             
             if all_emails:
@@ -183,9 +159,9 @@ async def process_job(job):
                             is_business_email=True
                         )
             
-            # Remove invalid/duplicate/irrelevant emails from database
-            # 1. Emails that failed validation or deduplication
+            # Remove invalid/AI-rejected emails from database
             found_total = list(set(organic_data['emails'] + maps_data['emails']))
+            # Emails that failed validation
             emails_to_remove = [e for e in found_total if e not in all_emails]
             
             # 2. Emails that AI rejected (if AI enrichment ran)
