@@ -133,8 +133,9 @@ async def process_job(job):
             # Validate Emails (Syntax + MX Record + Blacklist)
             from core.validator import EmailValidator
 
+            raw_found_emails = list(set(organic_data['emails'] + maps_data['emails']))
             valid_emails = []
-            for email in list(set(organic_data['emails'] + maps_data['emails'])):
+            for email in raw_found_emails:
                 if EmailValidator.validate(email):
                     valid_emails.append(email)
                 else:
@@ -235,7 +236,6 @@ async def process_job(job):
 
             if new_emails_count > 0:
                 total_emails += new_emails_count
-                consecutive_empty = 0
                 # Update job progress
                 try:
                     supabase.table("email_search_jobs").update({
@@ -243,10 +243,15 @@ async def process_job(job):
                     }).eq("id", job_id).execute()
                 except Exception as update_err:
                     logger.warning(f"Failed to update total_emails_found (job may have been deleted): {update_err}")
+
+            # consecutive_empty tracks raw crawler output (before dedup),
+            # so re-running the same query doesn't stop early due to duplicates
+            if len(raw_found_emails) > 0:
+                consecutive_empty = 0
             else:
                 consecutive_empty += 1
                 if consecutive_empty >= 3:
-                    logger.info(f"3 consecutive pages with no new emails. Stopping search at page {page}.")
+                    logger.info(f"3 consecutive pages with no new emails from crawler. Stopping search at page {page}.")
                     break
 
             page += 1
