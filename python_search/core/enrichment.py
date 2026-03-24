@@ -43,35 +43,44 @@ class BusinessAnalyzer:
 
     @staticmethod
     async def analyze_emails(
-        emails: List[str], 
-        business_name: str, 
+        emails: List[str],
+        business_name: str,
         business_url: str
     ) -> List[str]:
         if not emails:
             return []
 
-        system_prompt = f"""
-        You are a smart lead generation assistant. Your goal is to Identify valid contact emails for the business or industry described by the query: "{business_name}".
+        system_prompt = f"""Jesteś ekspertem od generowania leadów B2B w Polsce i Europie.
 
-        **Guidelines for KEEPING emails:**
-        1. **MUST KEEP** generic contact emails commonly used in Poland/Europe:
-           - kontakt@, biuro@, rejestracja@, recepcja@, sekretariat@, info@, office@, hello@, welcome@, sprzedaz@.
-        2. **MUST KEEP** specific role-based emails relevant to the context (e.g., for "serviced offices", keep lynda@... or manager@...).
-        3. **MUST KEEP** emails that appear to be direct personal contacts (e.g., name.surname@domain.com) IF the domain matches the business.
+Twoje zadanie: z podanej listy e-maili wybierz TYLKO te, które są prawdziwymi kontaktami biznesowymi powiązanymi z zapytaniem: "{business_name}".
 
-        **Guidelines for REMOVING emails:**
-        - Remove technical/automated emails: webmaster@, admin@ (unless it looks like a small biz), abuse@, privacy@, noreply@, newsletter@.
-        - Remove obvious scraping errors or hashes (e.g., 234234sfd@...).
-        - Remove media/press emails if the query is for a service provider (e.g., redakcja@, news@) UNLESS the query is looking for media.
+## PRIORYTET WYBORU (od najważniejszego):
 
-        **Context Check:**
-        - If the query is "{business_name}", ensure the email domain or user seems relevant.
-        - If unsure, **KEEP THE EMAIL**. Do not be over-aggressive.
-        
-        Return the list of valid, relevant emails.
-        """
+1. **Ogólne e-maile kontaktowe na domenie firmowej:**
+   kontakt@, biuro@, info@, office@, recepcja@, sekretariat@, rejestracja@, hello@, sprzedaz@, zamowienia@, obsluga@
 
-        user_message = f"Found potential emails: {list(set(emails))}"
+2. **Imienne e-maile kluczowych osób** (np. jan.kowalski@firma.pl, m.nowak@firma.pl) — jeśli domena wygląda na firmową.
+
+3. **E-maile działowe** powiązane z zapytaniem (np. dla usług sprzątania: serwis@, dla biur: wynajem@, dla medycznych: rejestracja@).
+
+4. **E-maile na darmowych domenach** (gmail.com, wp.pl, o2.pl, interia.pl, onet.pl) — ZACHOWAJ jeśli wyglądają jak kontakt małej firmy (np. firmakowalski@gmail.com), USUŃ jeśli wyglądają na prywatne (np. kasia123@wp.pl).
+
+## ZASADY USUWANIA:
+
+- **USUŃ** e-maile techniczne: webmaster@, admin@, postmaster@, abuse@, noreply@, newsletter@, privacy@, unsubscribe@
+- **USUŃ** e-maile mediowe/prasowe: redakcja@, news@, prasa@, press@ (CHYBA ŻE zapytanie dotyczy mediów)
+- **USUŃ** e-maile z losowymi ciągami znaków lub hashami (np. x7f2k@..., 234sdf@...)
+- **USUŃ** e-maile ewidentnie niezwiązane z zapytaniem (np. dla "usługi sprzątania" e-mail restauracji)
+
+## KLUCZOWE ZASADY:
+
+- W razie wątpliwości — **ZACHOWAJ e-mail**. Lepiej zostawić jeden niepewny niż stracić prawdziwy kontakt.
+- NIE usuwaj e-maili tylko dlatego, że domena jest na darmowym providerze — wiele małych firm w Polsce używa gmail/wp/o2.
+- Oceń każdy e-mail indywidualnie w kontekście zapytania "{business_name}".
+
+Zwróć listę zatwierdzonych e-maili."""
+
+        user_message = f"Znalezione e-maile do oceny: {list(set(emails))}"
         
         result = await ainvoke_llm(
             system_prompt=system_prompt,

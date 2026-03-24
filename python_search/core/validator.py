@@ -8,9 +8,9 @@ EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 
 # Domains to block (News, Aggregators, Generic Junk)
 BLOCKED_DOMAINS = {
-    "polskapress.pl", "gazetakrakowska.pl", "naszemiasto.pl", "gazeta.pl", 
-    "onet.pl", "wp.pl", "interia.pl", "o2.pl", "gmail.com", "yahoo.com", "outlook.com", "hotmail.com" # Maybe block generic free emails? User said "irrelevant emails".
-    # User complained about media group emails primarily.
+    "polskapress.pl", "gazetakrakowska.pl", "naszemiasto.pl", "gazeta.pl",
+    "onet.pl", "wp.pl", "interia.pl", "o2.pl",
+    # Note: gmail.com/yahoo/outlook NOT blocked — many small businesses use free email providers
 }
 
 # Specific prefixes to block if domain is generic (e.g. contact@gmail is ok? actually business@gmail is common)
@@ -19,7 +19,7 @@ BLOCKED_PREFIXES = {
     "abuse", "no-reply", "noreply", "postmaster", "webmaster", "hostmaster", "privacy", "legal", "subscription", "unsubscribe"
 }
 # Also editorial/press emails
-BLOCKED_KEYWORDS = {"redakcja", "news", "prasa", "press", "media", "reklama", "oglo", "bok"}
+BLOCKED_KEYWORDS = {"redakcja", "news", "prasa", "press"}
 
 class EmailValidator:
     @staticmethod

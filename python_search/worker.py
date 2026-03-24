@@ -98,12 +98,12 @@ async def process_job(job):
         total_emails = 0
         
         # Load limits from env or defaults
-        MAX_PAGES = int(os.getenv("MAX_SEARCH_PAGES", "4"))
         CRAWL_DEPTH = int(os.getenv("CRAWL_DEPTH", "1"))
-        
+
         crawler = AsyncCrawler(deep_scan=True, max_depth=CRAWL_DEPTH)
-    
-        while page <= MAX_PAGES:
+        consecutive_empty = 0  # Stop after 3 consecutive pages with no new results
+
+        while True:
             logger.info(f"Searching Serper (Organic + Maps) page {page} for '{query}'...")
             
             # Fetch from Organic
@@ -189,7 +189,11 @@ async def process_job(job):
             
             # 2. Emails that AI rejected (if AI enrichment ran)
             if best_emails is None:
-                logger.warning("AI enrichment failed (returned None). Skipping AI filtering (keeping all emails).")
+                logger.warning("AI enrichment failed (returned None). Keeping all emails.")
+                best_emails = all_emails
+            elif not best_emails and all_emails:
+                # AI returned empty list — likely a mistake, keep all
+                logger.warning("AI returned empty list but emails exist. Keeping all emails.")
                 best_emails = all_emails
             elif all_emails:
                 ai_rejected = [e for e in all_emails if e not in best_emails]
@@ -228,9 +232,10 @@ async def process_job(job):
                     )
     
             new_emails_count = len(all_emails)
-            
+
             if new_emails_count > 0:
                 total_emails += new_emails_count
+                consecutive_empty = 0
                 # Update job progress
                 try:
                     supabase.table("email_search_jobs").update({
@@ -238,6 +243,11 @@ async def process_job(job):
                     }).eq("id", job_id).execute()
                 except Exception as update_err:
                     logger.warning(f"Failed to update total_emails_found (job may have been deleted): {update_err}")
+            else:
+                consecutive_empty += 1
+                if consecutive_empty >= 3:
+                    logger.info(f"3 consecutive pages with no new emails. Stopping search at page {page}.")
+                    break
 
             page += 1
 
