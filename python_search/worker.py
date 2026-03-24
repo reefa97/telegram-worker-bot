@@ -134,6 +134,8 @@ async def process_job(job):
             from core.validator import EmailValidator
 
             raw_found_emails = list(set(organic_data['emails'] + maps_data['emails']))
+            logger.info(f"Page {page}: Crawler found {len(raw_found_emails)} raw emails")
+
             valid_emails = []
             for email in raw_found_emails:
                 if EmailValidator.validate(email):
@@ -143,8 +145,9 @@ async def process_job(job):
 
             # Deduplicate within this batch only (same page may return same email twice)
             all_emails = list(set(valid_emails))
+            logger.info(f"Page {page}: {len(all_emails)} emails passed validation (from {len(raw_found_emails)} raw)")
             best_emails = []
-            
+
             if all_emails:
                 logger.info(f"Enriching {len(all_emails)} emails with AI...")
                 
@@ -176,8 +179,11 @@ async def process_job(job):
                 ai_rejected = [e for e in all_emails if e not in best_emails]
                 emails_to_remove.extend(ai_rejected)
             
+            if best_emails and all_emails:
+                logger.info(f"Page {page}: AI kept {len(best_emails)}/{len(all_emails)} emails")
+
             if emails_to_remove:
-                logger.info(f"Removing {len(emails_to_remove)} invalid/duplicate/irrelevant emails...")
+                logger.info(f"Removing {len(emails_to_remove)} invalid/AI-rejected emails...")
                 try:
                     # Supabase 'in' operator has limits, but for 50-100 emails it's fine.
                     supabase.table("email_search_results")\
