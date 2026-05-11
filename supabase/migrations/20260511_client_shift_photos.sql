@@ -39,10 +39,10 @@ BEGIN
   JOIN cleaning_objects co ON ws.object_id = co.id
   LEFT JOIN workers w ON ws.worker_id = w.id
   LEFT JOIN (
-    SELECT session_id, COUNT(*)::INT AS cnt
+    SELECT shift_photos.session_id AS sid, COUNT(*)::INT AS cnt
     FROM shift_photos
-    GROUP BY session_id
-  ) sp ON sp.session_id = ws.id
+    GROUP BY shift_photos.session_id
+  ) sp ON sp.sid = ws.id
   WHERE ws.object_id IN (
     SELECT clo.object_id FROM client_objects clo WHERE clo.client_id = p_client_id
   )
