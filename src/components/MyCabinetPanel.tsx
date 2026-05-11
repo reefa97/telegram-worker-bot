@@ -7,6 +7,8 @@ import {
     CheckCircle2, User, Trash2, X, Briefcase, MessageSquare, Building2, Loader2, UserCheck, ClipboardCopy
 } from 'lucide-react';
 import CrmPipeline from './crm/CrmPipeline';
+import MyFinancesPanel from './MyFinancesPanel';
+import { DollarSign } from 'lucide-react';
 
 interface Task {
     id: string;
@@ -31,6 +33,7 @@ interface AdminUser {
 
 export default function MyCabinetPanel() {
     const { adminUser } = useAuth();
+    const [cabinetTab, setCabinetTab] = useState<'cabinet' | 'finances'>('cabinet');
     const [tasks, setTasks] = useState<Task[]>([]);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -256,7 +259,36 @@ export default function MyCabinetPanel() {
     }
 
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
+            {/* Sub-tabs */}
+            <div className="flex gap-1 border-b border-border">
+                <button
+                    onClick={() => setCabinetTab('cabinet')}
+                    className={`px-4 py-2.5 text-sm font-medium transition-colors relative flex items-center gap-1.5 ${
+                        cabinetTab === 'cabinet'
+                            ? 'text-main after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-500'
+                            : 'text-muted hover:text-main'
+                    }`}
+                >
+                    <User className="w-4 h-4" />
+                    Мой кабинет
+                </button>
+                <button
+                    onClick={() => setCabinetTab('finances')}
+                    className={`px-4 py-2.5 text-sm font-medium transition-colors relative flex items-center gap-1.5 ${
+                        cabinetTab === 'finances'
+                            ? 'text-main after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-500'
+                            : 'text-muted hover:text-main'
+                    }`}
+                >
+                    <DollarSign className="w-4 h-4" />
+                    Мои финансы
+                </button>
+            </div>
+
+            {cabinetTab === 'finances' ? (
+                <MyFinancesPanel />
+            ) : (<>
             {/* Header */}
             <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Мой кабинет</h2>
@@ -533,8 +565,8 @@ export default function MyCabinetPanel() {
             </div>
 
             {/* Modal */}
-            {showModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+            {showModal && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
                     <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn">
                         <div className="p-4 border-b border-border flex justify-between items-center bg-subtle">
                             <h3 className="font-bold text-lg text-main">Новая задача</h3>
@@ -620,7 +652,8 @@ export default function MyCabinetPanel() {
                         </form>
                     </div>
                 </div>
-            )}
+            , document.body)}
+        </>)}
         </div>
     );
 }

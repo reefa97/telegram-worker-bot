@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Search, Star, History, Filter, ChevronLeft, ChevronRight, Eye, AlertTriangle, SkipForward, CalendarClock, Camera, Image as ImageIcon, Shield, Trash2, Edit2 } from 'lucide-react';
+import { ClipboardCheck, Calendar, Plus, X, Check, Minus, MapPin, User, Star, History, Filter, ChevronLeft, ChevronRight, Eye, AlertTriangle, SkipForward, CalendarClock, Camera, Image as ImageIcon, Shield, Trash2, Edit2 } from 'lucide-react';
 import type { QualityCheck, QualityCheckSchedule, QualityCheckItem } from '../types/qualityControl';
 import imageCompression from 'browser-image-compression';
 
@@ -33,7 +33,7 @@ interface CheckItem {
 const DAY_LABELS = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const FREQ_LABELS: Record<number, string> = { 1: 'Каждую неделю', 2: 'Раз в 2 недели', 3: 'Раз в 3 недели', 4: 'Раз в месяц' };
 
-export default function QualityControlPanel() {
+export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: string }) {
     const { adminUser } = useAuth();
     const isSuperAdmin = adminUser?.role === 'super_admin';
 
@@ -70,7 +70,7 @@ export default function QualityControlPanel() {
     ]);
     const [checkNotes, setCheckNotes] = useState('');
     const [newItemName, setNewItemName] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
+    const searchQuery = searchTerm;
 
     // History state
     const [historyChecks, setHistoryChecks] = useState<any[]>([]);
@@ -584,17 +584,6 @@ export default function QualityControlPanel() {
                 </h2>
 
                 <div className="flex items-center gap-3">
-                    {/* Search */}
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="Поиск объекта..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full md:w-56 pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 transition-all shadow-sm"
-                        />
-                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    </div>
                 </div>
             </div>
 

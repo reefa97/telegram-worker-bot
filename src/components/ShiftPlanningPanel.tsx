@@ -24,7 +24,11 @@ interface WorkerObject {
     cleaning_objects: CleaningObject;
 }
 
-const DAYS = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+// Days in order Mon-Sun, values 1-7 to match schedule_days format in DB
+const DAYS = [
+    { val: 1, label: 'Понедельник' }, { val: 2, label: 'Вторник' }, { val: 3, label: 'Среда' },
+    { val: 4, label: 'Четверг' }, { val: 5, label: 'Пятница' }, { val: 6, label: 'Суббота' }, { val: 7, label: 'Воскресенье' }
+];
 
 export default function ShiftPlanningPanel() {
     const [viewMode, setViewMode] = useState<'calendar' | 'template'>('calendar');
@@ -58,19 +62,16 @@ export default function ShiftPlanningPanel() {
                 const processedObjects = objects || [];
                 const processedAssignments = assignments || [];
 
-                // A. Weekly Template Data
-                const template = DAYS.map((dayName, dayIndex) => {
+                // A. Weekly Template Data (Mon=1 through Sun=7)
+                const template = DAYS.map((day) => {
                     const dayObjects = processedObjects.filter((obj: any) =>
-                        obj.schedule_days && obj.schedule_days.includes(dayIndex)
+                        obj.schedule_days && obj.schedule_days.includes(day.val)
                     );
                     return {
-                        title: dayName,
+                        title: day.label,
                         objects: mapWorkersToObjects(dayObjects, processedAssignments)
                     };
                 });
-                // Move Sunday to end for template view
-                const sunday = template.shift();
-                if (sunday) template.push(sunday);
                 setScheduleData(template);
 
                 // B. Calendar Data (Next 30 Days)
@@ -79,16 +80,18 @@ export default function ShiftPlanningPanel() {
                 for (let i = 0; i < 30; i++) {
                     const date = new Date(today);
                     date.setDate(today.getDate() + i);
-                    const dayIndex = date.getDay(); // 0 (Sun) - 6 (Sat)
+                    const jsDay = date.getDay(); // 0 (Sun) - 6 (Sat)
+                    const dayOfWeek = jsDay === 0 ? 7 : jsDay; // Convert to 1-7 (Mon=1, Sun=7)
 
                     const dayObjects = processedObjects.filter((obj: any) =>
-                        obj.schedule_days && obj.schedule_days.includes(dayIndex)
+                        obj.schedule_days && obj.schedule_days.includes(dayOfWeek)
                     );
 
+                    const dayLabel = DAYS.find(d => d.val === dayOfWeek)?.label || '';
                     if (dayObjects.length > 0) {
                         calendar.push({
                             date: date,
-                            title: `${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} (${DAYS[dayIndex]})`,
+                            title: `${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} (${dayLabel})`,
                             objects: mapWorkersToObjects(dayObjects, processedAssignments),
                             isToday: i === 0
                         });

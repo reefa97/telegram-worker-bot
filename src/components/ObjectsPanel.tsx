@@ -2,10 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, Search, LayoutGrid, List, Map, UserCheck, UserMinus } from 'lucide-react';
+import { useUndo } from '../contexts/UndoContext';
+import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, LayoutGrid, List, Map, UserCheck, UserMinus, FileText, Upload, Download } from 'lucide-react';
 import ObjectsMap from './ObjectsMap';
 import AddressAutocomplete from './AddressAutocomplete';
 import TaskManagementModal from './TaskManagementModal';
+import ShiftPlanningPanel from './ShiftPlanningPanel';
+import { Calendar } from 'lucide-react';
 
 interface CleaningObject {
     id: string;
@@ -35,10 +38,14 @@ interface CleaningObject {
     last_reminder_at?: string;
     owner_ids?: string[];
     client_contact_names?: string[];
+    late_notifications_enabled?: boolean;
+    schedule_day_times?: Record<string, string>;
 }
 
-export default function ObjectsPanel() {
+export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string }) {
     const { adminUser } = useAuth();
+    const { pushUndo } = useUndo();
+    const [subTab, setSubTab] = useState<'objects' | 'schedule'>('objects');
     const [objects, setObjects] = useState<CleaningObject[]>([]);
     const [creators, setCreators] = useState<Record<string, string>>({});
     const [adminsList, setAdminsList] = useState<Array<{ id: string, name: string, role: string }>>([]);
@@ -57,6 +64,11 @@ export default function ObjectsPanel() {
     const [showGuardianModal, setShowGuardianModal] = useState<'assign' | 'remove' | null>(null);
     const [bulkSaving, setBulkSaving] = useState(false);
 
+    // Documents state
+    const [objectDocuments, setObjectDocuments] = useState<Array<{ id: string; file_name: string; file_path: string; file_size: number; created_at: string }>>([]);
+    const [uploadingDoc, setUploadingDoc] = useState(false);
+    const docInputRef = useRef<HTMLInputElement>(null);
+
     // Close dropdown on outside click
     useEffect(() => {
         const handleOutsideClick = () => setOpenMenuId(null);
@@ -73,7 +85,7 @@ export default function ObjectsPanel() {
     useEffect(() => {
         localStorage.setItem('objects_view_mode', viewMode);
     }, [viewMode]);
-    const [searchQuery, setSearchQuery] = useState('');
+    const searchQuery = searchTerm;
     const [allWorkers, setAllWorkers] = useState<any[]>([]);
 
     const [formData, setFormData] = useState({
@@ -101,6 +113,9 @@ export default function ObjectsPanel() {
         reminder_frequency: 'monthly' as 'weekly' | 'monthly' | 'quarterly',
         reminder_assignee_id: '',
         owner_rates: {} as Record<string, number>,
+        late_notifications_enabled: true,
+        schedule_day_times: {} as Record<string, string>,
+        worker_schedule_days: {} as Record<string, number[]>,
     });
 
     useEffect(() => {
@@ -137,6 +152,60 @@ export default function ObjectsPanel() {
             .select('id, first_name, last_name')
             .order('first_name');
         if (data) setAllWorkers(data);
+    };
+
+    const loadDocuments = async (objectId: string) => {
+        const { data } = await supabase
+            .from('object_documents')
+            .select('id, file_name, file_path, file_size, created_at')
+            .eq('object_id', objectId)
+            .order('created_at', { ascending: false });
+        setObjectDocuments(data || []);
+    };
+
+    const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>, objectId: string) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        setUploadingDoc(true);
+        try {
+            for (const file of Array.from(files)) {
+                const ext = file.name.split('.').pop() || 'pdf';
+                const path = `${objectId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('object-documents')
+                    .upload(path, file, { contentType: file.type });
+
+                if (uploadError) {
+                    console.error('Upload error:', uploadError);
+                    alert(`Ошибка загрузки ${file.name}: ${uploadError.message}`);
+                    continue;
+                }
+
+                await supabase.from('object_documents').insert({
+                    object_id: objectId,
+                    file_name: file.name,
+                    file_path: path,
+                    file_size: file.size,
+                    uploaded_by: adminUser?.id,
+                });
+            }
+            await loadDocuments(objectId);
+        } catch (err) {
+            console.error('Document upload error:', err);
+        } finally {
+            setUploadingDoc(false);
+            if (docInputRef.current) docInputRef.current.value = '';
+        }
+    };
+
+    const handleDocDelete = async (doc: { id: string; file_path: string; file_name: string }, objectId: string) => {
+        if (!confirm(`Удалить документ "${doc.file_name}"?`)) return;
+
+        await supabase.storage.from('object-documents').remove([doc.file_path]);
+        await supabase.from('object_documents').delete().eq('id', doc.id);
+        await loadDocuments(objectId);
     };
 
     const loadObjects = async () => {
@@ -199,6 +268,8 @@ export default function ObjectsPanel() {
                 reminder_active: formData.reminder_active,
                 reminder_frequency: formData.reminder_frequency,
                 reminder_assignee_id: formData.reminder_assignee_id || null,
+                late_notifications_enabled: formData.late_notifications_enabled,
+                schedule_day_times: formData.schedule_day_times,
             };
 
             if (!editingObject) {
@@ -257,7 +328,8 @@ export default function ObjectsPanel() {
             if (formData.worker_ids && formData.worker_ids.length > 0) {
                 const workerRows = formData.worker_ids.map(wid => ({
                     object_id: targetId,
-                    worker_id: wid
+                    worker_id: wid,
+                    schedule_days: formData.worker_schedule_days[wid]?.length ? formData.worker_schedule_days[wid] : null,
                 }));
                 await supabase.from('worker_objects').insert(workerRows);
             }
@@ -275,6 +347,7 @@ export default function ObjectsPanel() {
         e?.stopPropagation(); // Stop propagation if called from button inside row/card
         if (!confirm('Переместить объект в корзину?')) return;
 
+        const deletedObj = objects.find(o => o.id === id);
         const { error } = await supabase.rpc('soft_delete_object', { object_id: id });
 
         if (error) {
@@ -282,17 +355,22 @@ export default function ObjectsPanel() {
             alert('Ошибка при удалении');
         } else {
             loadObjects();
+            pushUndo(`Объект «${deletedObj?.name || ''}» удалён`, async () => {
+                await supabase.rpc('restore_from_trash', { item_type: 'objects', item_id: id });
+                loadObjects();
+            });
         }
     };
 
     const openModal = async (object?: CleaningObject) => {
         if (object) {
             setEditingObject(object);
+            loadDocuments(object.id);
 
             // Fetch both owners and workers in parallel for better performance
             const [ownersRes, workersRes] = await Promise.all([
                 supabase.from('object_owners').select('admin_id').eq('object_id', object.id),
-                supabase.from('worker_objects').select('worker_id').eq('object_id', object.id)
+                supabase.from('worker_objects').select('worker_id, schedule_days').eq('object_id', object.id)
             ]);
 
             const ownersData = ownersRes.data;
@@ -307,6 +385,14 @@ export default function ObjectsPanel() {
             }
 
             const workerIds = workersData ? workersData.map((w: any) => w.worker_id) : [];
+            const workerScheduleDays: Record<string, number[]> = {};
+            if (workersData) {
+                workersData.forEach((w: any) => {
+                    if (w.schedule_days && w.schedule_days.length > 0) {
+                        workerScheduleDays[w.worker_id] = w.schedule_days;
+                    }
+                });
+            }
 
             setFormData({
                 name: object.name,
@@ -340,6 +426,9 @@ export default function ObjectsPanel() {
                 reminder_active: object.reminder_active || false,
                 reminder_frequency: object.reminder_frequency || 'monthly',
                 reminder_assignee_id: object.reminder_assignee_id || '',
+                late_notifications_enabled: object.late_notifications_enabled !== false,
+                schedule_day_times: object.schedule_day_times || {},
+                worker_schedule_days: workerScheduleDays,
                 owner_rates: await (async () => {
                     const { data } = await supabase.from('admin_object_rates').select('admin_id, monthly_rate').eq('object_id', object.id);
                     const rates: Record<string, number> = {};
@@ -349,6 +438,7 @@ export default function ObjectsPanel() {
             });
         } else {
             setEditingObject(null);
+            setObjectDocuments([]);
             setFormData({
                 name: '',
                 address: '',
@@ -374,6 +464,9 @@ export default function ObjectsPanel() {
                 reminder_frequency: 'monthly',
                 reminder_assignee_id: adminUser?.id || '',
                 owner_rates: {},
+                late_notifications_enabled: true,
+                schedule_day_times: {},
+                worker_schedule_days: {},
             });
         }
         setShowModal(true);
@@ -527,6 +620,34 @@ export default function ObjectsPanel() {
 
     return (
         <div>
+            {/* Sub-tabs: Объекты / График */}
+            <div className="flex gap-1 mb-4 border-b border-border">
+                <button
+                    onClick={() => setSubTab('objects')}
+                    className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+                        subTab === 'objects'
+                            ? 'text-main after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-500'
+                            : 'text-muted hover:text-main'
+                    }`}
+                >
+                    Объекты
+                </button>
+                <button
+                    onClick={() => setSubTab('schedule')}
+                    className={`px-4 py-2.5 text-sm font-medium transition-colors relative flex items-center gap-1.5 ${
+                        subTab === 'schedule'
+                            ? 'text-main after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-500'
+                            : 'text-muted hover:text-main'
+                    }`}
+                >
+                    <Calendar className="w-4 h-4" />
+                    График
+                </button>
+            </div>
+
+            {subTab === 'schedule' ? (
+                <ShiftPlanningPanel />
+            ) : (<>
             {/* Header with Title, Search, View Toggle, Add Button */}
             <div className="flex flex-col gap-3 mb-6">
                 {/* Row 1: Title + Add Button */}
@@ -553,20 +674,8 @@ export default function ObjectsPanel() {
                     </div>
                 </div>
 
-                {/* Row 2: Search + View Toggle */}
+                {/* View Toggle */}
                 <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                        <input
-                            type="text"
-                            placeholder="Поиск по названию или адресу..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 transition-all shadow-sm"
-                        />
-                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    </div>
-
-                    {/* View Toggle */}
                     <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700 shrink-0">
                         <button
                             onClick={() => setViewMode('grid')}
@@ -1253,33 +1362,6 @@ export default function ObjectsPanel() {
                                             </div>
                                         </div>
 
-                                        {/* Client accounts */}
-                                        {adminsList.some(a => a.role === 'client') && (
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Клиенты (аккаунты)
-                                                </label>
-                                                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 space-y-1">
-                                                    {adminsList.filter(a => a.role === 'client').map((client) => (
-                                                        <label key={client.id} className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={formData.owner_ids.includes(client.id)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        setFormData({ ...formData, owner_ids: [...formData.owner_ids, client.id] });
-                                                                    } else {
-                                                                        setFormData({ ...formData, owner_ids: formData.owner_ids.filter(id => id !== client.id) });
-                                                                    }
-                                                                }}
-                                                                className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                                                            />
-                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{client.name}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
                                         </>
                                     )}
 
@@ -1551,7 +1633,14 @@ export default function ObjectsPanel() {
                                                             const updated = current.includes(day.val)
                                                                 ? current.filter(d => d !== day.val)
                                                                 : [...current, day.val].sort();
-                                                            setFormData({ ...formData, schedule_days: updated });
+                                                            // Remove day_times entry if day is deselected
+                                                            if (!updated.includes(day.val)) {
+                                                                const newDayTimes = { ...formData.schedule_day_times };
+                                                                delete newDayTimes[String(day.val)];
+                                                                setFormData({ ...formData, schedule_days: updated, schedule_day_times: newDayTimes });
+                                                            } else {
+                                                                setFormData({ ...formData, schedule_days: updated });
+                                                            }
                                                         }}
                                                         className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${formData.schedule_days.includes(day.val)
                                                             ? 'bg-blue-600 text-white shadow-md transform scale-105'
@@ -1564,9 +1653,10 @@ export default function ObjectsPanel() {
                                             </div>
                                         </div>
 
+                                        {/* Default time */}
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Начало</label>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Начало (по умолч.)</label>
                                                 <input
                                                     type="time"
                                                     value={formData.schedule_time_start}
@@ -1575,7 +1665,7 @@ export default function ObjectsPanel() {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Конец</label>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Конец (по умолч.)</label>
                                                 <input
                                                     type="time"
                                                     value={formData.schedule_time_end}
@@ -1584,40 +1674,243 @@ export default function ObjectsPanel() {
                                                 />
                                             </div>
                                         </div>
+
+                                        {/* Per-day time overrides */}
+                                        {formData.schedule_days.length > 0 && (
+                                            <div className="space-y-2">
+                                                <label className="block text-xs font-medium text-muted">Индивидуальное время по дням (необязательно)</label>
+                                                <div className="space-y-1.5">
+                                                    {[
+                                                        { val: 1, label: 'Понедельник' }, { val: 2, label: 'Вторник' }, { val: 3, label: 'Среда' },
+                                                        { val: 4, label: 'Четверг' }, { val: 5, label: 'Пятница' }, { val: 6, label: 'Суббота' }, { val: 7, label: 'Воскресенье' }
+                                                    ].filter(d => formData.schedule_days.includes(d.val)).map((day) => {
+                                                        const dayKey = String(day.val);
+                                                        const hasOverride = dayKey in formData.schedule_day_times;
+                                                        return (
+                                                            <div key={day.val} className="flex items-center gap-2">
+                                                                <span className="text-xs text-muted w-24 shrink-0">{day.label}</span>
+                                                                {hasOverride ? (
+                                                                    <>
+                                                                        <input
+                                                                            type="time"
+                                                                            value={formData.schedule_day_times[dayKey] || formData.schedule_time_start}
+                                                                            onChange={(e) => {
+                                                                                setFormData({
+                                                                                    ...formData,
+                                                                                    schedule_day_times: { ...formData.schedule_day_times, [dayKey]: e.target.value }
+                                                                                });
+                                                                            }}
+                                                                            className="input text-xs py-1 w-28"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const newDayTimes = { ...formData.schedule_day_times };
+                                                                                delete newDayTimes[dayKey];
+                                                                                setFormData({ ...formData, schedule_day_times: newDayTimes });
+                                                                            }}
+                                                                            className="text-xs text-muted hover:text-danger transition-colors"
+                                                                            title="Сбросить"
+                                                                        >
+                                                                            <X size={14} />
+                                                                        </button>
+                                                                    </>
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setFormData({
+                                                                                ...formData,
+                                                                                schedule_day_times: { ...formData.schedule_day_times, [dayKey]: formData.schedule_time_start }
+                                                                            });
+                                                                        }}
+                                                                        className="text-xs text-blue-500 hover:text-blue-400 transition-colors"
+                                                                    >
+                                                                        {formData.schedule_time_start} — изменить
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
+
+                                    {/* Late notifications toggle */}
+                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                                        <div>
+                                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Уведомления об опозданиях</label>
+                                            <p className="text-xs text-gray-500 mt-0.5">Отправлять уведомления при опоздании на смену</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, late_notifications_enabled: !formData.late_notifications_enabled })}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.late_notifications_enabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.late_notifications_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+
+                                    {/* Documents */}
+                                    {editingObject && adminUser?.role === 'super_admin' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Документы
+                                            </label>
+                                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-2">
+                                                {objectDocuments.length > 0 ? (
+                                                    objectDocuments.map(doc => (
+                                                        <div key={doc.id} className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                                                                <div className="min-w-0">
+                                                                    <p className="text-sm text-gray-900 dark:text-gray-100 truncate">{doc.file_name}</p>
+                                                                    <p className="text-xs text-gray-500">{doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} КБ` : ''}</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const { data } = supabase.storage.from('object-documents').getPublicUrl(doc.file_path);
+                                                                        window.open(data.publicUrl, '_blank');
+                                                                    }}
+                                                                    className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+                                                                    title="Скачать"
+                                                                >
+                                                                    <Download className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDocDelete(doc, editingObject.id)}
+                                                                    className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                                                                    title="Удалить"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <p className="text-xs text-gray-500 text-center py-2">Нет загруженных документов</p>
+                                                )}
+
+                                                <input
+                                                    ref={docInputRef}
+                                                    type="file"
+                                                    multiple
+                                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                                    onChange={(e) => handleDocUpload(e, editingObject.id)}
+                                                    className="hidden"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => docInputRef.current?.click()}
+                                                    disabled={uploadingDoc}
+                                                    className="w-full flex items-center justify-center gap-2 p-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+                                                >
+                                                    <Upload className="w-4 h-4" />
+                                                    {uploadingDoc ? 'Загрузка...' : 'Загрузить документ'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Workers Selection */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                             Назначенные работники
                                         </label>
-                                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700">
+                                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-700 space-y-1">
                                             {allWorkers.length > 0 ? (
-                                                allWorkers.map((worker) => (
-                                                    <label key={worker.id} className="flex items-center gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded cursor-pointer transition-colors">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={formData.worker_ids.includes(worker.id)}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) {
-                                                                    setFormData({
-                                                                        ...formData,
-                                                                        worker_ids: [...formData.worker_ids, worker.id]
-                                                                    });
-                                                                } else {
-                                                                    setFormData({
-                                                                        ...formData,
-                                                                        worker_ids: formData.worker_ids.filter(id => id !== worker.id)
-                                                                    });
-                                                                }
-                                                            }}
-                                                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                                                        />
-                                                        <span className="text-gray-700 dark:text-gray-300">
-                                                            {worker.first_name} {worker.last_name}
-                                                        </span>
-                                                    </label>
-                                                ))
+                                                allWorkers.map((worker) => {
+                                                    const isAssigned = formData.worker_ids.includes(worker.id);
+                                                    const workerDays = formData.worker_schedule_days[worker.id];
+                                                    const hasCustomDays = workerDays && workerDays.length > 0;
+                                                    return (
+                                                        <div key={worker.id} className={`rounded-lg transition-colors ${isAssigned ? 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700' : ''}`}>
+                                                            <label className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isAssigned}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) {
+                                                                            setFormData({
+                                                                                ...formData,
+                                                                                worker_ids: [...formData.worker_ids, worker.id]
+                                                                            });
+                                                                        } else {
+                                                                            const { [worker.id]: _, ...restDays } = formData.worker_schedule_days;
+                                                                            setFormData({
+                                                                                ...formData,
+                                                                                worker_ids: formData.worker_ids.filter(id => id !== worker.id),
+                                                                                worker_schedule_days: restDays,
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                                />
+                                                                <span className="text-gray-700 dark:text-gray-300 flex-1">
+                                                                    {worker.first_name} {worker.last_name}
+                                                                </span>
+                                                                {isAssigned && (
+                                                                    <span className="text-[10px] text-muted">
+                                                                        {hasCustomDays
+                                                                            ? `${workerDays.filter(d => formData.schedule_days.includes(d)).length} из ${formData.schedule_days.length} дн.`
+                                                                            : 'все дни'}
+                                                                    </span>
+                                                                )}
+                                                            </label>
+                                                            {isAssigned && formData.schedule_days.length > 0 && (
+                                                                <div className="px-2 pb-2 pt-0">
+                                                                    <div className="flex items-center gap-1 flex-wrap">
+                                                                        <span className="text-[10px] text-muted mr-1">Дни:</span>
+                                                                        {[
+                                                                            { val: 1, label: 'Пн' }, { val: 2, label: 'Вт' }, { val: 3, label: 'Ср' },
+                                                                            { val: 4, label: 'Чт' }, { val: 5, label: 'Пт' }, { val: 6, label: 'Сб' }, { val: 7, label: 'Вс' }
+                                                                        ].filter(d => formData.schedule_days.includes(d.val)).map((day) => {
+                                                                            const isSelected = !hasCustomDays || workerDays.includes(day.val);
+                                                                            return (
+                                                                                <button
+                                                                                    key={day.val}
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        let newDays: number[];
+                                                                                        if (!hasCustomDays) {
+                                                                                            // First click: deselect this day (keep all others)
+                                                                                            newDays = formData.schedule_days.filter(d => d !== day.val);
+                                                                                        } else if (isSelected) {
+                                                                                            newDays = workerDays.filter(d => d !== day.val);
+                                                                                        } else {
+                                                                                            newDays = [...workerDays, day.val].sort((a, b) => a - b);
+                                                                                        }
+                                                                                        // If all object days are selected, clear custom (means "all days")
+                                                                                        const allSelected = formData.schedule_days.every(d => newDays.includes(d));
+                                                                                        const { [worker.id]: _, ...restDays } = formData.worker_schedule_days;
+                                                                                        setFormData({
+                                                                                            ...formData,
+                                                                                            worker_schedule_days: allSelected
+                                                                                                ? restDays
+                                                                                                : { ...formData.worker_schedule_days, [worker.id]: newDays },
+                                                                                        });
+                                                                                    }}
+                                                                                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium transition-colors ${
+                                                                                        isSelected
+                                                                                            ? 'bg-primary text-white'
+                                                                                            : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500'
+                                                                                    }`}
+                                                                                >
+                                                                                    {day.label}
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })
                                             ) : (
                                                 <div className="text-center py-4 text-xs text-muted">Работники не найдены</div>
                                             )}
@@ -1693,7 +1986,8 @@ export default function ObjectsPanel() {
                     />
                 )
             }
-        </div >
+        </>)}
+        </div>
     );
 }
 

@@ -4,9 +4,10 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
-    User, Plus, Trash2, Building2, Search,
+    User, Plus, Trash2, Building2,
     X, Check, Mail, Eye, EyeOff, MessageSquare, Save, Loader2
 } from 'lucide-react';
+import PasswordGenerator from './PasswordGenerator';
 import ClientRequestsTab from './ClientRequestsTab';
 
 interface ClientUser {
@@ -33,13 +34,13 @@ interface CleaningObject {
     name: string;
 }
 
-export default function ClientsPanel() {
+export default function ClientsPanel({ searchTerm = '' }: { searchTerm?: string }) {
     const { adminUser } = useAuth();
     const [clients, setClients] = useState<ClientUser[]>([]);
     const [allObjects, setAllObjects] = useState<CleaningObject[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    // searchTerm comes from prop
     const [activeTab, setActiveTab] = useState<'clients' | 'requests'>('clients');
 
     const [formData, setFormData] = useState({
@@ -334,20 +335,6 @@ export default function ClientsPanel() {
             {activeTab === 'requests' && <ClientRequestsTab />}
 
             {activeTab === 'clients' && <>
-            {/* Search */}
-            {clients.length > 0 && (
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Поиск по имени или email..."
-                        className="input pl-10"
-                    />
-                </div>
-            )}
-
             {/* Clients Grid */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredClients.map((client) => (
@@ -489,19 +476,12 @@ export default function ClientsPanel() {
                                     </div>
 
                                     {/* Change password */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
-                                            Новый пароль <span className="normal-case font-normal">(оставьте пустым, чтобы не менять)</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={editForm.password}
-                                            onChange={e => setEditForm({ ...editForm, password: e.target.value })}
-                                            className="input font-mono"
-                                            placeholder="Минимум 6 символов"
-                                            minLength={editForm.password ? 6 : undefined}
-                                        />
-                                    </div>
+                                    <PasswordGenerator
+                                        value={editForm.password}
+                                        onChange={(v) => setEditForm({ ...editForm, password: v })}
+                                        label="Новый пароль (оставьте пустым, чтобы не менять)"
+                                        placeholder="Минимум 6 символов"
+                                    />
 
                                     {/* Objects */}
                                     <div>
@@ -630,20 +610,13 @@ export default function ClientsPanel() {
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
-                                        Пароль
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.password}
-                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                        className="input font-mono"
-                                        placeholder="Минимум 6 символов"
-                                        required
-                                        minLength={6}
-                                    />
-                                </div>
+                                <PasswordGenerator
+                                    value={formData.password}
+                                    onChange={(v) => setFormData({ ...formData, password: v })}
+                                    label="Пароль"
+                                    placeholder="Минимум 6 символов"
+                                    required
+                                />
 
                                 <div>
                                     <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">

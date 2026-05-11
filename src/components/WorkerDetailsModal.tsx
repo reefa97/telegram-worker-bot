@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { X, Calendar, MapPin, Phone, User, Shield, MessageCircle, Coins, ChevronDown, TrendingUp, Plus, Minus, Save } from 'lucide-react';
+import { X, Calendar, MapPin, Phone, User, Shield, MessageCircle, Coins, ChevronDown, TrendingUp, Plus, Minus, Save, Unlink } from 'lucide-react';
 
 interface Worker {
     id: string;
@@ -16,6 +16,7 @@ interface Worker {
     created_at: string;
     created_by?: string;
     total_points?: number;
+    deleted_at?: string | null;
 }
 
 interface PointsLogEntry {
@@ -43,6 +44,28 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
     const [pointsChange, setPointsChange] = useState<number | ''>('');
     const [adjustReason, setAdjustReason] = useState('');
     const [isAdjusting, setIsAdjusting] = useState(false);
+    const [unlinkingObjectId, setUnlinkingObjectId] = useState<string | null>(null);
+
+    const isDeleted = !!worker.deleted_at;
+
+    const handleUnlinkObject = async (objectId: string) => {
+        if (!confirm('Отвязать объект от работника?')) return;
+        setUnlinkingObjectId(objectId);
+        try {
+            const { error } = await supabase
+                .from('worker_objects')
+                .delete()
+                .eq('worker_id', worker.id)
+                .eq('object_id', objectId);
+            if (error) throw error;
+            setAssignedObjects(prev => prev.filter(o => o.id !== objectId));
+        } catch (err: any) {
+            console.error('Error unlinking object:', err);
+            alert(`Ошибка: ${err.message}`);
+        } finally {
+            setUnlinkingObjectId(null);
+        }
+    };
 
     useEffect(() => {
         const fetchDetails = async () => {
@@ -248,9 +271,21 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
                             ) : assignedObjects.length > 0 ? (
                                 <div className="space-y-2">
                                     {assignedObjects.map((obj) => (
-                                        <div key={obj.id} className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
-                                            <div className="font-medium text-zinc-900 dark:text-white">{obj.name}</div>
-                                            <div className="text-xs text-zinc-500 mt-0.5">{obj.address}</div>
+                                        <div key={obj.id} className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex items-center justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <div className="font-medium text-zinc-900 dark:text-white">{obj.name}</div>
+                                                <div className="text-xs text-zinc-500 mt-0.5">{obj.address}</div>
+                                            </div>
+                                            {isDeleted && (
+                                                <button
+                                                    onClick={() => handleUnlinkObject(obj.id)}
+                                                    disabled={unlinkingObjectId === obj.id}
+                                                    className="shrink-0 p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                                                    title="Отвязать объект"
+                                                >
+                                                    <Unlink className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

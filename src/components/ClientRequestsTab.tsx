@@ -9,6 +9,7 @@ import {
 interface ClientRequest {
     id: string;
     message: string;
+    admin_message: string | null;
     status: 'new' | 'in_progress' | 'done';
     admin_note: string | null;
     created_at: string;
@@ -56,6 +57,8 @@ export default function ClientRequestsTab() {
     const [editingNote, setEditingNote] = useState<string | null>(null);
     const [noteValue, setNoteValue] = useState('');
     const [assigningWorker, setAssigningWorker] = useState<string | null>(null);
+    const [assignModal, setAssignModal] = useState<{ requestId: string; workerId: string } | null>(null);
+    const [assignMessage, setAssignMessage] = useState('');
 
     useEffect(() => {
         loadAll();
@@ -70,7 +73,7 @@ export default function ClientRequestsTab() {
     const loadRequests = async () => {
         const { data: reqs } = await supabase
             .from('client_requests')
-            .select('id, message, status, admin_note, created_at, resolved_at, object_id, client_id, assigned_worker_id, worker_task_status')
+            .select('id, message, admin_message, status, admin_note, created_at, resolved_at, object_id, client_id, assigned_worker_id, worker_task_status')
             .order('created_at', { ascending: false });
 
         if (!reqs) return;
@@ -120,19 +123,46 @@ export default function ClientRequestsTab() {
         setRequests(prev => prev.map(r => r.id === id ? { ...r, status: status as any, resolved_at: update.resolved_at || r.resolved_at } : r));
     };
 
-    const assignWorker = async (requestId: string, workerId: string | null) => {
+    const openAssignModal = (requestId: string, workerId: string) => {
+        const req = requests.find(r => r.id === requestId);
+        setAssignMessage(req?.admin_message || req?.message || '');
+        setAssignModal({ requestId, workerId });
+        setAssigningWorker(null);
+    };
+
+    const confirmAssignWorker = async () => {
+        if (!assignModal) return;
+        const { requestId, workerId } = assignModal;
         await supabase.from('client_requests').update({
             assigned_worker_id: workerId,
-            worker_task_status: workerId ? 'pending' : null,
-            status: workerId ? 'in_progress' : 'new',
+            worker_task_status: 'pending',
+            status: 'in_progress',
+            admin_message: assignMessage.trim() || null,
         }).eq('id', requestId);
-        const worker = workerId ? workers.find(w => w.id === workerId) : null;
+        const worker = workers.find(w => w.id === workerId);
         setRequests(prev => prev.map(r => r.id === requestId ? {
             ...r,
             assigned_worker_id: workerId,
-            worker_task_status: workerId ? 'pending' : null,
+            worker_task_status: 'pending',
             worker_name: worker ? `${worker.first_name} ${worker.last_name}` : null,
-            status: workerId ? 'in_progress' : 'new',
+            status: 'in_progress',
+            admin_message: assignMessage.trim() || null,
+        } : r));
+        setAssignModal(null);
+    };
+
+    const unassignWorker = async (requestId: string) => {
+        await supabase.from('client_requests').update({
+            assigned_worker_id: null,
+            worker_task_status: null,
+            status: 'new',
+        }).eq('id', requestId);
+        setRequests(prev => prev.map(r => r.id === requestId ? {
+            ...r,
+            assigned_worker_id: null,
+            worker_task_status: null,
+            worker_name: null,
+            status: 'new',
         } : r));
         setAssigningWorker(null);
     };
@@ -284,7 +314,7 @@ export default function ClientRequestsTab() {
                                         <div className="absolute left-0 top-full mt-1 z-20 bg-card border border-border rounded-xl shadow-xl overflow-hidden min-w-[200px] max-h-52 overflow-y-auto">
                                             {req.assigned_worker_id && (
                                                 <button
-                                                    onClick={() => assignWorker(req.id, null)}
+                                                    onClick={() => unassignWorker(req.id)}
                                                     className="w-full text-left px-3 py-2 text-sm text-danger hover:bg-subtle transition-colors flex items-center gap-2"
                                                 >
                                                     <X size={12} /> Снять работника
@@ -293,7 +323,7 @@ export default function ClientRequestsTab() {
                                             {workers.map(w => (
                                                 <button
                                                     key={w.id}
-                                                    onClick={() => assignWorker(req.id, w.id)}
+                                                    onClick={() => openAssignModal(req.id, w.id)}
                                                     className={`w-full text-left px-3 py-2 text-sm hover:bg-subtle transition-colors flex items-center gap-2 ${
                                                         req.assigned_worker_id === w.id ? 'text-primary font-medium' : 'text-main'
                                                     }`}
@@ -362,6 +392,50 @@ export default function ClientRequestsTab() {
                         <div className="modal-footer">
                             <button onClick={() => setEditingNote(null)} className="btn-secondary">Отмена</button>
                             <button onClick={() => saveNote(editingNote)} className="btn-primary">Сохранить</button>
+                        </div>
+                    </div>
+                </div>
+            , document.body)}
+
+            {/* Assign worker modal with editable message */}
+            {assignModal && createPortal(
+                <div className="modal-overlay animate-fadeIn" onClick={() => setAssignModal(null)}>
+                    <div className="modal-content animate-scaleIn" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="text-lg font-bold text-main flex items-center gap-2">
+                                <UserCheck size={18} className="text-primary" /> Назначить работника
+                            </h3>
+                            <button onClick={() => setAssignModal(null)} className="btn-icon"><X size={20} /></button>
+                        </div>
+                        <div className="modal-body space-y-4">
+                            <div>
+                                <label className="text-xs font-medium text-muted mb-1 block">Работник</label>
+                                <p className="text-sm font-medium text-main">
+                                    {workers.find(w => w.id === assignModal.workerId)?.first_name}{' '}
+                                    {workers.find(w => w.id === assignModal.workerId)?.last_name}
+                                </p>
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-muted mb-1 block">
+                                    Сообщение для работника
+                                </label>
+                                <textarea
+                                    value={assignMessage}
+                                    onChange={e => setAssignMessage(e.target.value)}
+                                    className="input resize-none h-28"
+                                    placeholder="Опишите задание для работника..."
+                                    autoFocus
+                                />
+                                <p className="text-[11px] text-muted mt-1">
+                                    Можете отредактировать сообщение клиента перед отправкой работнику
+                                </p>
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button onClick={() => setAssignModal(null)} className="btn-secondary">Отмена</button>
+                            <button onClick={confirmAssignWorker} className="btn-primary flex items-center gap-2">
+                                <UserCheck size={14} /> Назначить
+                            </button>
                         </div>
                     </div>
                 </div>

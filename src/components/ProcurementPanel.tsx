@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import {
     Package, CheckCircle, Clock, Truck, ExternalLink, RefreshCw,
-    ShoppingCart, Archive, Briefcase, Users, MapPin, User, X,
-    Search
+    ShoppingCart, Archive, Briefcase, Users, MapPin, User, X
 } from 'lucide-react';
 
 interface ProcurementRequest {
@@ -29,14 +28,14 @@ interface ProcurementRequest {
 
 import { useAuth } from '../contexts/AuthContext';
 
-export default function ProcurementPanel() {
+export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: string }) {
     const { adminUser } = useAuth();
     const [requests, setRequests] = useState<ProcurementRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'active' | 'archive'>('active');
     const [processingId, setProcessingId] = useState<number | null>(null);
     const [selectedRequest, setSelectedRequest] = useState<ProcurementRequest | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
+    const searchQuery = searchTerm;
 
     useEffect(() => {
         fetchRequests();
@@ -129,15 +128,17 @@ export default function ProcurementPanel() {
             if (error) throw error;
 
             // Optimistic update
-            setRequests(prev => prev.map(req =>
-                req.id === id ? { ...req, ...updates } : req
-            ).filter(() => {
-                // If moving to delivered, remove from Active tab
-                if (activeTab === 'active' && newStatus === 'delivered') return false;
-                // If moving from delivered (archive) to active, remove from Archive tab
-                if (activeTab === 'archive' && newStatus !== 'delivered') return false;
-                return true;
-            }));
+            setRequests(prev => prev
+                .map(req => req.id === id ? { ...req, ...updates } : req)
+                .filter(req => {
+                    if (req.id !== id) return true;
+                    // If moving to delivered, remove from Active tab
+                    if (activeTab === 'active' && newStatus === 'delivered') return false;
+                    // If moving from delivered (archive) to active, remove from Archive tab
+                    if (activeTab === 'archive' && newStatus !== 'delivered') return false;
+                    return true;
+                })
+            );
 
             // Close modal if open
             if (selectedRequest?.id === id) {
@@ -185,18 +186,6 @@ export default function ProcurementPanel() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                    {/* Search Input */}
-                    <div className="relative flex-grow md:flex-grow-0 md:w-64">
-                        <input
-                            type="text"
-                            placeholder="Поиск по названию, объекту..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 transition-all shadow-sm text-gray-900 dark:text-gray-100 placeholder-gray-400"
-                        />
-                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    </div>
-
                     {/* Tabs */}
                     <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
                         <button

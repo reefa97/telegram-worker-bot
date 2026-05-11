@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { UndoProvider } from './contexts/UndoContext';
 import AuthForm from './components/AuthForm';
 import Dashboard from './components/Dashboard';
 import ClientDashboard from './components/client/ClientDashboard';
@@ -10,7 +11,9 @@ function App() {
     return (
         <ErrorBoundary>
             <AuthProvider>
-                <AppContent />
+                <UndoProvider>
+                    <AppContent />
+                </UndoProvider>
             </AuthProvider>
         </ErrorBoundary>
     );
@@ -43,11 +46,12 @@ function AppContent() {
         return () => clearTimeout(timer);
     }, [adminUser, loading, user]);
 
-    if (loading && !localLoadingOverride) {
+    // Single unified loading screen: show while auth is loading OR while waiting for admin profile to load
+    if ((loading || (user && !adminUser && !showProfileError)) && !localLoadingOverride) {
         return (
-            <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center gap-4">
+            <div className="min-h-screen bg-white dark:bg-[#0B0E14] flex flex-col items-center justify-center gap-4">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                <div className="text-white text-xl">Загрузка...</div>
+                <div className="text-gray-800 dark:text-white text-xl">Загрузка...</div>
                 {showForceReload && (
                     <div className="flex flex-col items-center gap-2 mt-4 animate-fadeIn">
                         <p className="text-gray-400 text-sm">Все еще грузится?</p>
@@ -84,18 +88,9 @@ function AppContent() {
         return <AuthForm />;
     }
 
-    // Safety check: User is logged in, but adminUser data is missing.
-    // This could happen if fetchAdminUser failed or timed out.
-    if (!adminUser && !loading) {
-        if (!showProfileError) {
-            return (
-                <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center gap-4">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                    <div className="text-white text-xl">Проверка профиля...</div>
-                </div>
-            );
-        }
-
+    // Safety check: User is logged in, but adminUser data is missing AND timeout fired.
+    // The unified loading screen above handles the waiting state.
+    if (!adminUser && !loading && showProfileError) {
         return (
             <div className="min-h-screen bg-app flex flex-col items-center justify-center p-4 text-center">
                 <div className="bg-card p-8 rounded-lg border border-border max-w-md w-full shadow-lg">

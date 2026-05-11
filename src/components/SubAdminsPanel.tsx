@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { UserPlus2, Plus, Trash2, Edit2, Shield, User, Smartphone, Layout, X } from 'lucide-react';
+import { UserPlus2, Plus, Trash2, Edit2, Shield, User, Smartphone, Layout, X, Eye, EyeOff, Copy } from 'lucide-react';
+import PasswordGenerator from './PasswordGenerator';
 
 interface AdminUser {
     id: string;
@@ -17,6 +18,7 @@ interface AdminUser {
     telegram_username?: string;
     invitation_token?: string;
     is_active?: boolean;
+    plain_password?: string | null;
 }
 
 export default function SubAdminsPanel() {
@@ -62,6 +64,9 @@ export default function SubAdminsPanel() {
             roles_manage: false,
             // Email Search
             email_search_view: false,
+            // Процедуры (SOP library) — на просмотр включено по умолчанию,
+            // super-admin может выключить если нужно скрыть от конкретного админа.
+            procedures_view: true,
         }
     });
 
@@ -188,6 +193,7 @@ export default function SubAdminsPanel() {
                     roles_view: true,
                     roles_manage: false,
                     email_search_view: false,
+                    procedures_view: true,
                 }
             });
         }
@@ -290,6 +296,7 @@ export default function SubAdminsPanel() {
                                 <th>Роль</th>
                                 <th>Telegram ID</th>
                                 <th>Телефон</th>
+                                <th>Пароль</th>
                                 <th className="text-right">Действия</th>
                             </tr>
                         </thead>
@@ -333,6 +340,11 @@ export default function SubAdminsPanel() {
                                                     {admin.phone}
                                                 </div>
                                             ) : '-'}
+                                        </td>
+                                        <td className="text-zinc-600 dark:text-zinc-300">
+                                            {admin.plain_password ? (
+                                                <PasswordCell password={admin.plain_password} />
+                                            ) : <span className="text-zinc-400 dark:text-zinc-500">—</span>}
                                         </td>
                                         <td className="text-right">
                                             {canEditThis && (
@@ -453,20 +465,13 @@ export default function SubAdminsPanel() {
                                             />
                                         </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                                {editingAdmin ? 'Новый пароль (оставьте пустым чтобы не менять)' : 'Пароль'}
-                                            </label>
-                                            <input
-                                                type="password"
-                                                value={formData.password}
-                                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                                className="input"
-                                                placeholder={editingAdmin ? "..." : "******"}
-                                                required={!editingAdmin}
-                                                minLength={6}
-                                            />
-                                        </div>
+                                        <PasswordGenerator
+                                            value={formData.password}
+                                            onChange={(v) => setFormData({ ...formData, password: v })}
+                                            label={editingAdmin ? 'Новый пароль (оставьте пустым чтобы не менять)' : 'Пароль'}
+                                            placeholder={editingAdmin ? "..." : "******"}
+                                            required={!editingAdmin}
+                                        />
                                     </div>
                                 </div>
 
@@ -508,6 +513,9 @@ export default function SubAdminsPanel() {
                                         {renderPermissionsGroup('Email Search', [
                                             { key: 'email_search_view', label: 'Доступ к поиску Email' },
                                         ])}
+                                        {renderPermissionsGroup('Процедуры', [
+                                            { key: 'procedures_view', label: 'Просмотр процедур (SOP)' },
+                                        ])}
                                     </div>
                                 </div>
 
@@ -525,6 +533,39 @@ export default function SubAdminsPanel() {
                 </div>,
                 document.body
             )}
+        </div>
+    );
+}
+
+function PasswordCell({ password }: { password: string }) {
+    const [visible, setVisible] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(password);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+    };
+
+    return (
+        <div className="flex items-center gap-1.5">
+            <span className="font-mono text-sm">
+                {visible ? password : '••••••••'}
+            </span>
+            <button
+                onClick={() => setVisible(!visible)}
+                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
+                title={visible ? 'Скрыть' : 'Показать'}
+            >
+                {visible ? <EyeOff className="w-3.5 h-3.5 text-zinc-400" /> : <Eye className="w-3.5 h-3.5 text-zinc-400" />}
+            </button>
+            <button
+                onClick={handleCopy}
+                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
+                title="Копировать"
+            >
+                <Copy className={`w-3.5 h-3.5 ${copied ? 'text-green-500' : 'text-zinc-400'}`} />
+            </button>
         </div>
     );
 }

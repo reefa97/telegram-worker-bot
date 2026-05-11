@@ -1,33 +1,31 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import {
-    LogOut, Users, Briefcase, FileText, Settings, UserCog, UserPlus2,
-    Calendar, X, Trash2, ScrollText, Search, ChevronLeft, ChevronRight, Sun, Moon, Menu, User, Bell
+    LogOut, Users, Briefcase, FileText, Settings,
+    X, Search, ChevronLeft, ChevronRight, Sun, Moon, Menu, Bell
 } from 'lucide-react';
 import WorkersPanel from './WorkersPanel';
 import ObjectsPanel from './ObjectsPanel';
 import ReportsPanel from './ReportsPanel';
 import SettingsPanel from './SettingsPanel';
-import UsersPanel from './UsersPanel';
-import SubAdminsPanel from './SubAdminsPanel';
-import ShiftPlanningPanel from './ShiftPlanningPanel';
-import LogsPanel from './LogsPanel';
-import TrashPanel from './TrashPanel';
 import EmailSearchPanel from './EmailSearchPanel';
-import RolesPanel from './RolesPanel';
 
 import ProcurementPanel from './ProcurementPanel';
-import MyFinancesPanel from './MyFinancesPanel';
 import MyCabinetPanel from './MyCabinetPanel';
 import ClientsPanel from './ClientsPanel';
 import QualityControlPanel from './QualityControlPanel';
 import ContactsPanel from './ContactsPanel';
 import EmailTrackingPanel from './EmailTrackingPanel';
-import { Shield, ShoppingBag, CheckSquare, ClipboardCheck, BookUser, MailCheck } from 'lucide-react';
+import LeadsPanel from './LeadsPanel';
+import BlogPanel from './BlogPanel';
+import ProceduresPanel from './ProceduresPanel';
+import ChatStatsPanel from './ChatStatsPanel';
+import NotificationsDropdown from './NotificationsDropdown';
+import { ShoppingBag, CheckSquare, ClipboardCheck, BookUser, MailCheck, Inbox, Newspaper, BookOpen, MessageSquare } from 'lucide-react';
 
-type Tab = 'workers' | 'objects' | 'reports' | 'superadmins' | 'subadmins' | 'settings' | 'shifts' | 'tasks' | 'logs' | 'trash' | 'email_search' | 'roles' | 'procurement' | 'my_finances' | 'my_cabinet' | 'clients' | 'quality' | 'contacts' | 'email_tracking';
+type Tab = 'leads' | 'blog' | 'workers' | 'objects' | 'reports' | 'settings' | 'tasks' | 'email_search' | 'procurement' | 'my_cabinet' | 'clients' | 'quality' | 'contacts' | 'email_tracking' | 'procedures' | 'chat_stats';
 
 export default function Dashboard() {
     const { signOut, adminUser } = useAuth();
@@ -46,7 +44,9 @@ export default function Dashboard() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [lastSeenAt, setLastSeenAt] = useState<string>(() => localStorage.getItem('notif_last_seen') || '');
-    const [notifTab, setNotifTab] = useState<'client' | 'procurement' | 'late'>('client');
+    const [notifTab, setNotifTab] = useState<'client' | 'procurement' | 'late' | 'calls'>('client');
+    const [, setPendingCallsCount] = useState(0);
+    const bellRef = useRef<HTMLButtonElement>(null);
 
     // Save activeTab to localStorage whenever it changes
     useEffect(() => {
@@ -59,10 +59,11 @@ export default function Dashboard() {
         const now = new Date();
         const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
-        const [lateRes, clientRes, procRes] = await Promise.all([
+        const [lateRes, clientRes, procRes, callsRes] = await Promise.all([
             supabase.from('notifications_log').select('id, notification_type, message, sent_at, metadata').gte('sent_at', threeDaysAgo).order('sent_at', { ascending: false }).limit(20),
             supabase.from('client_requests').select('id, message, status, created_at, client_id, object_id, cleaning_objects(name)').gte('created_at', threeDaysAgo).order('created_at', { ascending: false }).limit(20),
             supabase.from('procurement_requests').select('id, item_name, status, created_at, worker_id, object_id, workers:worker_id(first_name, last_name), cleaning_objects:object_id(name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(20),
+            supabase.from('admin_users').select('id, name, email, phone, next_courtesy_call_due').eq('role', 'client').lte('next_courtesy_call_due', new Date().toISOString()).order('next_courtesy_call_due', { ascending: true }),
         ]);
 
         const items: any[] = [];
@@ -83,6 +84,12 @@ export default function Dashboard() {
             const o = p.cleaning_objects as any;
             const workerName = w ? `${w.first_name} ${w.last_name}` : '';
             items.push({ id: `proc_${p.id}`, type: 'procurement', message: `Заявка: ${p.item_name}`, detail: `${workerName} — ${o?.name || ''}`, time: p.created_at, raw: p });
+        });
+
+        const dueCallClients = callsRes.data || [];
+        setPendingCallsCount(dueCallClients.length);
+        dueCallClients.forEach((c: any) => {
+            items.push({ id: `call_${c.id}`, type: 'calls', message: `Позвонить: ${c.name || c.email}`, detail: c.phone || 'телефон не указан', time: c.next_courtesy_call_due || new Date().toISOString(), raw: c });
         });
 
         items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
@@ -115,23 +122,20 @@ export default function Dashboard() {
     const isSuperAdmin = adminUser?.role === 'super_admin';
 
     const tabs: { id: Tab; label: string; icon: any; superAdminOnly?: boolean; requiredPermission?: string }[] = [
+        { id: 'leads', label: 'Лиды', icon: Inbox, superAdminOnly: true },
+        { id: 'blog', label: 'CMS', icon: Newspaper, superAdminOnly: true },
+        { id: 'chat_stats', label: 'Чат-бот', icon: MessageSquare, superAdminOnly: true },
         { id: 'workers', label: 'Работники', icon: Users, requiredPermission: 'workers_view' },
         { id: 'objects', label: 'Объекты', icon: Briefcase, requiredPermission: 'objects_view' },
-        { id: 'my_finances', label: 'Мои финансы', icon: User, requiredPermission: 'workers_view' },
         { id: 'my_cabinet', label: 'Мой кабинет', icon: CheckSquare, requiredPermission: 'workers_view' },
-        { id: 'shifts', label: 'Смены', icon: Calendar, requiredPermission: 'shifts_view' },
         { id: 'procurement', label: 'Закупки', icon: ShoppingBag, requiredPermission: 'objects_view' }, // Assuming objects_view implies access to object supplies
         { id: 'quality', label: 'Контроль', icon: ClipboardCheck, requiredPermission: 'objects_view' },
+        { id: 'procedures', label: 'Процедуры', icon: BookOpen, requiredPermission: 'procedures_view' },
         { id: 'reports', label: 'Отчеты', icon: FileText, requiredPermission: 'reports_view' },
-        { id: 'logs', label: 'Логи', icon: ScrollText, superAdminOnly: true },
-        { id: 'superadmins', label: 'Super Admins', icon: UserCog, superAdminOnly: true },
-        { id: 'subadmins', label: 'Sub Admins', icon: UserPlus2, superAdminOnly: true },
         { id: 'clients', label: 'Клиенты', icon: Users, superAdminOnly: true },
         { id: 'contacts', label: 'Контакты', icon: BookUser, superAdminOnly: true },
         { id: 'email_search', label: 'Поиск Email', icon: Search, requiredPermission: 'email_search_view' },
         { id: 'email_tracking', label: 'Трекинг Email', icon: MailCheck, superAdminOnly: true },
-        { id: 'roles', label: 'Роли', icon: Shield, requiredPermission: 'roles_view' },
-        { id: 'trash', label: 'Корзина', icon: Trash2, superAdminOnly: true },
         { id: 'settings', label: 'Настройки', icon: Settings, superAdminOnly: true },
 
     ];
@@ -315,6 +319,7 @@ export default function Dashboard() {
                     {/* Notifications Bell */}
                     <div className="relative">
                         <button
+                            ref={bellRef}
                             onClick={() => {
                                 const opening = !showNotifications;
                                 setShowNotifications(opening);
@@ -337,101 +342,34 @@ export default function Dashboard() {
                         </button>
 
                         {/* Notifications Dropdown */}
-                        {showNotifications && (() => {
-                            const clientNotifs = notifications.filter(n => n.type === 'client');
-                            const procNotifs = notifications.filter(n => n.type === 'procurement');
-                            const lateNotifs = notifications.filter(n => n.type === 'late');
-                            const tabNotifs = notifTab === 'client' ? clientNotifs : notifTab === 'procurement' ? procNotifs : lateNotifs;
-
-                            return (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-card border border-border rounded-lg shadow-xl z-50 max-h-[70vh] flex flex-col">
-                                    <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                                        <h3 className="font-semibold text-main text-sm">Уведомления</h3>
-                                        <button onClick={() => setShowNotifications(false)} className="p-1 hover:bg-subtle rounded text-muted">
-                                            <X size={16} />
-                                        </button>
-                                    </div>
-
-                                    {/* Tabs */}
-                                    <div className="flex border-b border-border">
-                                        {([
-                                            { key: 'client' as const, label: 'Клиенты', icon: '💬', count: clientNotifs.length },
-                                            { key: 'procurement' as const, label: 'Закупки', icon: '📦', count: procNotifs.length },
-                                            { key: 'late' as const, label: 'Опоздания', icon: '🔴', count: lateNotifs.length },
-                                        ]).map(tab => (
-                                            <button
-                                                key={tab.key}
-                                                onClick={() => setNotifTab(tab.key)}
-                                                className={`flex-1 px-2 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors flex items-center justify-center gap-1.5 ${notifTab === tab.key ? 'border-blue-500 text-main' : 'border-transparent text-muted hover:text-main'}`}
-                                            >
-                                                <span>{tab.icon}</span>
-                                                <span>{tab.label}</span>
-                                                {tab.count > 0 && (
-                                                    <span className="ml-0.5 text-[10px] bg-subtle px-1.5 py-0.5 rounded-full">{tab.count}</span>
-                                                )}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    <div className="overflow-y-auto flex-1">
-                                        {tabNotifs.length === 0 ? (
-                                            <div className="p-6 text-center text-muted text-sm">Нет уведомлений</div>
-                                        ) : (
-                                            tabNotifs.map((n) => {
-                                                const isNew = lastSeenAt ? new Date(n.time) > new Date(lastSeenAt) : false;
-                                                return (
-                                                <div
-                                                    key={n.id}
-                                                    className={`px-4 py-3 border-b border-border/50 hover:bg-subtle/50 transition-colors cursor-pointer ${isNew ? 'bg-blue-500/5' : ''}`}
-                                                    onClick={() => {
-                                                        if (n.type === 'client') { setActiveTab('clients'); }
-                                                        else if (n.type === 'procurement') { setActiveTab('procurement'); }
-                                                        setShowNotifications(false);
-                                                    }}
-                                                >
-                                                    <div className="flex items-start gap-2">
-                                                        {isNew && <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />}
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-sm text-main leading-snug">{n.message}</p>
-                                                            {n.detail && <p className="text-xs text-muted mt-0.5">{n.detail}</p>}
-                                                            <p className="text-[11px] text-muted mt-1">
-                                                                {new Date(n.time).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                </div>
-                            </>
-                            );
-                        })()}
+                        {showNotifications && <NotificationsDropdown
+                            notifications={notifications}
+                            notifTab={notifTab}
+                            setNotifTab={setNotifTab}
+                            lastSeenAt={lastSeenAt}
+                            onClose={() => setShowNotifications(false)}
+                            onNavigate={(tab: string) => { setActiveTab(tab as Tab); setShowNotifications(false); }}
+                            anchorRef={bellRef}
+                        />}
                     </div>
                 </header>
 
                 {/* Content Area */}
                 <div className="flex-1 overflow-y-auto p-4 lg:p-8 pb-20 lg:pb-8">
+                    {activeTab === 'leads' && <LeadsPanel searchTerm={globalSearch} />}
+                    {activeTab === 'blog' && <BlogPanel searchTerm={globalSearch} />}
                     {activeTab === 'workers' && <WorkersPanel searchTerm={globalSearch} />}
                     {activeTab === 'objects' && <ObjectsPanel searchTerm={globalSearch} />}
-                    {activeTab === 'my_finances' && <MyFinancesPanel />}
                     {activeTab === 'my_cabinet' && <MyCabinetPanel />}
-                    {activeTab === 'shifts' && <ShiftPlanningPanel />}
                     {activeTab === 'reports' && <ReportsPanel />}
                     {activeTab === 'procurement' && <ProcurementPanel searchTerm={globalSearch} />}
-                    {activeTab === 'superadmins' && isSuperAdmin && <UsersPanel />}
-                    {activeTab === 'subadmins' && <SubAdminsPanel />}
                     {activeTab === 'settings' && <SettingsPanel />}
-                    {activeTab === 'logs' && <LogsPanel />}
                     {activeTab === 'email_search' && <EmailSearchPanel />}
 
-                    {activeTab === 'roles' && <RolesPanel />}
-                    {activeTab === 'trash' && <TrashPanel />}
                     {activeTab === 'clients' && <ClientsPanel searchTerm={globalSearch} />}
                     {activeTab === 'quality' && <QualityControlPanel searchTerm={globalSearch} />}
+                    {activeTab === 'procedures' && <ProceduresPanel searchTerm={globalSearch} />}
+                    {activeTab === 'chat_stats' && <ChatStatsPanel />}
                     {activeTab === 'contacts' && <ContactsPanel searchTerm={globalSearch} />}
                     {activeTab === 'email_tracking' && <EmailTrackingPanel />}
                 </div>

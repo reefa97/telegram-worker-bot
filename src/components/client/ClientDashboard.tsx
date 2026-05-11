@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { LogOut, Calendar, Menu, X, Moon, Sun, Phone, Send } from 'lucide-react';
+import { LogOut, Calendar, Menu, X, Moon, Sun, Phone, Send, FileText, ClipboardList } from 'lucide-react';
 import ClientCalendar from './ClientCalendar';
 import ClientRequests from './ClientRequests';
 import ClientContact from './ClientContact';
+import ClientDocuments from './ClientDocuments';
+import ClientTasks from './ClientTasks';
 
-type ClientTab = 'calendar' | 'requests' | 'contact';
+type ClientTab = 'calendar' | 'tasks' | 'requests' | 'documents' | 'contact';
 
 export default function ClientDashboard() {
     const { signOut, adminUser } = useAuth();
@@ -24,7 +26,9 @@ export default function ClientDashboard() {
 
     const tabs: { id: ClientTab; label: string; icon: any }[] = [
         { id: 'calendar', label: 'Harmonogram', icon: Calendar },
+        { id: 'tasks', label: 'Zakres prac', icon: ClipboardList },
         { id: 'requests', label: 'Wiadomości', icon: Send },
+        { id: 'documents', label: 'Dokumenty', icon: FileText },
         { id: 'contact', label: 'Kontakt', icon: Phone },
     ];
 
@@ -128,7 +132,9 @@ export default function ClientDashboard() {
                 <div className="flex-1 overflow-auto p-4 lg:p-8">
                     <div className="max-w-6xl mx-auto">
                         {activeTab === 'calendar' && <ClientCalendar />}
+                        {activeTab === 'tasks' && <ClientTasks />}
                         {activeTab === 'requests' && <ClientRequests />}
+                        {activeTab === 'documents' && <ClientDocuments />}
                         {activeTab === 'contact' && <ClientContact />}
                     </div>
                 </div>

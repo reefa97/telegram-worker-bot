@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Save, User as UserIcon, Phone, Mail, FileText, DollarSign, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -103,8 +104,8 @@ export default function LeadModal({ isOpen, onClose, onSave, leadToEdit }: LeadM
 
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
             <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn flex flex-col max-h-[90vh]">
 
                 {/* Header */}
@@ -247,5 +248,5 @@ export default function LeadModal({ isOpen, onClose, onSave, leadToEdit }: LeadM
                 </div>
             </div>
         </div>
-    );
+    , document.body);
 }

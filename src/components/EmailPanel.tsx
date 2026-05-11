@@ -245,7 +245,8 @@ function AccountModal({ account, onClose, onSave }: { account?: any, onClose: ()
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="label">Email</label>
@@ -364,7 +365,9 @@ function AccountModal({ account, onClose, onSave }: { account?: any, onClose: ()
                         <p className="text-xs text-muted mt-1">Поддерживается HTML и CSS inline стили.</p>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                    </div>
+
+                    <div className="modal-footer">
                         <button type="button" onClick={onClose} className="btn-secondary">
                             Отмена
                         </button>

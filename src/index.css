@@ -387,10 +387,16 @@ html:not(.dark) body {
       @apply max-w-none rounded-none h-full max-h-full flex flex-col;
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
+      min-height: 0;
+    }
+
+    .modal-content > form {
+      @apply flex flex-col flex-1 min-h-0;
     }
 
     .modal-body {
       @apply max-h-none flex-1 overflow-y-auto;
+      min-height: 0;
     }
   }
 

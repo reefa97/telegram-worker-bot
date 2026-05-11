@@ -192,10 +192,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         initAuth();
 
-        // Listen for auth changes
+        // Listen for auth changes (skip INITIAL_SESSION — already handled by initAuth)
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
+            if (_event === 'INITIAL_SESSION') return;
             console.log('AuthContext: Auth change', _event, session?.user?.email);
             setSession(session);
             setUser(session?.user ?? null);
@@ -205,7 +206,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
                 setAdminUser(null);
             }
-            // Ensure loading is false if auth change happens (e.g. sign out)
             setLoading(false);
         });
 

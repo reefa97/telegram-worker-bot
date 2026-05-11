@@ -158,16 +158,18 @@ export default function TrashPanel() {
                                     <button
                                         onClick={() => handleRestore(item.id)}
                                         disabled={!!processingId}
-                                        className="p-1.5 bg-green-50 dark:bg-green-900/20 text-green-600 rounded-lg disabled:opacity-50"
+                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-medium disabled:opacity-50"
                                     >
-                                        {processingId === item.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                                        {processingId === item.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                                        Восстановить
                                     </button>
                                     <button
                                         onClick={() => handlePermanentDelete(item.id)}
                                         disabled={!!processingId}
-                                        className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg disabled:opacity-50"
+                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-medium disabled:opacity-50"
                                     >
-                                        {processingId === item.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                                        {processingId === item.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                                        Удалить
                                     </button>
                                 </div>
                             </div>
@@ -218,26 +220,26 @@ export default function TrashPanel() {
                                                 <button
                                                     onClick={() => handleRestore(item.id)}
                                                     disabled={!!processingId}
-                                                    className="p-1.5 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg transition-colors disabled:opacity-50"
-                                                    title="Восстановить"
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
                                                 >
                                                     {processingId === item.id ? (
                                                         <RefreshCw className="w-4 h-4 animate-spin" />
                                                     ) : (
                                                         <CheckCircle className="w-4 h-4" />
                                                     )}
+                                                    Восстановить
                                                 </button>
                                                 <button
                                                     onClick={() => handlePermanentDelete(item.id)}
                                                     disabled={!!processingId}
-                                                    className="p-1.5 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg transition-colors disabled:opacity-50"
-                                                    title="Удалить навсегда"
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
                                                 >
                                                     {processingId === item.id ? (
                                                         <RefreshCw className="w-4 h-4 animate-spin" />
                                                     ) : (
                                                         <XCircle className="w-4 h-4" />
                                                     )}
+                                                    Удалить
                                                 </button>
                                             </div>
                                         </td>

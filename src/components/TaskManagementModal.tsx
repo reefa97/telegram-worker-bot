@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { Plus, Trash2, Calendar, Star, X, ScanText, RotateCw } from 'lucide-react';
+import { useUndo } from '../contexts/UndoContext';
 
 interface Task {
     id: string;
@@ -23,7 +24,7 @@ interface TaskManagementModalProps {
 }
 
 // Days of week starting from Monday (1) to Sunday (0) for display order
-const orderedDays = [1, 2, 3, 4, 5, 6, 0];
+const orderedDays = [1, 2, 3, 4, 5, 6, 7];
 const dayNames: { [key: number]: string } = {
     1: 'Понедельник',
     2: 'Вторник',
@@ -31,10 +32,11 @@ const dayNames: { [key: number]: string } = {
     4: 'Четверг',
     5: 'Пятница',
     6: 'Суббота',
-    0: 'Воскресенье'
+    7: 'Воскресенье'
 };
 
 export default function TaskManagementModal({ objectId, objectName, onClose }: TaskManagementModalProps) {
+    const { pushUndo } = useUndo();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -159,6 +161,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
         e?.stopPropagation(); // Prevent opening edit modal
         if (!confirm('Переместить задачу в корзину?')) return;
 
+        const deletedTask = tasks.find(t => t.id === id);
         const { error } = await supabase.rpc('soft_delete_task', { task_id: id });
 
         if (error) {
@@ -177,6 +180,10 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
 
         setTasks(prev => prev.filter(t => t.id !== id));
         if (editingTask?.id === id) closeForm();
+        pushUndo(`Задача «${deletedTask?.title || ''}» удалена`, async () => {
+            await supabase.rpc('restore_from_trash', { item_type: 'tasks', item_id: id });
+            loadTasks();
+        });
     };
 
     const closeForm = () => {
@@ -323,7 +330,16 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                         body: { image: base64Image, objectId }
                     });
 
-                    if (error) throw error;
+                    if (error) {
+                        // Extract real error message from response body
+                        let detail = error.message;
+                        try {
+                            const ctx: any = (error as any).context;
+                            if (ctx?.json) detail = (await ctx.json()).error || detail;
+                            else if (ctx?.text) detail = await ctx.text();
+                        } catch {}
+                        throw new Error(detail);
+                    }
                     if (data.error) throw new Error(data.error);
 
                     const extractedTasks = data.tasks;
@@ -353,7 +369,15 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
 
                 } catch (err: any) {
                     console.error('OCR Error:', err);
-                    alert(`Ошибка OCR: ${err.message}`);
+                    let msg = err.message || String(err);
+                    if (/credit balance is too low/i.test(msg)) {
+                        msg = 'Закончились кредиты Anthropic API. Пополните баланс в console.anthropic.com → Plans & Billing.';
+                    } else if (/ANTHROPIC_API_KEY not configured/i.test(msg)) {
+                        msg = 'Не настроен ANTHROPIC_API_KEY в Supabase Edge Function.';
+                    } else if (/rate.?limit/i.test(msg)) {
+                        msg = 'Превышен лимит запросов Anthropic API. Подождите минуту и попробуйте снова.';
+                    }
+                    alert(`Ошибка OCR: ${msg}`);
                     setLoading(false);
                 }
             };
@@ -371,7 +395,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
 
     return createPortal(
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content sm:max-w-[95vw] sm:h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="modal-content max-h-[95vh] sm:max-w-[95vw] sm:h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div className="modal-header">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -388,7 +412,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                     <div className="flex items-center gap-2 shrink-0">
                         <label className="btn-secondary flex items-center gap-1.5 cursor-pointer relative px-2.5 py-1.5 text-sm">
                             {loading ? <span className="animate-pulse text-xs">...</span> : <><ScanText className="w-4 h-4" /><span className="hidden sm:inline">OCR</span></>}
-                            <input type="file" accept="image/*" className="hidden" onChange={handleOcrUpload} disabled={loading} />
+                            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleOcrUpload} disabled={loading} />
                         </label>
                         <button
                             onClick={() => { closeForm(); setShowAddForm(true); }}
@@ -497,7 +521,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                                                 : 'bg-gray-100 dark:bg-gray-700/50 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
                                                                 }`}
                                                         >
-                                                            {dayNames[day].substring(0, 2)}
+                                                            {(dayNames[day] || '?').substring(0, 2)}
                                                         </button>
                                                     ))}
                                                 </div>
@@ -568,7 +592,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                             ) : (
                                 tasks.map(task => {
                                     const scheduleLabel = task.frequency === 'weekly' && task.scheduled_days?.length
-                                        ? task.scheduled_days.map(d => dayNames[d].substring(0, 2)).join(', ')
+                                        ? task.scheduled_days.map(d => (dayNames[d] || '?').substring(0, 2)).join(', ')
                                         : task.frequency === 'monthly' && task.scheduled_days?.length
                                         ? `${task.scheduled_days.join(', ')}-е число`
                                         : task.frequency === 'one_time' && task.scheduled_dates?.length
@@ -642,9 +666,9 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                             onDrop={(e) => handleDrop(e, `day-${day}`)}
                                         >
                                             <div className={`p-3 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 text-sm flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 rounded-t-xl z-20 
-                                                ${day === new Date().getDay() ? 'text-primary-600 dark:text-primary-400' : ''}`}>
+                                                ${day === (new Date().getDay() || 7) ? 'text-primary-600 dark:text-primary-400' : ''}`}>
                                                 <span>{dayNames[day]}</span>
-                                                <span className={`px-2 py-0.5 rounded-full text-xs ${day === new Date().getDay() ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs ${day === (new Date().getDay() || 7) ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
                                                     {dayTasks.length}
                                                 </span>
                                             </div>

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, Send, Copy, Check, Users, History, Search, RefreshCw } from 'lucide-react';
+import { useUndo } from '../contexts/UndoContext';
+import { Plus, Edit2, Trash2, Send, Copy, Check, Users, History, Search, RefreshCw, MessageSquare, X } from 'lucide-react';
 import WorkSessionsModal from './WorkSessionsModal';
 import WorkerDetailsModal from './WorkerDetailsModal';
 import SalariesTab from './SalariesTab';
@@ -35,8 +36,9 @@ interface CleaningObject {
     address: string;
 }
 
-export default function WorkersPanel() {
+export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string }) {
     const { adminUser } = useAuth();
+    const { pushUndo } = useUndo();
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [objects, setObjects] = useState<CleaningObject[]>([]);
     const [roles, setRoles] = useState<WorkerRole[]>([]);
@@ -54,6 +56,13 @@ export default function WorkersPanel() {
     const [bulkMessage, setBulkMessage] = useState('');
     const [sendingBulk, setSendingBulk] = useState(false);
 
+    // Standalone message modal
+    const [showMessageModal, setShowMessageModal] = useState(false);
+    const [messageRecipients, setMessageRecipients] = useState<Set<string>>(new Set());
+    const [messageText, setMessageText] = useState('');
+    const [messageSearch, setMessageSearch] = useState('');
+    const [sendingMessage, setSendingMessage] = useState(false);
+
     // Form state
     const [formData, setFormData] = useState({
         first_name: '',
@@ -65,7 +74,7 @@ export default function WorkersPanel() {
     });
 
     const [activeTab, setActiveTab] = useState<'list' | 'salaries'>('list');
-    const [searchQuery, setSearchQuery] = useState('');
+    const searchQuery = searchTerm;
     const [isAddingRole, setIsAddingRole] = useState(false);
     const [newRoleName, setNewRoleName] = useState('');
     const [isSavingRole, setIsSavingRole] = useState(false);
@@ -232,7 +241,8 @@ export default function WorkersPanel() {
     const handleDelete = async (id: string) => {
         if (!confirm('Переместить работника в корзину?')) return;
 
-        const { error } = await supabase.rpc('soft_delete_worker', { worker_id: id });
+        const deletedWorker = workers.find(w => w.id === id);
+        const { error } = await supabase.rpc('soft_delete_worker', { p_worker_id: id });
 
         if (error) {
             console.error('Error deleting worker:', error);
@@ -244,6 +254,10 @@ export default function WorkersPanel() {
                 newSelected.delete(id);
                 setSelectedWorkers(newSelected);
             }
+            pushUndo(`Работник «${deletedWorker?.first_name || ''} ${deletedWorker?.last_name || ''}» удалён`, async () => {
+                await supabase.rpc('restore_from_trash', { item_type: 'workers', item_id: id });
+                loadWorkers();
+            });
         }
     };
 
@@ -309,6 +323,77 @@ export default function WorkersPanel() {
             alert('Ошибка при рассылке');
         } finally {
             setSendingBulk(false);
+        }
+    };
+
+    const handleSendMessage = async () => {
+        if (!messageText.trim()) {
+            alert('Введите сообщение');
+            return;
+        }
+        if (messageRecipients.size === 0) {
+            alert('Выберите хотя бы одного работника');
+            return;
+        }
+
+        setSendingMessage(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        try {
+            for (const workerId of messageRecipients) {
+                try {
+                    const response = await supabase.functions.invoke('send-message', {
+                        body: { workerId, message: messageText },
+                    });
+                    if (response.error) throw response.error;
+                    successCount++;
+                } catch (error) {
+                    console.error(`Error sending to worker ${workerId}:`, error);
+                    failCount++;
+                }
+            }
+
+            await supabase.from('system_logs').insert({
+                level: 'info',
+                category: 'bulk_message',
+                message: `Сообщение ${messageRecipients.size} работникам. Успешно: ${successCount}, Ошибок: ${failCount}`,
+                metadata: { total: messageRecipients.size, success: successCount, failed: failCount, message_preview: messageText },
+                admin_id: adminUser?.id
+            });
+
+            alert(`Отправлено.\nУспешно: ${successCount}\nОшибок: ${failCount}`);
+            setMessageText('');
+            setShowMessageModal(false);
+            setMessageRecipients(new Set());
+            setMessageSearch('');
+        } catch (error) {
+            console.error('Error sending messages:', error);
+            alert('Ошибка при отправке');
+        } finally {
+            setSendingMessage(false);
+        }
+    };
+
+    const activeWorkers = workers.filter(w => w.telegram_chat_id && w.is_active);
+
+    const filteredMessageWorkers = activeWorkers.filter(w => {
+        if (!messageSearch.trim()) return true;
+        const q = messageSearch.toLowerCase();
+        return `${w.first_name} ${w.last_name}`.toLowerCase().includes(q);
+    });
+
+    const toggleMessageRecipient = (id: string) => {
+        const next = new Set(messageRecipients);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        setMessageRecipients(next);
+    };
+
+    const toggleAllMessageRecipients = () => {
+        if (messageRecipients.size === activeWorkers.length) {
+            setMessageRecipients(new Set());
+        } else {
+            setMessageRecipients(new Set(activeWorkers.map(w => w.id)));
         }
     };
 
@@ -433,18 +518,6 @@ export default function WorkersPanel() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div className="flex items-center gap-4 flex-1 w-full">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white shrink-0">Работники</h2>
-                    {activeTab === 'list' && (
-                        <div className="relative flex-1 max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Поиск по имени, роли, телефону..."
-                                className="input pl-10 h-10 w-full"
-                            />
-                        </div>
-                    )}
                 </div>
                 <div className="flex items-center gap-2 w-full md:w-auto">
                     {activeTab === 'list' && selectedWorkers.size > 0 && (
@@ -454,6 +527,15 @@ export default function WorkersPanel() {
                         >
                             <Users className="w-4 h-4" />
                             Написать ({selectedWorkers.size})
+                        </button>
+                    )}
+                    {activeTab === 'list' && adminUser?.role === 'super_admin' && (
+                        <button
+                            onClick={() => { setShowMessageModal(true); setMessageRecipients(new Set()); setMessageText(''); setMessageSearch(''); }}
+                            className="btn-secondary flex items-center gap-2"
+                        >
+                            <MessageSquare className="w-4 h-4" />
+                            Написать
                         </button>
                     )}
                     {activeTab === 'list' && (adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_create) && (
@@ -871,6 +953,93 @@ export default function WorkersPanel() {
                                 className="btn-primary flex-1 flex items-center justify-center gap-2"
                             >
                                 {sendingBulk ? 'Отправка...' : 'Отправить'}
+                                <Send className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            , document.body)}
+
+            {/* Send Message Modal */}
+            {showMessageModal && createPortal(
+                <div className="modal-overlay" onClick={() => setShowMessageModal(false)}>
+                    <div className="modal-content sm:max-w-lg" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="text-xl font-bold text-main">Написать работникам</h3>
+                            <button onClick={() => setShowMessageModal(false)} className="btn-icon">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="modal-body space-y-4">
+                            {/* Select recipients */}
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-sm font-medium text-main">
+                                        Получатели ({messageRecipients.size} из {activeWorkers.length})
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={toggleAllMessageRecipients}
+                                        className="text-xs text-primary hover:underline"
+                                    >
+                                        {messageRecipients.size === activeWorkers.length ? 'Снять всех' : 'Выбрать всех'}
+                                    </button>
+                                </div>
+                                <div className="relative mb-2">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                                    <input
+                                        type="text"
+                                        value={messageSearch}
+                                        onChange={(e) => setMessageSearch(e.target.value)}
+                                        placeholder="Поиск..."
+                                        className="input pl-10 h-9 w-full text-sm"
+                                    />
+                                </div>
+                                <div className="max-h-48 overflow-y-auto border border-border rounded-lg divide-y divide-border">
+                                    {filteredMessageWorkers.map(w => (
+                                        <label key={w.id} className="flex items-center gap-3 px-3 py-2 hover:bg-subtle cursor-pointer transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={messageRecipients.has(w.id)}
+                                                onChange={() => toggleMessageRecipient(w.id)}
+                                                className="rounded border-border text-primary focus:ring-1 focus:ring-primary"
+                                            />
+                                            <span className="text-sm text-main">{w.first_name} {w.last_name}</span>
+                                            {w.telegram_username && (
+                                                <span className="text-xs text-muted ml-auto">@{w.telegram_username}</span>
+                                            )}
+                                        </label>
+                                    ))}
+                                    {filteredMessageWorkers.length === 0 && (
+                                        <div className="text-center text-muted text-sm py-4">Не найдено</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Message text */}
+                            <div>
+                                <label className="block text-sm font-medium text-main mb-1">Сообщение</label>
+                                <textarea
+                                    value={messageText}
+                                    onChange={(e) => setMessageText(e.target.value)}
+                                    className="input min-h-[100px]"
+                                    placeholder="Введите текст сообщения..."
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer flex gap-3">
+                            <button
+                                onClick={() => setShowMessageModal(false)}
+                                className="btn-secondary flex-1"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                onClick={handleSendMessage}
+                                disabled={sendingMessage || !messageText.trim() || messageRecipients.size === 0}
+                                className="btn-primary flex-1 flex items-center justify-center gap-2"
+                            >
+                                {sendingMessage ? 'Отправка...' : `Отправить (${messageRecipients.size})`}
                                 <Send className="w-4 h-4" />
                             </button>
                         </div>
