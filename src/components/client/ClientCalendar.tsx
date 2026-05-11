@@ -3,8 +3,9 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
     Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight,
-    User, CheckCircle2, CalendarDays, X, Building2
+    User, CheckCircle2, CalendarDays, X, Building2, Camera
 } from 'lucide-react';
+import ClientPhotoGalleryModal from './ClientPhotoGalleryModal';
 
 interface ScheduleEvent {
     session_id: string;
@@ -14,6 +15,7 @@ interface ScheduleEvent {
     start_time: string;
     end_time: string | null;
     duration_minutes: number | null;
+    photo_count: number;
 }
 
 interface PlannedSchedule {
@@ -36,6 +38,8 @@ interface UnifiedEvent {
     planned_start?: string;
     planned_end?: string;
     date: Date;
+    session_id?: string;
+    photo_count?: number;
 }
 
 export default function ClientCalendar() {
@@ -45,6 +49,7 @@ export default function ClientCalendar() {
     const [loading, setLoading] = useState(true);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDay, setSelectedDay] = useState<number | null>(null);
+    const [gallerySessionId, setGallerySessionId] = useState<string | null>(null);
 
     useEffect(() => {
         if (adminUser?.id) loadSchedule();
@@ -124,7 +129,9 @@ export default function ClientCalendar() {
             start_time: c.start_time,
             end_time: c.end_time,
             duration_minutes: c.duration_minutes,
-            date: new Date(c.start_time)
+            date: new Date(c.start_time),
+            session_id: c.session_id,
+            photo_count: c.photo_count ?? 0,
         }));
 
         return [...unifiedCompleted, ...planned].sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -314,25 +321,36 @@ export default function ClientCalendar() {
                                     </div>
 
                                     {event.type === 'completed' ? (
-                                        <div className="grid grid-cols-2 gap-2 text-xs text-muted mt-2">
-                                            <div className="flex items-center gap-1.5">
-                                                <Clock className="w-3.5 h-3.5 shrink-0" />
-                                                {formatTime(event.start_time!)}
-                                                {event.end_time && ` — ${formatTime(event.end_time)}`}
+                                        <>
+                                            <div className="grid grid-cols-2 gap-2 text-xs text-muted mt-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Clock className="w-3.5 h-3.5 shrink-0" />
+                                                    {formatTime(event.start_time!)}
+                                                    {event.end_time && ` — ${formatTime(event.end_time)}`}
+                                                </div>
+                                                {event.worker_name && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <User className="w-3.5 h-3.5 shrink-0" />
+                                                        {event.worker_name}
+                                                    </div>
+                                                )}
+                                                {event.duration_minutes && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Building2 className="w-3.5 h-3.5 shrink-0" />
+                                                        {formatDuration(event.duration_minutes)}
+                                                    </div>
+                                                )}
                                             </div>
-                                            {event.worker_name && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <User className="w-3.5 h-3.5 shrink-0" />
-                                                    {event.worker_name}
-                                                </div>
+                                            {(event.photo_count ?? 0) > 0 && event.session_id && (
+                                                <button
+                                                    onClick={() => setGallerySessionId(event.session_id!)}
+                                                    className="mt-3 inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                                                >
+                                                    <Camera className="w-3.5 h-3.5" />
+                                                    Zobacz zdjęcia ({event.photo_count})
+                                                </button>
                                             )}
-                                            {event.duration_minutes && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <Building2 className="w-3.5 h-3.5 shrink-0" />
-                                                    {formatDuration(event.duration_minutes)}
-                                                </div>
-                                            )}
-                                        </div>
+                                        </>
                                     ) : (
                                         <div className="text-xs text-muted flex items-center gap-1.5 mt-2">
                                             <Clock className="w-3.5 h-3.5" />
@@ -355,6 +373,14 @@ export default function ClientCalendar() {
                         W wybranym miesiącu nie ma ani zaplanowanych, ani zakończonych sprzątań.
                     </p>
                 </div>
+            )}
+
+            {gallerySessionId && adminUser?.id && (
+                <ClientPhotoGalleryModal
+                    sessionId={gallerySessionId}
+                    clientId={adminUser.id}
+                    onClose={() => setGallerySessionId(null)}
+                />
             )}
         </div>
     );
