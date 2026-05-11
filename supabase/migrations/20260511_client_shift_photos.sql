@@ -6,7 +6,8 @@
 --    whose object belongs to the requesting client.
 -- ========================================
 
--- 1. get_client_schedule: add photo_count
+-- 1. get_client_schedule: add photo_count + derive end_time/duration from
+--    last photo when worker forgot to press the "Finish" button.
 DROP FUNCTION IF EXISTS get_client_schedule(UUID, TIMESTAMPTZ, TIMESTAMPTZ);
 
 CREATE OR REPLACE FUNCTION get_client_schedule(
@@ -32,14 +33,28 @@ BEGIN
     co.name AS object_name,
     COALESCE(w.first_name || ' ' || w.last_name, 'Nieznany') AS worker_name,
     ws.start_time,
-    ws.end_time,
-    ws.duration_minutes,
+    -- If the worker forgot to press "Finish" but uploaded photos, fall back
+    -- to the timestamp of the last photo as the effective end_time.
+    COALESCE(ws.end_time, sp.last_photo_at) AS end_time,
+    -- Same fallback for duration: prefer recorded duration, otherwise compute
+    -- minutes between start_time and last photo.
+    COALESCE(
+      ws.duration_minutes,
+      CASE
+        WHEN sp.last_photo_at IS NOT NULL
+          THEN GREATEST(0, (EXTRACT(EPOCH FROM (sp.last_photo_at - ws.start_time)) / 60)::INT)
+        ELSE NULL
+      END
+    ) AS duration_minutes,
     COALESCE(sp.cnt, 0)::INT AS photo_count
   FROM work_sessions ws
   JOIN cleaning_objects co ON ws.object_id = co.id
   LEFT JOIN workers w ON ws.worker_id = w.id
   LEFT JOIN (
-    SELECT shift_photos.session_id AS sid, COUNT(*)::INT AS cnt
+    SELECT
+      shift_photos.session_id AS sid,
+      COUNT(*)::INT AS cnt,
+      MAX(shift_photos.uploaded_at) AS last_photo_at
     FROM shift_photos
     GROUP BY shift_photos.session_id
   ) sp ON sp.sid = ws.id
