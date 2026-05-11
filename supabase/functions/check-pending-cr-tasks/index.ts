@@ -27,6 +27,7 @@ serve(async () => {
       .select(`
         id,
         message,
+        admin_message,
         object_id,
         assigned_worker_id,
         worker_task_status,
@@ -84,7 +85,7 @@ serve(async () => {
         `⚠️ <b>Задание не подтверждено!</b>\n\n` +
         `📍 Объект: <b>${objectName}</b>\n` +
         `👤 Работник: <b>${workerName}</b>\n` +
-        `💬 Задание: ${task.message}\n\n` +
+        `💬 Задание: ${task.admin_message || task.message}\n\n` +
         `Работник завершил смену и не ответил на вопрос о выполнении задания.\n` +
         `🔴 Требуется вмешательство!`;
 

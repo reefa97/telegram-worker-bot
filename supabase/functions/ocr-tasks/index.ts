@@ -1,11 +1,55 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const SYSTEM_PROMPT = `Jesteś ekspertem od analizy dokumentów dla firm sprzątających w Polsce.
+
+Twoim zadaniem jest przeczytanie dokumentu (umowa, specyfikacja, checklist, harmonogram) i wyodrębnienie WYŁĄCZNIE zadań sprzątania/utrzymania czystości z przypisaniem do dni tygodnia.
+
+## ZASADY EKSTRAKCJI:
+
+1. **Wyodrębniaj TYLKO konkretne czynności do wykonania** — ignoruj dane firmowe, adresy, NIP, warunki płatności, kary umowne, dane kontaktowe, podpisy itp.
+
+2. **Każde zadanie powinno być konkretne i zrozumiałe** — np. "Mycie podłóg" zamiast "Utrzymanie czystości" (chyba że dokument nie precyzuje).
+
+3. **Przypisz dni tygodnia** na podstawie informacji z dokumentu:
+   - Jeśli dokument mówi "codziennie" → scheduled_days: [1,2,3,4,5,6,7]
+   - Jeśli "od poniedziałku do piątku" → scheduled_days: [1,2,3,4,5]
+   - Jeśli "raz w tygodniu" bez podanego dnia → scheduled_days: [1] (domyślnie poniedziałek)
+   - Jeśli "raz w miesiącu" → is_recurring: true, scheduled_days: [1]
+   - Jeśli podane konkretne dni → użyj ich (1=Pon, 2=Wt, 3=Śr, 4=Czw, 5=Pt, 6=Sob, 7=Ndz)
+
+4. **Częstotliwość w opisie** — jeśli dokument mówi "2x w tygodniu", "co 2 tygodnie", "raz w miesiącu" itp., dodaj tę informację do pola description.
+
+5. **Grupuj logicznie** — jeśli dokument wymienia podobne czynności dla różnych pomieszczeń, można je połączyć lub zostawić osobno (zależy od dokumentu).
+
+## FORMAT ODPOWIEDZI:
+
+Odpowiedz WYŁĄCZNIE poprawną tablicą JSON (bez markdown, bez tekstu przed/po):
+
+[
+  {
+    "title": "Mycie podłóg",
+    "description": "Wszystkie pomieszczenia biurowe, środek do paneli",
+    "is_recurring": true,
+    "scheduled_days": [1,2,3,4,5],
+    "scheduled_dates": []
+  },
+  {
+    "title": "Mycie okien",
+    "description": "Raz w miesiącu, wszystkie okna wewnątrz i na zewnątrz",
+    "is_recurring": true,
+    "scheduled_days": [5],
+    "scheduled_dates": []
+  }
+]
+
+Numeracja dni: 1=Poniedziałek, 2=Wtorek, 3=Środa, 4=Czwartek, 5=Piątek, 6=Sobota, 7=Niedziela.
+Nie dodawaj żadnego tekstu poza tablicą JSON.`;
 
 serve(async (req: Request) => {
     if (req.method === "OPTIONS") {
@@ -13,88 +57,104 @@ serve(async (req: Request) => {
     }
 
     try {
-        const { image, objectId } = await req.json();
+        const { image } = await req.json();
 
         if (!image) {
             throw new Error("No image provided");
         }
 
-        const supabaseAdmin = createClient(
-            Deno.env.get("SUPABASE_URL") ?? "",
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-        );
-
-        // 1. Get OpenAI Key from Admin Users (any admin with key, or specific one?)
-        // Ideally from the user who made the request, but we don't have auth context here easily without passing token.
-        // Let's grab the first non-null key for now, assuming shared organization key logic from python script.
-        const { data: adminData } = await supabaseAdmin
-            .from("admin_users")
-            .select("openai_key")
-            .not("openai_key", "is", null)
-            .limit(1)
-            .single();
-
-        const openaiKey = adminData?.openai_key;
-
-        if (!openaiKey) {
-            throw new Error("OpenAI API Key not found. Please add it to admin_users table.");
+        const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+        if (!anthropicKey) {
+            throw new Error("ANTHROPIC_API_KEY not configured");
         }
 
-        // 2. Call OpenAI GPT-4o
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        // Prepare content — support base64 data URI for images and PDFs
+        let mediaType = "image/jpeg";
+        let base64Data = image;
+        let isPdf = false;
+
+        if (image.startsWith("data:")) {
+            const match = image.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+                mediaType = match[1];
+                base64Data = match[2];
+                isPdf = mediaType === "application/pdf";
+            }
+        }
+
+        // Build the file content block — PDF uses "document" type, images use "image" type
+        const fileBlock = isPdf
+            ? {
+                type: "document",
+                source: {
+                    type: "base64",
+                    media_type: "application/pdf",
+                    data: base64Data,
+                },
+            }
+            : {
+                type: "image",
+                source: {
+                    type: "base64",
+                    media_type: mediaType,
+                    data: base64Data,
+                },
+            };
+
+        // Call Claude Haiku with vision/document
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${openaiKey}`,
+                "x-api-key": anthropicKey,
+                "anthropic-version": "2023-06-01",
             },
             body: JSON.stringify({
-                model: "gpt-4o",
+                model: "claude-haiku-4-5-20251001",
+                max_tokens: 4096,
+                system: SYSTEM_PROMPT,
                 messages: [
-                    {
-                        role: "system",
-                        content: `You are an AI that extracts cleaning tasks from images of contracts or checklists. 
-                        Output ONLY valid JSON array of tasks. 
-                        Each task object should have:
-                        - title: string (The task name)
-                        - description: string (Any details, optional)
-                        - is_recurring: boolean (true if daily/weekly, false if one-time date)
-                        - scheduled_days: number[] (0=Sun, 1=Mon... 6=Sat). If Daily, return [0,1,2,3,4,5,6]. If specific days, return those. If monthly/unknown, guess or leave empty.
-                        - scheduled_dates: string[] (YYYY-MM-DD) if is_recurring is false.
-                        
-                        Example:
-                        [
-                            {"title": "Mop floors", "description": "Use pine cleaner", "is_recurring": true, "scheduled_days": [1,3,5], "scheduled_dates": []},
-                            {"title": "Deep clean windows", "description": "", "is_recurring": false, "scheduled_days": [], "scheduled_dates": ["2024-12-25"]}
-                        ]
-                        Do not include markdown formatting like \`\`\`json.`
-                    },
                     {
                         role: "user",
                         content: [
-                            { type: "text", text: "Extract these tasks:" },
-                            { type: "image_url", image_url: { url: image } } // 'image' can be base64 data URI or public URL
-                        ]
-                    }
+                            fileBlock,
+                            {
+                                type: "text",
+                                text: "Przeanalizuj ten dokument i wyodrębnij zadania sprzątania z przypisaniem do dni tygodnia.",
+                            },
+                        ],
+                    },
                 ],
-                max_tokens: 2000
-            })
+            }),
         });
 
         const data = await response.json();
 
         if (data.error) {
-            throw new Error(`OpenAI Error: ${data.error.message}`);
+            throw new Error(`Claude Error: ${data.error.message}`);
         }
 
-        const content = data.choices[0].message.content;
+        const content = data.content?.[0]?.text || "";
         let tasks = [];
         try {
+            // Try direct parse first
+            let text = content.trim();
             // Remove markdown code blocks if present
-            const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
-            tasks = JSON.parse(cleanContent);
-        } catch (e) {
-            console.error("Failed to parse JSON:", content);
-            throw new Error("Failed to parse AI response");
+            if (text.includes("```")) {
+                const match = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+                if (match) text = match[1].trim();
+            }
+            tasks = JSON.parse(text);
+        } catch {
+            // Fallback: find JSON array in response
+            const bracketStart = content.indexOf("[");
+            const bracketEnd = content.lastIndexOf("]");
+            if (bracketStart !== -1 && bracketEnd !== -1) {
+                tasks = JSON.parse(content.slice(bracketStart, bracketEnd + 1));
+            } else {
+                console.error("Failed to parse JSON:", content);
+                throw new Error("AI nie zwróciło poprawnego JSON");
+            }
         }
 
         return new Response(

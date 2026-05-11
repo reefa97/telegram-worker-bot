@@ -19,29 +19,6 @@ Deno.serve(async (req) => {
 
         const now = new Date();
 
-        // 1. Fetch objects with active reminders
-        const { data: objects, error: objectsError } = await supabaseClient
-            .from('cleaning_objects')
-            .select(`
-                id, 
-                name, 
-                client_phones, 
-                client_contact_names, 
-                reminder_active, 
-                reminder_frequency, 
-                reminder_assignee_id, 
-                last_reminder_at,
-                assignee:admin_users!reminder_assignee_id(id, name, telegram_chat_id)
-            `)
-            .eq('reminder_active', true)
-            .not('reminder_assignee_id', 'is', null);
-
-        if (objectsError) throw objectsError;
-
-        console.log(`Found ${objects?.length || 0} objects with active reminders.`);
-
-        const remindersSent: any[] = [];
-
         let botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
         if (!botToken) {
             const { data: settings } = await supabaseClient
@@ -56,6 +33,31 @@ Deno.serve(async (req) => {
                 return new Response(JSON.stringify({ error: 'Missing Bot Token' }), { status: 500, headers: corsHeaders });
             }
         }
+
+        const remindersSent: any[] = [];
+
+        // ============================================
+        // PART 1: Object-level reminders (existing)
+        // ============================================
+        const { data: objects, error: objectsError } = await supabaseClient
+            .from('cleaning_objects')
+            .select(`
+                id,
+                name,
+                client_phones,
+                client_contact_names,
+                reminder_active,
+                reminder_frequency,
+                reminder_assignee_id,
+                last_reminder_at,
+                assignee:admin_users!reminder_assignee_id(id, name, telegram_chat_id)
+            `)
+            .eq('reminder_active', true)
+            .not('reminder_assignee_id', 'is', null);
+
+        if (objectsError) throw objectsError;
+
+        console.log(`Found ${objects?.length || 0} objects with active reminders.`);
 
         for (const obj of (objects || [])) {
             const lastReminder = obj.last_reminder_at ? new Date(obj.last_reminder_at) : null;
@@ -100,13 +102,11 @@ Deno.serve(async (req) => {
                     });
 
                     if (response.ok) {
-                        // Update last_reminder_at
                         await supabaseClient
                             .from('cleaning_objects')
                             .update({ last_reminder_at: now.toISOString() })
                             .eq('id', obj.id);
 
-                        // Log to notifications_log
                         await supabaseClient.from('notifications_log').insert({
                             object_id: obj.id,
                             notification_type: 'client_call_reminder',
@@ -123,6 +123,47 @@ Deno.serve(async (req) => {
                     console.error(`Error sending message for object ${obj.id}:`, err);
                 }
             }
+        }
+
+        // ============================================
+        // PART 2: Courtesy calls — daily digest
+        // ============================================
+        try {
+            // Get all clients due for a courtesy call
+            const { data: dueClients } = await supabaseClient
+                .from('admin_users')
+                .select('id, name, email, phone, next_courtesy_call_due')
+                .eq('role', 'client')
+                .lte('next_courtesy_call_due', now.toISOString());
+
+            const dueCount = dueClients?.length || 0;
+            console.log(`Courtesy calls due: ${dueCount}`);
+
+            // Only send courtesy call digest to the designated coordinator
+            const COURTESY_CALLS_CHAT_ID = '5125127700';
+            if (dueCount > 0) {
+                const clientWord = dueCount === 1 ? 'клиенту' : 'клиентам';
+                const message = `📞 <b>Прозвоны клиентам</b>\n\n` +
+                    `Сегодня нужно позвонить <b>${dueCount}</b> ${clientWord}.\n\n` +
+                    `Нажмите кнопку «📞 Звонки клиентам» чтобы начать прозвон.`;
+
+                try {
+                    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: COURTESY_CALLS_CHAT_ID,
+                            text: message,
+                            parse_mode: 'HTML'
+                        })
+                    });
+                    remindersSent.push({ type: 'courtesy_digest', chat_id: COURTESY_CALLS_CHAT_ID, count: dueCount });
+                } catch (err) {
+                    console.error(`Error sending courtesy digest:`, err);
+                }
+            }
+        } catch (err) {
+            console.error('Error in courtesy calls digest:', err);
         }
 
         return new Response(JSON.stringify({

@@ -67,6 +67,7 @@ interface TelegramUpdate {
       id: number;
     };
     message: {
+      message_id: number;
       chat: {
         id: number;
       };
@@ -108,14 +109,15 @@ async function getWorkerKeyboard(workerId: string) {
   }
 
   // Common button for all states
-  keyboard.push([{ text: "💼 Мой кабинет" }]);
+  keyboard.push([{ text: "💰 Мои финансы" }]);
 
   return keyboard;
 }
 
 async function getDailyTasks(objectId: string) {
   const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 (Sun) to 6 (Sat)
+  const jsDay = today.getDay(); // 0 (Sun) to 6 (Sat)
+  const dayOfWeek = jsDay === 0 ? 7 : jsDay; // Convert to 1-7 (Mon=1, Sun=7)
   const dateString = today.toISOString().split('T')[0];
 
   console.log(`[getDailyTasks] Fetching tasks via RPC for object: ${objectId}`);
@@ -643,9 +645,10 @@ serve(async (req) => {
           });
         } else {
           // Mark as processed immediately
-          await supabase.from('processed_updates').insert({ update_id: update.update_id }).catch(err => {
-            console.warn(`[idempotency] Failed to insert update_id (non-critical):`, err);
-          });
+          const { error: insertErr } = await supabase.from('processed_updates').insert({ update_id: update.update_id });
+          if (insertErr) {
+            console.warn(`[idempotency] Failed to insert update_id (non-critical):`, insertErr);
+          }
         }
       }
     } catch (idemError) {
@@ -690,6 +693,75 @@ serve(async (req) => {
       } catch (e) {
         clearTimeout(acId);
         console.error("Error answering callback:", e);
+      }
+
+      // --- Courtesy call callbacks ---
+      if (data.startsWith("courtesy_done_") || data.startsWith("courtesy_skip_")) {
+        const isDone = data.startsWith("courtesy_done_");
+        const clientId = data.replace(isDone ? "courtesy_done_" : "courtesy_skip_", "");
+
+        // Find admin by chat id
+        const { data: adminUser } = await supabase
+          .from("admin_users")
+          .select("id, role")
+          .eq("telegram_chat_id", chatId.toString())
+          .maybeSingle();
+
+        if (adminUser) {
+          if (isDone) {
+            const nextDue = new Date(Date.now() + 42 * 24 * 60 * 60 * 1000).toISOString();
+
+            // Record the call
+            await supabase.from('client_courtesy_calls').insert({
+              client_id: clientId,
+              called_by: adminUser.id,
+              called_at: new Date().toISOString(),
+              next_call_due: nextDue
+            });
+
+            // Update client's next call due
+            await supabase
+              .from('admin_users')
+              .update({ next_courtesy_call_due: nextDue })
+              .eq('id', clientId);
+
+            // Edit message to show confirmation
+            try {
+              await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: chatId,
+                  message_id: message.message_id,
+                  text: `✅ Звонок отмечен! Следующий через 6 недель.`,
+                  parse_mode: "HTML"
+                })
+              });
+            } catch (_) {}
+          } else {
+            // Skip — just remove the message
+            try {
+              await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: chatId,
+                  message_id: message.message_id,
+                  text: `⏭ Пропущен. Нажмите кнопку "Звонки клиентам" чтобы продолжить.`,
+                  parse_mode: "HTML"
+                })
+              });
+            } catch (_) {}
+          }
+
+          // Show updated keyboard with new count
+          await sendTelegramMessage(botToken, chatId, isDone ? "📞 Продолжайте прозвон!" : "📞 Можете продолжить:", {
+            keyboard: await getAdminKeyboard(adminUser.id, adminUser.role, chatId),
+            resize_keyboard: true
+          });
+        }
+
+        return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
       }
 
       if (data.startsWith("select_object_")) {
@@ -863,13 +935,13 @@ serve(async (req) => {
             // Check for pending client request tasks first
             const { data: pendingCRTasks } = await supabase
               .from("client_requests")
-              .select("id, message")
+              .select("id, message, admin_message")
               .eq("object_id", activeSession.object_id)
               .eq("assigned_worker_id", worker.id)
               .eq("worker_task_status", "pending");
 
             if (pendingCRTasks && pendingCRTasks.length > 0) {
-              const taskDesc = pendingCRTasks.map((t: any, i: number) => `${i + 1}. ${t.message}`).join('\n');
+              const taskDesc = pendingCRTasks.map((t: any, i: number) => `${i + 1}. ${t.admin_message || t.message}`).join('\n');
               await sendTelegramMessage(
                 botToken,
                 chatId,
@@ -1136,25 +1208,25 @@ serve(async (req) => {
       });
     }
 
-    // Handle regular messages
-    if (update.message) {
-      const { from, chat, text, location } = update.message;
-      const chatId = chat.id;
-      const userId = from.id;
-
-      // Helper to get Admin Keyboard
-      const getAdminKeyboard = (role: string) => {
+    // Helper to get Admin Keyboard
+    const COURTESY_CALLS_CHAT_ID = '5125127700';
+    const getAdminKeyboard = async (_adminId: string, role: string, chatId?: string | number) => {
         if (role === 'sub_admin' || role === 'super_admin' || role === 'admin') {
-          // Admin/Super-admin menu
-          return [
-            [{ text: "📊 Статус объектов" }],
-            [{ text: "🔧 Функции" }]
-          ];
+          const keyboard: any[][] = [];
+          if (String(chatId) === COURTESY_CALLS_CHAT_ID) {
+            keyboard.push([{ text: `📞 Звонки клиентам` }]);
+          }
+          return keyboard;
         } else {
           return [];
         }
       };
 
+    // Handle regular messages
+    if (update.message) {
+      const { from, chat, text, location } = update.message;
+      const chatId = chat.id;
+      const userId = from.id;
 
       // --- PROCUREMENT LOGIC ---
       // Fetch ALL worker profiles for this telegram user (handles multiple profiles)
@@ -1363,7 +1435,7 @@ serve(async (req) => {
 
           await logToSystem('info', 'activation', `Admin activated successfully`, { adminId: tokenAdmin.id, userId, chatId });
           await sendTelegramMessage(botToken, chatId, `✅ Вы успешно активировали аккаунт администратора!`, {
-            keyboard: getAdminKeyboard(tokenAdmin.role),
+            keyboard: await getAdminKeyboard(tokenAdmin.id, tokenAdmin.role, chatId),
             resize_keyboard: true
           });
           return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
@@ -1384,16 +1456,80 @@ serve(async (req) => {
       if (admin) {
         if (text === "/start") {
           await sendTelegramMessage(botToken, chatId, `👋 Здравствуйте, ${admin.name || "Администратор"}!`, {
-            keyboard: getAdminKeyboard(admin.role),
+            keyboard: await getAdminKeyboard(admin.id, admin.role, chatId),
             resize_keyboard: true
           });
-        } else if (text === "📊 Статус объектов") {
-          await sendTelegramMessage(botToken, chatId, "ℹ️ Функция просмотра статуса объектов находится в разработке.");
-        } else if (text === "🔧 Функции") {
-          await sendTelegramMessage(botToken, chatId, "ℹ️ Панель дополнительных функций.");
+        } else if (text?.startsWith("📞 Звонки клиентам") && String(chatId) === COURTESY_CALLS_CHAT_ID) {
+          // Get due clients for this admin
+          let dueClients: any[] = [];
+
+          if (admin.role === 'super_admin') {
+            // Super admin sees all due clients
+            const { data } = await supabase
+              .from('admin_users')
+              .select('id, name, email, phone, next_courtesy_call_due')
+              .eq('role', 'client')
+              .lte('next_courtesy_call_due', new Date().toISOString())
+              .order('next_courtesy_call_due', { ascending: true });
+            dueClients = data || [];
+          } else {
+            // Sub-admin sees only clients linked to their objects
+            const { data: ownedObjs } = await supabase
+              .from('object_owners')
+              .select('object_id')
+              .eq('admin_id', admin.id);
+
+            if (ownedObjs && ownedObjs.length > 0) {
+              const objectIds = ownedObjs.map((o: any) => o.object_id);
+              const { data: clientLinks } = await supabase
+                .from('client_objects')
+                .select('client_id')
+                .in('object_id', objectIds);
+
+              if (clientLinks && clientLinks.length > 0) {
+                const clientIds = [...new Set(clientLinks.map((cl: any) => cl.client_id))];
+                const { data } = await supabase
+                  .from('admin_users')
+                  .select('id, name, email, phone, next_courtesy_call_due')
+                  .in('id', clientIds)
+                  .eq('role', 'client')
+                  .lte('next_courtesy_call_due', new Date().toISOString())
+                  .order('next_courtesy_call_due', { ascending: true });
+                dueClients = data || [];
+              }
+            }
+          }
+
+          if (dueClients.length === 0) {
+            await sendTelegramMessage(botToken, chatId, "✅ Все клиенты прозвонены! Следующие звонки появятся через некоторое время.", {
+              keyboard: await getAdminKeyboard(admin.id, admin.role, chatId),
+              resize_keyboard: true
+            });
+          } else {
+            const client = dueClients[0];
+            const remaining = dueClients.length - 1;
+            const phone = client.phone || 'не указан';
+            const lastCall = client.next_courtesy_call_due
+              ? new Date(new Date(client.next_courtesy_call_due).getTime() - 42 * 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU')
+              : 'никогда';
+
+            let msg = `📞 <b>Звонок клиенту</b>\n\n`;
+            msg += `👤 <b>${client.name || client.email}</b>\n`;
+            msg += `📱 Телефон: <b>${phone}</b>\n`;
+            msg += `📧 Email: ${client.email}\n`;
+            msg += `🕐 Прошлый звонок: ${lastCall}\n`;
+            if (remaining > 0) msg += `\n📋 Осталось ещё: ${remaining}`;
+
+            await sendTelegramMessage(botToken, chatId, msg, {
+              inline_keyboard: [
+                [{ text: "✅ Позвонил", callback_data: `courtesy_done_${client.id}` }],
+                [{ text: "⏭ Пропустить", callback_data: `courtesy_skip_${client.id}` }]
+              ]
+            });
+          }
         } else {
           await sendTelegramMessage(botToken, chatId, `🤖 Вы в панели администратора.`, {
-            keyboard: getAdminKeyboard(admin.role),
+            keyboard: await getAdminKeyboard(admin.id, admin.role, chatId),
             resize_keyboard: true
           });
         }
@@ -1420,7 +1556,8 @@ serve(async (req) => {
           keyboard,
           resize_keyboard: true
         });
-      } else if (text === "💼 Мой кабинет") {
+      } else if (text === "💰 Мои финансы" || text === "💼 Мой кабинет") {
+        // Fetch worker info
         const { data: worker } = await supabase
           .from("workers")
           .select("first_name, last_name, total_points")
@@ -1430,10 +1567,119 @@ serve(async (req) => {
         const points = worker?.total_points || 0;
         const name = worker ? `${worker.first_name} ${worker.last_name}` : activeWorker.first_name;
 
-        const message = `👤 <b>Мой кабинет</b>\n\n` +
-          `Работник: <b>${name}</b>\n` +
-          `💰 Ваш баланс: <b>${points}</b> баллов\n\n` +
-          `<i>Здесь вы можете видеть свои накопленные баллы за качество работы.</i>`;
+        // Current month range in Warsaw time
+        const now = new Date();
+        const warsawParts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Europe/Warsaw', year: 'numeric', month: '2-digit'
+        }).format(now).split('-');
+        const wYear = parseInt(warsawParts[0]);
+        const wMonth = parseInt(warsawParts[1]);
+        const monthStart = `${warsawParts[0]}-${warsawParts[1]}-01T00:00:00`;
+        const monthEnd = new Date(wYear, wMonth, 1).toISOString();
+
+        // Fetch sessions and adjustments in parallel
+        const [sessionsRes, adjustmentsRes] = await Promise.all([
+          supabase
+            .from("work_sessions")
+            .select("duration_minutes, object_id")
+            .eq("worker_id", activeWorker.id)
+            .gte("start_time", monthStart)
+            .lt("start_time", monthEnd)
+            .not("end_time", "is", null),
+          supabase
+            .from("salary_adjustments")
+            .select("type, amount, hours, hourly_rate, description")
+            .eq("worker_id", activeWorker.id)
+            .eq("year", wYear)
+            .eq("month", wMonth)
+        ]);
+
+        const sessions = sessionsRes.data || [];
+        const adjustments = adjustmentsRes.data || [];
+
+        // Get unique object ids
+        const objectIds = [...new Set(sessions.map((s: any) => s.object_id).filter(Boolean))];
+
+        let salaryLines = "";
+        let baseSalary = 0;
+
+        if (objectIds.length > 0) {
+          const { data: objects } = await supabase
+            .from("cleaning_objects")
+            .select("id, name, salary_type, hourly_rate, monthly_rate, expected_cleanings_per_month")
+            .in("id", objectIds);
+
+          for (const obj of (objects || [])) {
+            const objSessions = sessions.filter((s: any) => s.object_id === obj.id);
+            const totalMinutes = objSessions.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+            const sessionCount = objSessions.length;
+
+            let objSalary = 0;
+            let calcNote = "";
+
+            if (obj.salary_type === 'hourly') {
+              const hours = totalMinutes / 60;
+              objSalary = hours * (obj.hourly_rate || 0);
+              calcNote = `${hours.toFixed(1)}ч × ${obj.hourly_rate} zł`;
+            } else {
+              const expected = obj.expected_cleanings_per_month || 1;
+              const perSession = (obj.monthly_rate || 0) / expected;
+              objSalary = perSession * sessionCount;
+              calcNote = `${sessionCount} из ${expected} уборок`;
+            }
+
+            baseSalary += objSalary;
+            salaryLines += `\n📍 <b>${obj.name}</b>\n`;
+            salaryLines += `   ${calcNote} = <b>${objSalary.toFixed(0)} zł</b>\n`;
+          }
+        }
+
+        // Process adjustments
+        const overtimes = adjustments.filter((a: any) => a.type === 'overtime');
+        const advances = adjustments.filter((a: any) => a.type === 'advance');
+        const overtimeTotal = overtimes.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
+        const advanceTotal = advances.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
+        const totalSalary = baseSalary + overtimeTotal - advanceTotal;
+
+        let adjustmentLines = "";
+        if (overtimes.length > 0) {
+          adjustmentLines += "\n🕐 <b>Переработки:</b>\n";
+          for (const ot of overtimes) {
+            const desc = ot.hours && ot.hourly_rate
+              ? `${ot.hours}ч × ${ot.hourly_rate} zł`
+              : (ot.description || 'Переработка');
+            adjustmentLines += `   ${desc} = <b>+${Number(ot.amount).toFixed(0)} zł</b>\n`;
+          }
+        }
+        if (advances.length > 0) {
+          adjustmentLines += "\n💳 <b>Авансы:</b>\n";
+          for (const adv of advances) {
+            adjustmentLines += `   ${adv.description || 'Аванс'} = <b>-${Number(adv.amount).toFixed(0)} zł</b>\n`;
+          }
+        }
+
+        const monthName = new Intl.DateTimeFormat('ru-RU', {
+          timeZone: 'Europe/Warsaw', month: 'long', year: 'numeric'
+        }).format(now);
+
+        let summaryLine = `💵 Итого: <b>${totalSalary.toFixed(0)} zł</b>`;
+        if (overtimeTotal > 0 || advanceTotal > 0) {
+          summaryLine = `💵 Базовая: <b>${baseSalary.toFixed(0)} zł</b>\n`;
+          if (overtimeTotal > 0) summaryLine += `➕ Переработки: <b>${overtimeTotal.toFixed(0)} zł</b>\n`;
+          if (advanceTotal > 0) summaryLine += `➖ Авансы: <b>${advanceTotal.toFixed(0)} zł</b>\n`;
+          summaryLine += `\n💰 К выплате: <b>${totalSalary.toFixed(0)} zł</b>`;
+        }
+
+        const message =
+          `💰 <b>Мои финансы</b>\n` +
+          `👤 ${name}\n` +
+          `📅 ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}\n` +
+          `━━━━━━━━━━━━━━\n` +
+          (salaryLines || "\nНет смен в этом месяце\n") +
+          adjustmentLines +
+          `━━━━━━━━━━━━━━\n` +
+          summaryLine + `\n\n` +
+          `⭐ Баллы качества: <b>${points}</b>`;
 
         const keyboard = await getWorkerKeyboard(activeWorker.id);
         await sendTelegramMessage(botToken, chatId, message, {
@@ -1763,7 +2009,7 @@ serve(async (req) => {
             // Check for pending client request tasks
             const { data: pendingClientTasks } = await supabase
               .from("client_requests")
-              .select("id, message")
+              .select("id, message, admin_message")
               .eq("object_id", objectFull?.id)
               .eq("assigned_worker_id", worker.id)
               .eq("worker_task_status", "pending");
@@ -1771,7 +2017,7 @@ serve(async (req) => {
             if (pendingClientTasks && pendingClientTasks.length > 0) {
               message += `\n\n⚠️ <b>Задания от клиента (${pendingClientTasks.length}):</b>\n`;
               pendingClientTasks.forEach((task: any, index: number) => {
-                message += `${index + 1}. ${task.message}\n`;
+                message += `${index + 1}. ${task.admin_message || task.message}\n`;
               });
             }
 

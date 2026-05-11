@@ -40,21 +40,25 @@ serve(async (req: Request) => {
                 Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
             );
 
+            // Fetch track info — also check creation time to skip preview opens
+            const { data: track } = await supabase
+                .from("email_tracks")
+                .select("subject, recipient_email, created_at")
+                .eq("id", trackId)
+                .single();
+
+            if (!track) return;
+
+            // Ignore opens within 60 seconds of creation (email editor preview)
+            const createdAt = new Date(track.created_at).getTime();
+            if (Date.now() - createdAt < 60_000) return;
+
             // Record the open
             await supabase.from("email_opens").insert({
                 track_id: trackId,
                 ip,
                 user_agent: userAgent,
             });
-
-            // Fetch track info for notification
-            const { data: track } = await supabase
-                .from("email_tracks")
-                .select("subject, recipient_email")
-                .eq("id", trackId)
-                .single();
-
-            if (!track) return;
 
             // Count total opens for this track
             const { count } = await supabase

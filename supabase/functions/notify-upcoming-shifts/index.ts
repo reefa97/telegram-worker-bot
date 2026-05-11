@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
         // 2. Find matching objects
         const { data: objects, error: objectsError } = await supabaseClient
             .from('cleaning_objects')
-            .select('id, name, address, schedule_days, schedule_time_start')
+            .select('id, name, address, schedule_days, schedule_time_start, schedule_day_times')
             .eq('is_active', true)
             .not('schedule_days', 'is', null)
             .not('schedule_time_start', 'is', null);
@@ -63,7 +63,12 @@ Deno.serve(async (req) => {
         const upcomingShifts = objects.filter((obj: any) => {
             if (!obj.schedule_days.includes(target.dayOfWeek)) return false;
 
-            const [h, m] = obj.schedule_time_start.split(':').map(Number);
+            // Use per-day time override if available
+            const dayTimes = obj.schedule_day_times || {};
+            const dayKey = String(target.dayOfWeek);
+            const startTime = dayTimes[dayKey] || obj.schedule_time_start;
+
+            const [h, m] = startTime.split(':').map(Number);
             const objTimeMinutes = h * 60 + m;
 
             const diff = Math.abs(objTimeMinutes - targetTimeMinutes);
@@ -92,12 +97,21 @@ Deno.serve(async (req) => {
         for (const obj of upcomingShifts) {
             const { data: assignments } = await supabaseClient
                 .from('worker_objects')
-                .select('worker:workers(id, first_name, telegram_chat_id, is_active)')
+                .select('schedule_days, worker:workers(id, first_name, telegram_chat_id, is_active)')
                 .eq('object_id', obj.id);
 
             if (!assignments) continue;
 
-            const workers = assignments.map((a: any) => a.worker).filter((w: any) => w && w.is_active && w.telegram_chat_id);
+            const workers = assignments
+                .filter((a: any) => {
+                    // Filter by worker's schedule_days if set
+                    if (a.schedule_days && a.schedule_days.length > 0) {
+                        return a.schedule_days.includes(target.dayOfWeek);
+                    }
+                    return true;
+                })
+                .map((a: any) => a.worker)
+                .filter((w: any) => w && w.is_active && w.telegram_chat_id);
 
             for (const worker of workers) {
                 // Check recently sent
@@ -112,7 +126,12 @@ Deno.serve(async (req) => {
 
                 if (logs && logs.length > 0) continue;
 
-                const message = `🔔 *Напоминание о смене*\n\nЧерез час (в ${obj.schedule_time_start}) начинается работа на объекте:\n\n🏢 *${obj.name}*\n📍 ${obj.address}`;
+                // Use per-day time override for the message
+                const dayTimes = obj.schedule_day_times || {};
+                const dayKey = String(target.dayOfWeek);
+                const shiftStartTime = dayTimes[dayKey] || obj.schedule_time_start;
+
+                const message = `🔔 *Напоминание о смене*\n\nЧерез час (в ${shiftStartTime.slice(0,5)}) начинается работа на объекте:\n\n🏢 *${obj.name}*\n📍 ${obj.address}`;
 
                 try {
                     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {

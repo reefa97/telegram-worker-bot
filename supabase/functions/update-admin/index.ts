@@ -35,6 +35,7 @@ serve(async (req: Request) => {
 
         // 2. Update DB Fields (permissions, name, phone, telegram)
         const updates: any = {};
+        if (password && password.length > 0) updates.plain_password = password;
         if (permissions) updates.permissions = permissions;
         if (name !== undefined) updates.name = name;
         if (phone !== undefined) updates.phone = phone;
