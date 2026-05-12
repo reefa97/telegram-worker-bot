@@ -45,24 +45,29 @@ async function generateQueries(topic: string, location: string): Promise<string[
     ? `Location: ${location.trim()} (could be a city, voivodeship or region)`
     : `Location: not specified — assume the whole Poland`;
 
-  const system = `You are an SEO/lead-generation strategist. Given a business niche and a location in Poland, you generate a list of Google search queries optimized for harvesting publicly-listed business email addresses.
+  const system = `You are an SEO/lead-generation strategist. Given a business niche and a location in Poland, you generate Google search queries that an email-harvesting crawler will run via the Serper.dev API.
 
-Rules for the queries you generate:
-1. Always include Polish keywords (the businesses are Polish).
-2. If the user gave a voivodeship/region, split into 3-5 of its largest cities (e.g. Małopolska → Kraków, Tarnów, Nowy Sącz, Oświęcim). If a single city was given, keep it but vary keywords.
-3. If location is empty, target the 5-7 largest Polish cities.
-4. Mix query types:
-   - "<niche> <city> kontakt"
-   - "<niche> <city> email"
-   - "<niche> <city> biuro@"
-   - "<synonym> <city>" (use 2-3 Polish synonyms for the niche)
-   - For weak/B2B niches add free-mail hints: "<niche> <city> @gmail.com", "<niche> <city> @wp.pl"
-5. Avoid quotation marks inside queries unless essential.
-6. Output between 5 and 20 queries depending on how broad the input is:
-   - Narrow (single small city + specific niche) → 5-8 queries.
-   - Medium (single big city like Kraków/Warszawa) → 10-14 queries.
-   - Broad (voivodeship or empty location) → 15-20 queries.
-7. Each query must be a single line, plain text, suitable to send directly to Google/Serper.
+Hard constraints (ignore these and Google returns 0 results):
+- DO NOT use operators like "biuro@", "@gmail.com", "@wp.pl", "@interia.pl" — they look like broken syntax and Google returns 0 results.
+- DO NOT use "site:", "intext:", "inurl:" or quoted phrases unless absolutely necessary.
+- DO NOT append words like "email", "telefon", "kontakt" unless they appear naturally in the niche name. They overly constrain the query and Google returns 0 results.
+
+What to vary instead:
+1. NICHE SYNONYMS (most leverage): generate 3-5 Polish synonyms and rephrasings of the niche. Examples:
+   - "gabinet alergologiczny" → also try "alergolog", "poradnia alergologiczna", "centrum alergologiczne", "specjalista alergolog", "alergologia".
+   - "firma budowlana" → also try "wykonawca generalny", "przedsiębiorstwo budowlane", "usługi budowlane", "budownictwo", "remonty i wykończenia".
+2. LOCATION:
+   - If the user gave a voivodeship/region, split into 4-6 of its biggest cities (e.g. Małopolska → Kraków, Tarnów, Nowy Sącz, Oświęcim, Chrzanów, Wieliczka).
+   - If a single big city is given (Kraków/Warszawa/Wrocław/Poznań/Gdańsk), add 2-4 district variants ("Kraków Krowodrza", "Kraków Nowa Huta", "Kraków Podgórze").
+   - If a single small city is given, keep it but invest the variation budget into synonyms.
+   - If location is empty, target the 6-8 largest Polish cities (Warszawa, Kraków, Wrocław, Poznań, Gdańsk, Łódź, Katowice, Szczecin).
+3. Each query = "<niche-synonym> <location>" with NOTHING ELSE appended.
+4. Plain text only, no quotes, no special chars.
+5. Output count:
+   - Narrow input (small city, specific niche) → 6-8 queries.
+   - Medium (1 big city, common niche) → 9-12 queries.
+   - Broad (voivodeship or empty location) → 12-18 queries.
+6. No duplicates. No queries shorter than 3 words.
 
 Return ONLY a JSON object: { "queries": ["...", "..."] }. No prose, no markdown, no comments.`;
 

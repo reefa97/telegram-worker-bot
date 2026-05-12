@@ -97,6 +97,7 @@ async def process_job(job):
         # Start Infinite Search Loop
         page = 1
         total_emails = 0
+        all_found_emails = set()  # Track all unique emails across all pages
         
         # Load limits from env or defaults
         CRAWL_DEPTH = int(os.getenv("CRAWL_DEPTH", "1"))
@@ -126,10 +127,26 @@ async def process_job(job):
             except: pass
             
             # Crawl Maps URLs (Prioritize Maps for local relevance)
-            maps_data = await crawler.crawl_urls(maps_urls, query, db_manager, username=job_id, source_type="maps")
-            
+            # Add timeout per batch to prevent Playwright hangs from blocking the entire search
+            BATCH_TIMEOUT = 120  # 2 minutes max per batch
+            try:
+                maps_data = await asyncio.wait_for(
+                    crawler.crawl_urls(maps_urls, query, db_manager, username=job_id, source_type="maps"),
+                    timeout=BATCH_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Page {page}: Maps crawling timed out after {BATCH_TIMEOUT}s")
+                maps_data = {'emails': [], 'social': {}, 'contacts': []}
+
             # Crawl Organic URLs
-            organic_data = await crawler.crawl_urls(organic_urls, query, db_manager, username=job_id, source_type="organic")
+            try:
+                organic_data = await asyncio.wait_for(
+                    crawler.crawl_urls(organic_urls, query, db_manager, username=job_id, source_type="organic"),
+                    timeout=BATCH_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Page {page}: Organic crawling timed out after {BATCH_TIMEOUT}s")
+                organic_data = {'emails': [], 'social': {}, 'contacts': []}
     
             # Validate Emails (Syntax + MX Record + Blacklist)
             from core.validator import EmailValidator
@@ -178,10 +195,13 @@ async def process_job(job):
                 except Exception as e:
                     logger.error(f"Failed to delete rejected emails: {e}")
 
-            new_emails_count = len(all_emails)
+            # Track only truly new emails (not seen on previous pages)
+            new_in_batch = [e for e in best_emails if e not in all_found_emails]
+            all_found_emails.update(best_emails)
 
-            if new_emails_count > 0:
-                total_emails += new_emails_count
+            if new_in_batch:
+                total_emails = len(all_found_emails)
+                logger.info(f"Page {page}: {len(new_in_batch)} new unique emails (total unique: {total_emails})")
                 # Update job progress
                 try:
                     supabase.table("email_search_jobs").update({
@@ -210,9 +230,12 @@ async def process_job(job):
                     logger.info("Job stopped by user.")
                     return
             except Exception as check_err:
-                logger.warning(f"Job status check failed (job may have been deleted): {check_err}. Stopping.")
-                return
+                logger.warning(f"Job status check failed: {check_err}. Continuing search...")
+                # Don't stop — just continue to next page
     
+        # Clean up browser
+        await crawler.close()
+
         # Job Completed
         try:
             supabase.table("email_search_jobs").update({
@@ -245,46 +268,62 @@ async def process_job(job):
 from scheduler import scheduler_loop
 
 async def worker_loop():
-    logger.info("Email Search Worker started. Polling for jobs...")
+    MAX_PARALLEL = int(os.getenv("MAX_PARALLEL_JOBS", "4"))
+    logger.info(f"Email Search Worker started. Parallelism = {MAX_PARALLEL}. Polling for jobs...")
 
     # On startup, reset any jobs stuck in running/processing to pending
-    try:
-        stuck = supabase.table("email_search_jobs")\
-            .select("id, query")\
-            .in_("status", ["running", "processing"])\
-            .execute()
-        if stuck.data:
-            for j in stuck.data:
-                logger.warning(f"Resetting stuck job {j['id']} ({j['query']}) to pending...")
-                supabase.table("email_search_jobs").update({
-                    "status": "pending",
-                    "started_at": None
-                }).eq("id", j['id']).execute()
-    except Exception as e:
-        logger.error(f"Failed to reset stuck jobs: {e}")
+    async def reset_stuck_jobs():
+        try:
+            # Find jobs stuck in "running" for more than 10 minutes
+            cutoff = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+            stuck = supabase.table("email_search_jobs")\
+                .select("id, query, started_at")\
+                .in_("status", ["running", "processing"])\
+                .lt("started_at", cutoff)\
+                .execute()
+            if stuck.data:
+                for j in stuck.data:
+                    logger.warning(f"Resetting stuck job {j['id']} ({j['query']}) to completed (was stuck)...")
+                    supabase.table("email_search_jobs").update({
+                        "status": "completed",
+                        "stopped_at": datetime.now(timezone.utc).isoformat()
+                    }).eq("id", j['id']).execute()
+        except Exception as e:
+            logger.error(f"Failed to reset stuck jobs: {e}")
+
+    await reset_stuck_jobs()
 
     # Start Scheduler in background
     asyncio.create_task(scheduler_loop())
-    
+
+    stuck_check_counter = 0
     while True:
         try:
-            # Fetch pending jobs
+            # Periodically check for stuck jobs (every ~60 seconds)
+            stuck_check_counter += 1
+            if stuck_check_counter >= 30:  # 30 * 2s poll = ~60s
+                stuck_check_counter = 0
+                await reset_stuck_jobs()
+
+            # Fetch up to MAX_PARALLEL pending jobs at once
             response = supabase.table("email_search_jobs")\
                 .select("*")\
                 .eq("status", "pending")\
                 .order("created_at", desc=False)\
-                .limit(1)\
+                .limit(MAX_PARALLEL)\
                 .execute()
-            
+
             jobs = response.data
-            
+
             if jobs:
-                for job in jobs:
-                    await process_job(job)
+                # Run jobs concurrently; gather waits for ALL to finish before next poll,
+                # which means at any moment ≤ MAX_PARALLEL jobs are in flight.
+                logger.info(f"Picked up {len(jobs)} job(s) for parallel processing")
+                await asyncio.gather(*(process_job(job) for job in jobs), return_exceptions=True)
             else:
                 # Wait before next poll
                 await asyncio.sleep(2)
-                
+
         except Exception as e:
             logger.error(f"Worker poll error: {e}")
             await asyncio.sleep(5)
