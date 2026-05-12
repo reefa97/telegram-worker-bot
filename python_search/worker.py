@@ -101,8 +101,9 @@ async def process_job(job):
         
         # Load limits from env or defaults
         CRAWL_DEPTH = int(os.getenv("CRAWL_DEPTH", "1"))
+        CRAWLER_CONCURRENCY = int(os.getenv("CRAWLER_CONCURRENCY", "2"))
 
-        crawler = AsyncCrawler(deep_scan=True, max_depth=CRAWL_DEPTH)
+        crawler = AsyncCrawler(deep_scan=True, max_depth=CRAWL_DEPTH, max_concurrency=CRAWLER_CONCURRENCY)
         consecutive_empty = 0  # Stop after 30 consecutive pages with no new results
 
         while True:
