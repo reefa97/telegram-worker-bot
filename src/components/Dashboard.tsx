@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -8,21 +8,22 @@ import {
 } from 'lucide-react';
 import WorkersPanel from './WorkersPanel';
 import ObjectsPanel from './ObjectsPanel';
-import ReportsPanel from './ReportsPanel';
 import SettingsPanel from './SettingsPanel';
-import EmailSearchPanel from './EmailSearchPanel';
-
-import ProcurementPanel from './ProcurementPanel';
 import MyCabinetPanel from './MyCabinetPanel';
 import ClientsPanel from './ClientsPanel';
-import QualityControlPanel from './QualityControlPanel';
 import ContactsPanel from './ContactsPanel';
-import EmailTrackingPanel from './EmailTrackingPanel';
-import LeadsPanel from './LeadsPanel';
-import BlogPanel from './BlogPanel';
-import ProceduresPanel from './ProceduresPanel';
-import ChatStatsPanel from './ChatStatsPanel';
 import NotificationsDropdown from './NotificationsDropdown';
+
+// Heavy panels split into separate chunks (jspdf, leaflet, html2canvas, etc.)
+const ReportsPanel = lazy(() => import('./ReportsPanel'));
+const EmailSearchPanel = lazy(() => import('./EmailSearchPanel'));
+const ProcurementPanel = lazy(() => import('./ProcurementPanel'));
+const QualityControlPanel = lazy(() => import('./QualityControlPanel'));
+const EmailTrackingPanel = lazy(() => import('./EmailTrackingPanel'));
+const LeadsPanel = lazy(() => import('./LeadsPanel'));
+const BlogPanel = lazy(() => import('./BlogPanel'));
+const ProceduresPanel = lazy(() => import('./ProceduresPanel'));
+const ChatStatsPanel = lazy(() => import('./ChatStatsPanel'));
 import { ShoppingBag, CheckSquare, ClipboardCheck, BookUser, MailCheck, Inbox, Newspaper, BookOpen, MessageSquare } from 'lucide-react';
 
 type Tab = 'leads' | 'blog' | 'workers' | 'objects' | 'reports' | 'settings' | 'tasks' | 'email_search' | 'procurement' | 'my_cabinet' | 'clients' | 'quality' | 'contacts' | 'email_tracking' | 'procedures' | 'chat_stats';
@@ -356,22 +357,28 @@ export default function Dashboard() {
 
                 {/* Content Area */}
                 <div className="flex-1 overflow-y-auto p-4 lg:p-8 pb-20 lg:pb-8">
-                    {activeTab === 'leads' && <LeadsPanel searchTerm={globalSearch} />}
-                    {activeTab === 'blog' && <BlogPanel searchTerm={globalSearch} />}
-                    {activeTab === 'workers' && <WorkersPanel searchTerm={globalSearch} />}
-                    {activeTab === 'objects' && <ObjectsPanel searchTerm={globalSearch} />}
-                    {activeTab === 'my_cabinet' && <MyCabinetPanel />}
-                    {activeTab === 'reports' && <ReportsPanel />}
-                    {activeTab === 'procurement' && <ProcurementPanel searchTerm={globalSearch} />}
-                    {activeTab === 'settings' && <SettingsPanel />}
-                    {activeTab === 'email_search' && <EmailSearchPanel />}
+                    <Suspense fallback={
+                        <div className="flex justify-center items-center h-64">
+                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    }>
+                        {activeTab === 'leads' && <LeadsPanel searchTerm={globalSearch} />}
+                        {activeTab === 'blog' && <BlogPanel searchTerm={globalSearch} />}
+                        {activeTab === 'workers' && <WorkersPanel searchTerm={globalSearch} />}
+                        {activeTab === 'objects' && <ObjectsPanel searchTerm={globalSearch} />}
+                        {activeTab === 'my_cabinet' && <MyCabinetPanel />}
+                        {activeTab === 'reports' && <ReportsPanel />}
+                        {activeTab === 'procurement' && <ProcurementPanel searchTerm={globalSearch} />}
+                        {activeTab === 'settings' && <SettingsPanel />}
+                        {activeTab === 'email_search' && <EmailSearchPanel />}
 
-                    {activeTab === 'clients' && <ClientsPanel searchTerm={globalSearch} />}
-                    {activeTab === 'quality' && <QualityControlPanel searchTerm={globalSearch} />}
-                    {activeTab === 'procedures' && <ProceduresPanel searchTerm={globalSearch} />}
-                    {activeTab === 'chat_stats' && <ChatStatsPanel />}
-                    {activeTab === 'contacts' && <ContactsPanel searchTerm={globalSearch} />}
-                    {activeTab === 'email_tracking' && <EmailTrackingPanel />}
+                        {activeTab === 'clients' && <ClientsPanel searchTerm={globalSearch} />}
+                        {activeTab === 'quality' && <QualityControlPanel searchTerm={globalSearch} />}
+                        {activeTab === 'procedures' && <ProceduresPanel searchTerm={globalSearch} />}
+                        {activeTab === 'chat_stats' && <ChatStatsPanel />}
+                        {activeTab === 'contacts' && <ContactsPanel searchTerm={globalSearch} />}
+                        {activeTab === 'email_tracking' && <EmailTrackingPanel />}
+                    </Suspense>
                 </div>
             </main>
         </div>

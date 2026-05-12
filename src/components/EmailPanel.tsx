@@ -642,10 +642,16 @@ function InboxView({ accounts, selectedAccount, onSelectAccount }: { accounts: a
                             </div>
                         </div>
 
-                        {/* Body */}
+                        {/* Body — rendered in a sandboxed iframe so any script/img/onerror
+                            from incoming email cannot run in the admin origin */}
                         <div className="flex-1 overflow-y-auto p-8 bg-card">
                             {selectedMessage.body_html ? (
-                                <div dangerouslySetInnerHTML={{ __html: selectedMessage.body_html }} className="prose dark:prose-invert max-w-none" />
+                                <iframe
+                                    title="Email body"
+                                    sandbox=""
+                                    srcDoc={`<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5;margin:0;padding:0}a{color:#2563eb}img{max-width:100%;height:auto}</style></head><body>${selectedMessage.body_html}</body></html>`}
+                                    className="w-full min-h-[60vh] border-0 bg-white"
+                                />
                             ) : (
                                 <pre className="whitespace-pre-wrap font-sans text-main leading-relaxed">{selectedMessage.body_text}</pre>
                             )}

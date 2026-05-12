@@ -272,17 +272,24 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
         let failCount = 0;
 
         try {
-            for (const workerId of selectedWorkers) {
-                try {
-                    const response = await supabase.functions.invoke('send-message', {
-                        body: { workerId, message: bulkMessage },
-                    });
-                    if (response.error) throw response.error;
-                    successCount++;
-                } catch (error) {
-                    console.error(`Error sending to worker ${workerId}:`, error);
-                    failCount++;
-                }
+            // Send in parallel chunks of 5 (avoid hammering edge function with 50+ calls)
+            const ids = Array.from(selectedWorkers);
+            const CHUNK = 5;
+            for (let i = 0; i < ids.length; i += CHUNK) {
+                const chunk = ids.slice(i, i + CHUNK);
+                const results = await Promise.allSettled(
+                    chunk.map(workerId =>
+                        supabase.functions.invoke('send-message', { body: { workerId, message: bulkMessage } })
+                    )
+                );
+                results.forEach((r, idx) => {
+                    if (r.status === 'fulfilled' && !r.value.error) successCount++;
+                    else {
+                        failCount++;
+                        console.error(`Error sending to worker ${chunk[idx]}:`,
+                            r.status === 'fulfilled' ? r.value.error : r.reason);
+                    }
+                });
             }
 
             // Log the action
@@ -341,17 +348,23 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
         let failCount = 0;
 
         try {
-            for (const workerId of messageRecipients) {
-                try {
-                    const response = await supabase.functions.invoke('send-message', {
-                        body: { workerId, message: messageText },
-                    });
-                    if (response.error) throw response.error;
-                    successCount++;
-                } catch (error) {
-                    console.error(`Error sending to worker ${workerId}:`, error);
-                    failCount++;
-                }
+            const ids = Array.from(messageRecipients);
+            const CHUNK = 5;
+            for (let i = 0; i < ids.length; i += CHUNK) {
+                const chunk = ids.slice(i, i + CHUNK);
+                const results = await Promise.allSettled(
+                    chunk.map(workerId =>
+                        supabase.functions.invoke('send-message', { body: { workerId, message: messageText } })
+                    )
+                );
+                results.forEach((r, idx) => {
+                    if (r.status === 'fulfilled' && !r.value.error) successCount++;
+                    else {
+                        failCount++;
+                        console.error(`Error sending to worker ${chunk[idx]}:`,
+                            r.status === 'fulfilled' ? r.value.error : r.reason);
+                    }
+                });
             }
 
             await supabase.from('system_logs').insert({

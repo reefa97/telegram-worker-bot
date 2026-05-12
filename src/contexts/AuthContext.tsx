@@ -78,22 +78,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             });
 
-            // Execute race
+            // Try strategies sequentially: first one that returns a user wins.
+            // (Old forEach(async) had a race-condition where setState could fire
+            // on an unmounted component after we already resolved with null.)
             const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000));
-
-            const successPromise = new Promise<AdminUser | null>((resolve) => {
-                let failureCount = 0;
-                strategies.forEach(async (strat) => {
-                    const result = await strat();
-                    if (result) resolve(result);
-                    else {
-                        failureCount++;
-                        if (failureCount === strategies.length) resolve(null);
+            const sequential = (async () => {
+                for (const strat of strategies) {
+                    try {
+                        const result = await strat();
+                        if (result) return result;
+                    } catch (e) {
+                        console.warn('AuthContext: strategy threw', e);
                     }
-                });
-            });
+                }
+                return null;
+            })();
 
-            const adminData = await Promise.race([successPromise, timeout]);
+            const adminData = await Promise.race([sequential, timeout]);
 
             if (adminData) {
                 console.log('AuthContext: Admin user found:', adminData.role);
@@ -145,59 +146,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Get initial session
+        // mounted flag in the effect closure (not in initAuth body) so the
+        // cleanup function below actually sets the same variable that the
+        // async paths read.
+        let mounted = true;
+
         const initAuth = async () => {
-            console.log('AuthContext: initAuth starting');
-            let mounted = true;
-
-            const authPromise = async () => {
-                try {
-                    console.log('AuthContext: Getting session...');
-                    const { data: { session }, error } = await supabase.auth.getSession();
-                    if (error) throw error;
-
-                    if (!mounted) return;
-
-                    console.log('AuthContext: Session retrieved', session?.user?.email);
-                    setSession(session);
-                    setUser(session?.user ?? null);
-
-                    if (session?.user && session?.access_token) {
-                        console.log('AuthContext: Fetching admin user...');
-                        await fetchAdminUser(session.user.id, session.access_token);
-                    }
-                } catch (err) {
-                    console.error('AuthContext: Error initializing auth', err);
-                }
-            };
-
-            // Race between auth and timeout
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Auth timeout')), 7000);
-            });
-
             try {
-                await Promise.race([authPromise(), timeoutPromise]);
-            } catch (err) {
-                console.error('AuthContext: Initialization error/timeout', err);
-            } finally {
-                if (mounted) {
-                    console.log('AuthContext: Setting loading false (finally)');
-                    setLoading(false);
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) throw error;
+                if (!mounted) return;
+                setSession(session);
+                setUser(session?.user ?? null);
+                if (session?.user && session?.access_token) {
+                    await fetchAdminUser(session.user.id, session.access_token);
                 }
+            } catch (err) {
+                console.error('AuthContext: Error initializing auth', err);
+            } finally {
+                if (mounted) setLoading(false);
             }
-
-            return () => { mounted = false; };
         };
 
-        initAuth();
+        // 7-second safety net for hung auth
+        const safetyTimer = setTimeout(() => {
+            if (mounted) {
+                console.warn('AuthContext: auth init took >7s, releasing loading');
+                setLoading(false);
+            }
+        }, 7000);
+
+        initAuth().finally(() => clearTimeout(safetyTimer));
 
         // Listen for auth changes (skip INITIAL_SESSION — already handled by initAuth)
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
             if (_event === 'INITIAL_SESSION') return;
-            console.log('AuthContext: Auth change', _event, session?.user?.email);
+            if (!mounted) return;
             setSession(session);
             setUser(session?.user ?? null);
 
@@ -206,10 +192,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
                 setAdminUser(null);
             }
-            setLoading(false);
+            if (mounted) setLoading(false);
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            clearTimeout(safetyTimer);
+            subscription.unsubscribe();
+        };
     }, []);
 
     const signIn = async (email: string, password: string) => {

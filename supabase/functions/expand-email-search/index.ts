@@ -145,14 +145,27 @@ serve(async (req) => {
   }
   const supabase = createClient(supabaseUrl, serviceKey);
 
-  // Verify caller via Authorization header — must be the same admin
+  // Verify caller via Authorization header — strict: must be present AND match
   const authHeader = req.headers.get('Authorization') || '';
   const accessToken = authHeader.replace(/^Bearer\s+/i, '');
-  if (accessToken) {
-    const { data: userData } = await supabase.auth.getUser(accessToken);
-    if (!userData?.user || userData.user.id !== adminId) {
-      return json(403, { error: 'admin_id does not match authenticated user' });
-    }
+  if (!accessToken) {
+    return json(401, { error: 'Authorization header required' });
+  }
+  const { data: userData, error: authError } = await supabase.auth.getUser(accessToken);
+  if (authError || !userData?.user) {
+    return json(401, { error: 'Invalid or expired token' });
+  }
+  if (userData.user.id !== adminId) {
+    return json(403, { error: 'admin_id does not match authenticated user' });
+  }
+  // Verify caller is an admin (not a client)
+  const { data: caller } = await supabase
+    .from('admin_users')
+    .select('role')
+    .eq('id', adminId)
+    .single();
+  if (!caller || !['super_admin', 'sub_admin', 'manager'].includes(caller.role)) {
+    return json(403, { error: 'Only admin users can run AI email search' });
   }
 
   // 1. Ask the AI for sub-queries

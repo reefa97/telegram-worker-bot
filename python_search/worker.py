@@ -105,6 +105,7 @@ async def process_job(job):
 
         crawler = AsyncCrawler(deep_scan=True, max_depth=CRAWL_DEPTH, max_concurrency=CRAWLER_CONCURRENCY)
         consecutive_empty = 0  # Stop after 30 consecutive pages with no new results
+        BROWSER_RECYCLE_PAGES = int(os.getenv("BROWSER_RECYCLE_PAGES", "10"))
 
         while True:
             logger.info(f"Searching Serper (Organic + Maps) page {page} for '{query}'...")
@@ -120,12 +121,8 @@ async def process_job(job):
             
             msg = f"Batch {page}: Found {len(organic_urls)} Organic, {len(maps_urls)} Maps."
             logger.info(msg + " Crawling...")
-            try:
-                with open("debug_worker.log", "a") as f:
-                    f.write(f"{datetime.utcnow().isoformat()} - {msg}\n")
-                    if maps_urls:
-                         f.write(f"Maps URLs: {maps_urls}\n")
-            except: pass
+            if maps_urls:
+                logger.debug(f"Maps URLs (batch {page}): {maps_urls}")
             
             # Crawl Maps URLs (Prioritize Maps for local relevance)
             # Add timeout per batch to prevent Playwright hangs from blocking the entire search
@@ -224,6 +221,16 @@ async def process_job(job):
 
             page += 1
 
+            # Recycle Chromium every N pages to release accumulated memory.
+            # AsyncCrawler.close() drops the cached browser; next fetch lazily
+            # spawns a fresh one. This prevents the OOM we saw on Railway.
+            if BROWSER_RECYCLE_PAGES > 0 and page % BROWSER_RECYCLE_PAGES == 0:
+                try:
+                    logger.info(f"Page {page}: recycling Chromium to free memory")
+                    await crawler.close()
+                except Exception as recyc_err:
+                    logger.warning(f"Browser recycle failed (non-critical): {recyc_err}")
+
             # Check if job was stopped by user
             try:
                 current_job = supabase.table("email_search_jobs").select("status").eq("id", job_id).single().execute()
@@ -233,8 +240,8 @@ async def process_job(job):
             except Exception as check_err:
                 logger.warning(f"Job status check failed: {check_err}. Continuing search...")
                 # Don't stop — just continue to next page
-    
-        # Clean up browser
+
+        # Clean up browser (normal path)
         await crawler.close()
 
         # Job Completed
@@ -248,16 +255,17 @@ async def process_job(job):
             logger.warning(f"Failed to mark job {job_id} as completed (may have been deleted): {complete_err}")
 
     except Exception as e:
-        logger.error(f"Job failed: {e}", exc_info=True)
-        # Log to file for debugging
+        # exc_info=True already includes full traceback in stdout (Railway captures it).
+        # Removed redundant file logging that was causing unbounded local disk growth.
+        logger.error(f"Job {job_id} failed: {e}", exc_info=True)
+
+        # Make sure the browser doesn't leak on the error path
         try:
-            with open("error.log", "a") as f:
-                f.write(f"Job {job_id} failed at {datetime.utcnow().isoformat()}:\n")
-                traceback.print_exc(file=f)
-                f.write("\n" + "-"*30 + "\n")
-        except:
-            pass # fallback if file write fails
-        
+            if 'crawler' in locals():
+                await crawler.close()
+        except Exception:
+            pass
+
         try:
             supabase.table("email_search_jobs").update({
                 "status": "failed",
@@ -270,7 +278,11 @@ from scheduler import scheduler_loop
 
 async def worker_loop():
     MAX_PARALLEL = int(os.getenv("MAX_PARALLEL_JOBS", "4"))
-    logger.info(f"Email Search Worker started. Parallelism = {MAX_PARALLEL}. Polling for jobs...")
+    JOB_TIMEOUT_SEC = int(os.getenv("JOB_TIMEOUT_SEC", "1200"))  # 20 min per job
+    logger.info(
+        f"Email Search Worker started. Parallelism = {MAX_PARALLEL}, "
+        f"job timeout = {JOB_TIMEOUT_SEC}s. Polling for jobs..."
+    )
 
     # On startup, reset any jobs stuck in running/processing to pending
     async def reset_stuck_jobs():
@@ -297,36 +309,62 @@ async def worker_loop():
     # Start Scheduler in background
     asyncio.create_task(scheduler_loop())
 
+    # Sliding pool: keep up to MAX_PARALLEL tasks in flight. As soon as one
+    # finishes, the next pending job is fetched. Each job is wrapped in
+    # asyncio.wait_for so one stuck Playwright can't block siblings.
+    in_flight = set()
     stuck_check_counter = 0
+
+    async def run_with_timeout(job):
+        try:
+            await asyncio.wait_for(process_job(job), timeout=JOB_TIMEOUT_SEC)
+        except asyncio.TimeoutError:
+            logger.error(f"Job {job.get('id')} hit JOB_TIMEOUT_SEC={JOB_TIMEOUT_SEC}s; marking failed")
+            try:
+                supabase.table("email_search_jobs").update({
+                    "status": "failed",
+                    "stopped_at": datetime.now(timezone.utc).isoformat(),
+                    "error": f"timeout after {JOB_TIMEOUT_SEC}s",
+                }).eq("id", job.get("id")).execute()
+            except Exception as upd_err:
+                logger.warning(f"Failed to mark timed-out job: {upd_err}")
+        except Exception as e:
+            logger.error(f"Job {job.get('id')} raised: {e}", exc_info=True)
+
     while True:
         try:
-            # Periodically check for stuck jobs (every ~60 seconds)
             stuck_check_counter += 1
-            if stuck_check_counter >= 30:  # 30 * 2s poll = ~60s
+            if stuck_check_counter >= 30:  # 30 polls ≈ 60s
                 stuck_check_counter = 0
                 await reset_stuck_jobs()
 
-            # Fetch up to MAX_PARALLEL pending jobs at once
-            response = supabase.table("email_search_jobs")\
-                .select("*")\
-                .eq("status", "pending")\
-                .order("created_at", desc=False)\
-                .limit(MAX_PARALLEL)\
-                .execute()
+            slots = MAX_PARALLEL - len(in_flight)
+            if slots > 0:
+                response = supabase.table("email_search_jobs")\
+                    .select("*")\
+                    .eq("status", "pending")\
+                    .order("created_at", desc=False)\
+                    .limit(slots)\
+                    .execute()
+                jobs = response.data or []
+                for job in jobs:
+                    task = asyncio.create_task(run_with_timeout(job))
+                    in_flight.add(task)
+                    logger.info(f"Started job {job.get('id')} ({len(in_flight)}/{MAX_PARALLEL} in flight)")
 
-            jobs = response.data
-
-            if jobs:
-                # Run jobs concurrently; gather waits for ALL to finish before next poll,
-                # which means at any moment ≤ MAX_PARALLEL jobs are in flight.
-                logger.info(f"Picked up {len(jobs)} job(s) for parallel processing")
-                await asyncio.gather(*(process_job(job) for job in jobs), return_exceptions=True)
-            else:
-                # Wait before next poll
+            if not in_flight:
                 await asyncio.sleep(2)
+                continue
+
+            # Wait for any task to finish, then loop back to top up the pool.
+            done, _ = await asyncio.wait(in_flight, return_when=asyncio.FIRST_COMPLETED, timeout=10)
+            for t in done:
+                in_flight.discard(t)
+                if t.exception():
+                    logger.error(f"Unhandled task exception: {t.exception()}")
 
         except Exception as e:
-            logger.error(f"Worker poll error: {e}")
+            logger.error(f"Worker poll error: {e}", exc_info=True)
             await asyncio.sleep(5)
 
 if __name__ == "__main__":

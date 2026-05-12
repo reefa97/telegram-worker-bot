@@ -556,13 +556,36 @@ serve(async (req) => {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Telegram-Bot-Api-Secret-Token",
       },
     });
   }
 
   try {
     const body = await req.json();
+
+    // --- WEBHOOK SECRET TOKEN VALIDATION ---
+    // For Telegram updates (anything with update_id) we require the
+    // X-Telegram-Bot-Api-Secret-Token header to match TELEGRAM_WEBHOOK_SECRET.
+    // Internal POSTs (e.g. email_notification, send-message direct call) pass
+    // by virtue of not having update_id; they should be hardened separately.
+    const WEBHOOK_SECRET = Deno.env.get('TELEGRAM_WEBHOOK_SECRET');
+    if (body.update_id !== undefined) {
+      if (!WEBHOOK_SECRET) {
+        // Secret not configured — log and allow for backwards compatibility.
+        // After deploying, run setWebhook with the secret and set the env var.
+        console.warn('[security] TELEGRAM_WEBHOOK_SECRET not set; webhook spoofing possible');
+      } else {
+        const headerSecret = req.headers.get('X-Telegram-Bot-Api-Secret-Token');
+        if (headerSecret !== WEBHOOK_SECRET) {
+          console.warn('[security] Rejected webhook call: secret mismatch');
+          return new Response(JSON.stringify({ error: 'forbidden' }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      }
+    }
 
     // --- INTERNAL: EMAIL NOTIFICATION ---
     if (body.type === 'email_notification') {
