@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ensureFirstUserIsSuperAdmin } from '../lib/adminSync';
-import { Lock, Mail } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 
 export default function AuthForm() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const { signIn } = useAuth();
@@ -14,89 +15,115 @@ export default function AuthForm() {
         e.preventDefault();
         setError('');
         setLoading(true);
-
         try {
             await signIn(email, password);
-
-            // Get current user
             const { data: { user } } = await (await import('../lib/supabase')).supabase.auth.getUser();
             if (user) {
                 await ensureFirstUserIsSuperAdmin(user.id, user.email || '');
             }
         } catch (err: any) {
-            setError(err.message || 'Login error');
+            setError(err.message || 'Nie udało się zalogować');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-            <div className="card w-full max-w-md p-8 shadow-2xl dark:shadow-none border-t-4 border-primary-500">
-                <div className="text-center mb-8">
-                    <img src="/reefa-logo.png" alt="Reefa" className="w-32 h-32 mx-auto mb-4 object-contain" />
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">
-                        Firma sprzątająca
-                    </h1>
-
+        <div className="min-h-screen w-full flex items-center justify-center px-4 py-8 bg-app">
+            <div className="w-full max-w-[400px]">
+                {/* Logo + brand */}
+                <div className="flex flex-col items-center mb-8">
+                    <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mb-4 shadow-sm">
+                        <img src="/reefa-logo.png" alt="" className="w-7 h-7 object-contain" />
+                    </div>
+                    <h1 className="text-h2 mb-1">Reefa</h1>
+                    <p className="page-subtitle">Panel zarządzania</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    {error && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2">
-                            <span className="block w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="space-y-4">
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                Email
-                            </label>
-                            <div className="relative">
-                                <input
-                                    id="email"
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="input pl-10"
-                                    placeholder="admin@example.com"
-                                    required
-                                />
-                                <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                {/* Card */}
+                <div className="card p-6 sm:p-8">
+                    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+                        {error && (
+                            <div
+                                role="alert"
+                                className="flex items-start gap-2.5 p-3 rounded-md text-sm animate-fadeIn"
+                                style={{
+                                    background: 'var(--danger-soft)',
+                                    color: 'var(--danger-fg)',
+                                }}
+                            >
+                                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                <span>{error}</span>
                             </div>
+                        )}
+
+                        <div>
+                            <label htmlFor="email" className="label">Email</label>
+                            <input
+                                id="email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="input"
+                                placeholder="ty@firma.pl"
+                                autoComplete="email"
+                                inputMode="email"
+                                autoCapitalize="off"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                required
+                                disabled={loading}
+                            />
                         </div>
 
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                Password
-                            </label>
+                            <label htmlFor="password" className="label">Hasło</label>
                             <div className="relative">
                                 <input
                                     id="password"
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="input pl-10"
+                                    className="input pr-11"
                                     placeholder="••••••••"
+                                    autoComplete="current-password"
                                     required
+                                    disabled={loading}
                                 />
-                                <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(v => !v)}
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 btn-icon"
+                                    style={{ width: 36, height: 36 }}
+                                    aria-label={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
+                                    tabIndex={-1}
+                                >
+                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
                             </div>
                         </div>
-                    </div>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="btn-primary w-full py-2.5 text-base shadow-lg shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-                    >
-                        {loading ? 'Signing in...' : 'Sign In'}
-                    </button>
-                </form>
+                        <button
+                            type="submit"
+                            disabled={loading || !email || !password}
+                            className="btn-primary btn-lg w-full"
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Logowanie...
+                                </>
+                            ) : (
+                                'Zaloguj się'
+                            )}
+                        </button>
+                    </form>
+                </div>
 
-
+                {/* Footer */}
+                <p className="text-center text-xs mt-6" style={{ color: 'var(--text-faint)' }}>
+                    Bezpieczne logowanie · app.reefa.pl
+                </p>
             </div>
         </div>
     );
