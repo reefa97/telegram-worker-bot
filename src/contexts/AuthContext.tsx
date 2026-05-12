@@ -5,7 +5,8 @@ import { User, Session } from '@supabase/supabase-js';
 interface AdminUser {
     id: string;
     email: string;
-    role: 'super_admin' | 'sub_admin' | 'client';
+    name?: string | null;
+    role: 'super_admin' | 'sub_admin' | 'manager' | 'client';
     created_by: string | null;
     permissions?: Record<string, boolean>;
 }
