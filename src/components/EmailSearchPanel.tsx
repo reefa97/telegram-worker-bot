@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Play, Square, Save, Loader2, Copy, Trash2, AlertTriangle, X } from 'lucide-react';
+import { Search, Play, Square, Save, Loader2, Copy, Trash2, AlertTriangle, X, Sparkles, ChevronRight, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -16,6 +16,20 @@ interface SearchJob {
     total_emails_found: number;
     created_at: string;
     stopped_at?: string;
+    batch_id?: string | null;
+    batch_topic?: string | null;
+    batch_location?: string | null;
+}
+
+interface BatchGroup {
+    batch_id: string;
+    topic: string;
+    location: string | null;
+    jobs: SearchJob[];
+    total_emails: number;
+    created_at: string;
+    completedCount: number;
+    runningCount: number;
 }
 
 interface SearchResult {
@@ -30,9 +44,14 @@ export default function EmailSearchPanel() {
     const { user } = useAuth();
     const [serperToken, setSerperToken] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [aiTopic, setAiTopic] = useState('');
+    const [aiLocation, setAiLocation] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
     const [jobs, setJobs] = useState<SearchJob[]>([]);
     const [results, setResults] = useState<SearchResult[]>([]);
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+    const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+    const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(false);
     const [balanceAlerts, setBalanceAlerts] = useState<BalanceAlert[]>([]);
     const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
@@ -126,6 +145,7 @@ export default function EmailSearchPanel() {
 
     const fetchResults = async (jobId: string) => {
         setSelectedJobId(jobId);
+        setSelectedBatchId(null);
         // Fetch results
         const { data: resData } = await supabase
             .from('email_search_results')
@@ -135,6 +155,127 @@ export default function EmailSearchPanel() {
 
         if (resData) setResults(resData);
     };
+
+    const fetchBatchResults = async (batchId: string, batchJobIds: string[]) => {
+        setSelectedBatchId(batchId);
+        setSelectedJobId(null);
+        if (batchJobIds.length === 0) {
+            setResults([]);
+            return;
+        }
+        const { data: resData } = await supabase
+            .from('email_search_results')
+            .select('*')
+            .in('job_id', batchJobIds)
+            .order('created_at', { ascending: true });
+
+        if (resData) {
+            // Dedupe by email — keep first occurrence
+            const seen = new Set<string>();
+            const unique: SearchResult[] = [];
+            for (const r of resData) {
+                if (!seen.has(r.email)) {
+                    seen.add(r.email);
+                    unique.push(r);
+                }
+            }
+            setResults(unique);
+        }
+    };
+
+    const runAiSearch = async () => {
+        if (!aiTopic.trim()) return;
+        if (!serperToken) return alert('Пожалуйста, сначала сохраните ваш токен Serper.');
+        try {
+            setAiLoading(true);
+            const { data: { session } } = await supabase.auth.getSession();
+            const accessToken = session?.access_token;
+            const res = await supabase.functions.invoke('expand-email-search', {
+                body: {
+                    topic: aiTopic.trim(),
+                    location: aiLocation.trim(),
+                    admin_id: user?.id,
+                },
+                headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+            });
+            if (res.error) throw res.error;
+            const payload = res.data as { batch_id: string; jobs_created: number; queries: string[] };
+            setAiTopic('');
+            setAiLocation('');
+            await fetchJobs();
+            if (payload?.batch_id) {
+                setExpandedBatches(prev => new Set(prev).add(payload.batch_id));
+            }
+            alert(`AI сгенерировал ${payload.queries.length} запросов и поставил их в очередь.`);
+        } catch (err: any) {
+            console.error('AI expand failed:', err);
+            const errorMsg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+            alert(`Не удалось запустить AI-поиск.\n\nОшибка: ${errorMsg}`);
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const toggleBatchExpand = (batchId: string) => {
+        setExpandedBatches(prev => {
+            const next = new Set(prev);
+            if (next.has(batchId)) next.delete(batchId);
+            else next.add(batchId);
+            return next;
+        });
+    };
+
+    const deleteBatch = async (batchId: string, jobIds: string[]) => {
+        if (!confirm(`Удалить весь пакет (${jobIds.length} подзапросов и все их результаты)?`)) return;
+        try {
+            await supabase.from('email_search_results').delete().in('job_id', jobIds);
+            await supabase.from('email_search_jobs').delete().eq('batch_id', batchId);
+            if (selectedBatchId === batchId) {
+                setSelectedBatchId(null);
+                setResults([]);
+            }
+            await fetchJobs();
+        } catch (err) {
+            console.error('Delete batch failed:', err);
+            alert('Ошибка при удалении пакета');
+        }
+    };
+
+    // Group jobs by batch_id for the history list
+    const { batches, standaloneJobs } = (() => {
+        const batchMap = new Map<string, BatchGroup>();
+        const standalone: SearchJob[] = [];
+        for (const job of jobs) {
+            if (!job.batch_id) {
+                standalone.push(job);
+                continue;
+            }
+            let group = batchMap.get(job.batch_id);
+            if (!group) {
+                group = {
+                    batch_id: job.batch_id,
+                    topic: job.batch_topic || job.query,
+                    location: job.batch_location || null,
+                    jobs: [],
+                    total_emails: 0,
+                    created_at: job.created_at,
+                    completedCount: 0,
+                    runningCount: 0,
+                };
+                batchMap.set(job.batch_id, group);
+            }
+            group.jobs.push(job);
+            group.total_emails += job.total_emails_found || 0;
+            if (job.status === 'completed' || job.status === 'stopped') group.completedCount += 1;
+            if (job.status === 'running' || job.status === 'pending') group.runningCount += 1;
+            // Use earliest created_at as the batch creation time
+            if (job.created_at < group.created_at) group.created_at = job.created_at;
+        }
+        const batchList = Array.from(batchMap.values()).sort(
+            (a, b) => (a.created_at < b.created_at ? 1 : -1)
+        );
+        return { batches: batchList, standaloneJobs: standalone };
+    })();
 
     const deleteJob = async (jobId: string) => {
         if (!confirm('Вы уверены, что хотите удалить эту историю поиска?')) return;
@@ -323,6 +464,41 @@ export default function EmailSearchPanel() {
                         Начать поиск
                     </button>
                 </div>
+
+                {/* AI-расширенный поиск */}
+                <div className="rounded-xl border border-violet-300/40 dark:border-violet-700/40 bg-violet-50/50 dark:bg-violet-900/10 p-3 md:p-4 flex flex-col gap-3">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                        <span className="font-medium text-main text-sm">AI-расширенный поиск</span>
+                        <span className="text-[11px] text-muted">— AI разобьёт ваш запрос на 5–20 точечных подзапросов</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                            type="text"
+                            value={aiTopic}
+                            onChange={(e) => setAiTopic(e.target.value)}
+                            className="input flex-1"
+                            placeholder="Тема (например, firma budowlana)"
+                            onKeyDown={(e) => e.key === 'Enter' && runAiSearch()}
+                        />
+                        <input
+                            type="text"
+                            value={aiLocation}
+                            onChange={(e) => setAiLocation(e.target.value)}
+                            className="input flex-1 sm:max-w-[240px]"
+                            placeholder="Город/воеводство (необязательно)"
+                            onKeyDown={(e) => e.key === 'Enter' && runAiSearch()}
+                        />
+                        <button
+                            onClick={runAiSearch}
+                            disabled={aiLoading || !aiTopic.trim()}
+                            className="btn-primary !bg-violet-600 hover:!bg-violet-700 whitespace-nowrap"
+                        >
+                            {aiLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles size={16} />}
+                            Расширить и запустить
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
@@ -330,7 +506,84 @@ export default function EmailSearchPanel() {
                 <div className="md:w-1/3 card overflow-hidden flex flex-col max-h-[40vh] md:max-h-none">
                     <div className="p-3 bg-subtle border-b border-border font-medium text-main">История поиска</div>
                     <div className="overflow-y-auto flex-1 p-2 space-y-2">
-                        {jobs.map(job => (
+                        {/* AI batches */}
+                        {batches.map(batch => {
+                            const isExpanded = expandedBatches.has(batch.batch_id);
+                            const isSelected = selectedBatchId === batch.batch_id;
+                            const batchJobIds = batch.jobs.map(j => j.id);
+                            return (
+                                <div key={batch.batch_id} className="rounded-lg border border-violet-300/40 dark:border-violet-700/40 bg-violet-50/30 dark:bg-violet-900/5 overflow-hidden">
+                                    <div
+                                        onClick={() => fetchBatchResults(batch.batch_id, batchJobIds)}
+                                        className={`p-3 cursor-pointer group relative ${isSelected ? 'bg-violet-100/60 dark:bg-violet-900/20' : 'hover:bg-violet-100/40 dark:hover:bg-violet-900/10'}`}
+                                    >
+                                        <div className="flex items-start gap-2 pr-6">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); toggleBatchExpand(batch.batch_id); }}
+                                                className="mt-0.5 text-violet-600 dark:text-violet-400 shrink-0"
+                                                title={isExpanded ? 'Свернуть' : 'Развернуть'}
+                                            >
+                                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                            </button>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Sparkles className="w-3 h-3 text-violet-600 dark:text-violet-400 shrink-0" />
+                                                    <span className="font-medium text-main line-clamp-1">{batch.topic}</span>
+                                                </div>
+                                                {batch.location && (
+                                                    <div className="text-xs text-muted mt-0.5">📍 {batch.location}</div>
+                                                )}
+                                                <div className="text-xs text-muted mt-1 flex items-center gap-2 flex-wrap">
+                                                    <span>{batch.jobs.length} подзапросов</span>
+                                                    <span>•</span>
+                                                    <span className="text-violet-700 dark:text-violet-300 font-medium">{batch.total_emails} email</span>
+                                                    {batch.runningCount > 0 && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span className="text-blue-600 dark:text-blue-400">{batch.runningCount} в работе</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); deleteBatch(batch.batch_id, batchJobIds); }}
+                                                className="absolute top-2 right-2 text-zinc-400 hover:text-red-500 p-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                                title="Удалить пакет"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {isExpanded && (
+                                        <div className="border-t border-violet-300/30 dark:border-violet-700/30 px-2 py-1 space-y-1">
+                                            {batch.jobs.map(job => (
+                                                <div
+                                                    key={job.id}
+                                                    onClick={(e) => { e.stopPropagation(); fetchResults(job.id); }}
+                                                    className={`px-2 py-1.5 rounded text-xs cursor-pointer transition-colors flex items-center justify-between gap-2 ${selectedJobId === job.id ? 'bg-primary/10 text-primary' : 'hover:bg-subtle text-muted'}`}
+                                                >
+                                                    <span className="truncate flex-1" title={job.query}>{job.query}</span>
+                                                    <span className="flex items-center gap-1.5 shrink-0">
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap ${job.status === 'completed' ? 'badge-success' :
+                                                            job.status === 'running' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800' :
+                                                                job.status === 'failed' ? 'badge-danger' :
+                                                                    'badge-neutral'
+                                                            }`}>
+                                                            {job.total_emails_found}
+                                                        </span>
+                                                        {job.status === 'running' && (
+                                                            <button onClick={(e) => { e.stopPropagation(); stopSearch(job.id); }} className="text-danger hover:text-red-600" title="Остановить"><Square size={12} fill="currentColor" /></button>
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        {/* Single-query jobs (no batch) */}
+                        {standaloneJobs.map(job => (
                             <div
                                 key={job.id}
                                 onClick={() => fetchResults(job.id)}
@@ -402,7 +655,7 @@ export default function EmailSearchPanel() {
                             )}
                         </div>
                         <div className="overflow-y-auto flex-1 p-0">
-                            {selectedJobId ? (
+                            {(selectedJobId || selectedBatchId) ? (
                                 <>
                                 {/* Mobile cards */}
                                 <div className="flex flex-col divide-y divide-border sm:hidden">
