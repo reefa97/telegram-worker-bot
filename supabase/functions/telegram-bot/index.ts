@@ -1232,7 +1232,7 @@ serve(async (req) => {
       // Fetch ALL worker profiles for this telegram user (handles multiple profiles)
       const { data: currentWorkerProfiles } = await supabase
         .from("workers")
-        .select("id, bot_state, temp_procurement_data, worker_objects(object_id, cleaning_objects(id, name))")
+        .select("id, bot_state, temp_procurement_data, worker_objects(object_id, cleaning_objects(id, name, is_active))")
         .eq("telegram_user_id", userId.toString());
 
       // Find the worker with active procurement state, or fall back to first profile
@@ -1244,7 +1244,7 @@ serve(async (req) => {
         for (const w of currentWorkerProfiles) {
           if (w.worker_objects) {
             for (const wo of w.worker_objects as any[]) {
-              if (wo.cleaning_objects) {
+              if (wo.cleaning_objects && wo.cleaning_objects.is_active !== false) {
                 allProcurementObjects.push(wo);
               }
             }
@@ -1539,7 +1539,7 @@ serve(async (req) => {
       // 3. Worker Interaction
       const { data: workers } = await supabase
         .from("workers")
-        .select("*, worker_objects(object_id, cleaning_objects(id, name))")
+        .select("*, worker_objects(object_id, cleaning_objects(id, name, is_active))")
         .eq("telegram_user_id", userId.toString());
 
       if (!workers || workers.length === 0) {
@@ -1703,7 +1703,7 @@ serve(async (req) => {
           workers.forEach(w => {
             if (w.worker_objects) {
               w.worker_objects.forEach((wo: any) => {
-                if (wo.cleaning_objects) allObjects.push({ ...wo, worker_id: w.id });
+                if (wo.cleaning_objects && wo.cleaning_objects.is_active !== false) allObjects.push({ ...wo, worker_id: w.id });
               });
             }
           });

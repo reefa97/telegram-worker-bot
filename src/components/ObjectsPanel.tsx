@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useUndo } from '../contexts/UndoContext';
-import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, LayoutGrid, List, Map, UserCheck, UserMinus, FileText, Upload, Download } from 'lucide-react';
+import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, LayoutGrid, List, Map, UserCheck, UserMinus, FileText, Upload, Download, Archive, ArchiveRestore } from 'lucide-react';
 import ObjectsMap from './ObjectsMap';
 import AddressAutocomplete from './AddressAutocomplete';
 import TaskManagementModal from './TaskManagementModal';
@@ -46,6 +46,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
     const { adminUser } = useAuth();
     const { pushUndo } = useUndo();
     const [subTab, setSubTab] = useState<'objects' | 'schedule'>('objects');
+    const [archiveView, setArchiveView] = useState<'active' | 'archive'>('active');
     const [objects, setObjects] = useState<CleaningObject[]>([]);
     const [creators, setCreators] = useState<Record<string, string>>({});
     const [adminsList, setAdminsList] = useState<Array<{ id: string, name: string, role: string }>>([]);
@@ -479,6 +480,11 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
 
     // Filter Logic
     const filteredObjects = objects.filter(obj => {
+        // Active/Archive filter: archived = is_active === false
+        const isActiveObj = obj.is_active !== false;
+        if (archiveView === 'active' && !isActiveObj) return false;
+        if (archiveView === 'archive' && isActiveObj) return false;
+
         if (!searchQuery) return true;
         const lowerQuery = searchQuery.toLowerCase();
 
@@ -490,6 +496,41 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
             (obj.client_contact_names && obj.client_contact_names.some(n => n && n.toLowerCase().includes(lowerQuery)))
         );
     });
+
+    const archivedCount = objects.filter(o => o.is_active === false).length;
+    const activeCount = objects.filter(o => o.is_active !== false).length;
+
+    const handleToggleArchive = async (object: CleaningObject, e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        const goingToArchive = object.is_active !== false;
+        const confirmMsg = goingToArchive
+            ? `Переместить объект «${object.name}» в архив клиентов? Данные и история сохранятся.`
+            : `Вернуть объект «${object.name}» из архива в активные?`;
+        if (!confirm(confirmMsg)) return;
+
+        const { error } = await supabase
+            .from('cleaning_objects')
+            .update({ is_active: !goingToArchive })
+            .eq('id', object.id);
+
+        if (error) {
+            console.error('Error toggling archive:', error);
+            alert('Ошибка при изменении статуса объекта');
+            return;
+        }
+        await loadObjects();
+        setOpenMenuId(null);
+        pushUndo(
+            goingToArchive ? `Объект «${object.name}» в архиве` : `Объект «${object.name}» возвращён в работу`,
+            async () => {
+                await supabase
+                    .from('cleaning_objects')
+                    .update({ is_active: goingToArchive })
+                    .eq('id', object.id);
+                await loadObjects();
+            }
+        );
+    };
 
     // Salary Summary Calculation
     const calculateSalarySummary = () => {
@@ -648,11 +689,44 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
             {subTab === 'schedule' ? (
                 <ShiftPlanningPanel />
             ) : (<>
+            {/* Active / Archive toggle */}
+            <div className="flex gap-1 mb-4 -mt-2">
+                <button
+                    onClick={() => setArchiveView('active')}
+                    className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                        archiveView === 'active'
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-muted hover:text-main hover:bg-subtle'
+                    }`}
+                >
+                    Активные клиенты
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${archiveView === 'active' ? 'bg-primary/20' : 'bg-subtle'}`}>
+                        {activeCount}
+                    </span>
+                </button>
+                <button
+                    onClick={() => setArchiveView('archive')}
+                    className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                        archiveView === 'archive'
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                            : 'text-muted hover:text-main hover:bg-subtle'
+                    }`}
+                >
+                    <Archive className="w-3.5 h-3.5" />
+                    Архив клиентов
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${archiveView === 'archive' ? 'bg-amber-500/25' : 'bg-subtle'}`}>
+                        {archivedCount}
+                    </span>
+                </button>
+            </div>
+
             {/* Header with Title, Search, View Toggle, Add Button */}
             <div className="flex flex-col gap-3 mb-6">
                 {/* Row 1: Title + Add Button */}
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xl sm:text-2xl font-bold text-main">Объекты работы</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-main">
+                        {archiveView === 'active' ? 'Объекты работы' : 'Архив клиентов'}
+                    </h2>
                     <div className="flex items-center gap-2">
                         {adminUser?.role === 'super_admin' && (
                             <button
@@ -734,6 +808,9 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                         <>
                                             <button onClick={(e) => { e.stopPropagation(); setManagingTasksFor(object); }} className="p-1.5 text-muted hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg" title="Задачи"><CheckSquare size={14} /></button>
                                             <button onClick={(e) => { e.stopPropagation(); openModal(object); }} className="p-1.5 text-muted hover:text-primary hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg" title="Редактировать"><Edit2 size={14} /></button>
+                                            <button onClick={(e) => handleToggleArchive(object, e)} className="p-1.5 text-muted hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg" title={object.is_active !== false ? 'В архив' : 'Вернуть в работу'}>
+                                                {object.is_active !== false ? <Archive size={14} /> : <ArchiveRestore size={14} />}
+                                            </button>
                                         </>
                                     )}
                                     {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
@@ -867,6 +944,13 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                         >
                                                             <Edit2 size={16} />
                                                         </button>
+                                                        <button
+                                                            onClick={(e) => handleToggleArchive(object, e)}
+                                                            className="p-1.5 text-muted hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                                                            title={object.is_active !== false ? 'В архив' : 'Вернуть в работу'}
+                                                        >
+                                                            {object.is_active !== false ? <Archive size={16} /> : <ArchiveRestore size={16} />}
+                                                        </button>
                                                     </>
                                                 )}
                                                 {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
@@ -971,6 +1055,14 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                             >
                                                                 <Edit2 size={16} className="text-muted" /> Редактировать
                                                             </button>
+                                                            <button
+                                                                onClick={(e) => handleToggleArchive(object, e)}
+                                                                className="w-full text-left px-4 py-2.5 hover:bg-amber-500/10 flex items-center gap-2 text-main"
+                                                            >
+                                                                {object.is_active !== false
+                                                                    ? <><Archive size={14} className="text-amber-600 dark:text-amber-400" /> В архив</>
+                                                                    : <><ArchiveRestore size={14} className="text-amber-600 dark:text-amber-400" /> Вернуть в работу</>}
+                                                            </button>
                                                         </>
                                                     )}
                                                     {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
@@ -1058,16 +1150,18 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                 {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
                                     <>
                                         <button
-                                            onClick={() => setManagingTasksFor(object)}
-                                            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-muted hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                                        >
-                                            <CheckSquare size={14} /> Задачи
-                                        </button>
-                                        <button
                                             onClick={() => openModal(object)}
                                             className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-muted hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
                                         >
                                             <Edit2 size={14} /> Изменить
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleToggleArchive(object, e)}
+                                            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-muted hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                                        >
+                                            {object.is_active !== false
+                                                ? <><Archive size={14} /> В архив</>
+                                                : <><ArchiveRestore size={14} /> Вернуть</>}
                                         </button>
                                     </>
                                 )}
