@@ -44,30 +44,22 @@ CREATE POLICY "admin_users select super_admin" ON admin_users
   FOR SELECT TO authenticated
   USING (is_super_admin());
 
--- Sub_admin sees clients they created + clients in general (so they can manage)
+-- IMPORTANT: inline SELECT-from-admin_users inside an admin_users RLS
+-- policy causes infinite recursion (Postgres errors with 42P17). We use
+-- the existing SECURITY DEFINER helper get_my_role() so the lookup
+-- bypasses RLS on the inner read.
+
 CREATE POLICY "admin_users select sub_admin" ON admin_users
   FOR SELECT TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM admin_users me
-      WHERE me.id = auth.uid()
-      AND me.role = 'sub_admin'
-    )
-    AND (
-      role = 'client'
-      OR created_by = auth.uid()
-    )
+    get_my_role() = 'sub_admin'
+    AND (role = 'client' OR created_by = auth.uid())
   );
 
--- Manager sees clients (for assigning, etc.)
 CREATE POLICY "admin_users select manager" ON admin_users
   FOR SELECT TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM admin_users me
-      WHERE me.id = auth.uid()
-      AND me.role = 'manager'
-    )
+    get_my_role() = 'manager'
     AND role = 'client'
   );
 
