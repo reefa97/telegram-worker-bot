@@ -519,7 +519,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -850,7 +850,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                                             <button
                                                 type="button"
                                                 onClick={() => setIsAddingRole(true)}
-                                                className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                                                className="text-xs text-primary hover:text-primary font-medium"
                                             >
                                                 + Добавить новую
                                             </button>
@@ -938,7 +938,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                                                             }));
                                                         }
                                                     }}
-                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary-500"
                                                 />
                                                 <span className="text-main">{obj.name}</span>
                                                 <span className="text-gray-500 text-xs ml-auto">{obj.address}</span>

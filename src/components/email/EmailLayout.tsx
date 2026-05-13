@@ -204,7 +204,7 @@ export const EmailLayout: React.FC = () => {
                                 setMobileView('list');
                             }}
                             className={`px-3 py-2 rounded-md cursor-pointer text-sm font-medium flex justify-between transition ${selectedFolder === folder.id
-                                ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                                ? 'bg-primary-50 dark:bg-primary-900/20 text-primary dark:text-primary-300'
                                 : 'text-main hover:bg-subtle'
                                 }`}
                         >

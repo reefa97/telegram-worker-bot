@@ -253,7 +253,7 @@ export default function MyCabinetPanel() {
     if (loading && tasks.length === 0) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -467,7 +467,7 @@ export default function MyCabinetPanel() {
                             <button
                                 key={f}
                                 onClick={() => setFilter(f)}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${filter === f ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${filter === f ? 'bg-white dark:bg-gray-700 shadow-sm text-primary dark:text-primary' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
                             >
                                 {f === 'pending' && 'Активные'}
                                 {f === 'all' && 'Все'}

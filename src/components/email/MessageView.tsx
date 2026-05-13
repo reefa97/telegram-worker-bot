@@ -69,7 +69,7 @@ export const MessageView: React.FC<MessageViewProps> = ({ message, onReply, onDe
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => onReply?.(message)}
-                            className="flex items-center gap-2 px-4 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition shadow-sm font-semibold text-sm"
+                            className="flex items-center gap-2 px-4 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary dark:text-primary rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition shadow-sm font-semibold text-sm"
                         >
                             <Reply size={16} />
                             <span>Ответить</span>
@@ -86,7 +86,7 @@ export const MessageView: React.FC<MessageViewProps> = ({ message, onReply, onDe
                 </div>
                 <div className="flex justify-between items-center text-sm">
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-700 dark:text-primary-300 font-bold uppercase">
+                        <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary dark:text-primary-300 font-bold uppercase">
                             {(message.from_name || message.from_address)[0]}
                         </div>
                         <div>

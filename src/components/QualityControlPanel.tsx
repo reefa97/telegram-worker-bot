@@ -569,7 +569,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -579,7 +579,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <h2 className="text-2xl font-bold text-main flex items-center gap-2">
-                    <ClipboardCheck className="w-7 h-7 text-primary-500" />
+                    <ClipboardCheck className="w-7 h-7 text-primary" />
                     Контроль качества
                 </h2>
 
@@ -592,7 +592,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                 <button
                     onClick={() => setActiveSubTab('checks')}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeSubTab === 'checks'
-                        ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                        ? 'bg-white dark:bg-gray-700 text-primary dark:text-primary shadow-sm'
                         : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                         }`}
                 >
@@ -602,7 +602,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                 <button
                     onClick={() => setActiveSubTab('history')}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeSubTab === 'history'
-                        ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                        ? 'bg-white dark:bg-gray-700 text-primary dark:text-primary shadow-sm'
                         : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                         }`}
                 >
@@ -612,7 +612,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                 <button
                     onClick={() => setActiveSubTab('schedules')}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeSubTab === 'schedules'
-                        ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                        ? 'bg-white dark:bg-gray-700 text-primary dark:text-primary shadow-sm'
                         : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                         }`}
                 >
@@ -653,7 +653,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                                             </p>
                                             <button
                                                 onClick={() => startCheck(obj)}
-                                                className="mt-4 w-full bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                                                className="mt-4 w-full bg-primary-hover hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                                             >
                                                 <ClipboardCheck className="w-4 h-4" />
                                                 Провести контроль
@@ -676,7 +676,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                                 </p>
                                 <button
                                     onClick={() => startCheck(obj)}
-                                    className="mt-4 w-full bg-gray-100 dark:bg-gray-700 hover:bg-primary-50 dark:hover:bg-primary-900/20 text-main hover:text-primary-600 dark:hover:text-primary-400 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-600"
+                                    className="mt-4 w-full bg-gray-100 dark:bg-gray-700 hover:bg-primary-50 dark:hover:bg-primary-900/20 text-main hover:text-primary dark:hover:text-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-600"
                                 >
                                     <ClipboardCheck className="w-4 h-4" />
                                     Провести контроль
@@ -762,7 +762,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                         {isSuperAdmin && (
                             <button
                                 onClick={handleOpenNewSchedule}
-                                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                className="bg-primary-hover hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                             >
                                 <Plus className="w-4 h-4" />
                                 Назначить график
@@ -877,7 +877,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                                         <div className="mt-4 flex gap-2 pt-3 border-t border-gray-100 dark:border-gray-700/50">
                                             <button
                                                 onClick={() => goToHistory(s.object_id)}
-                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-gray-50 dark:bg-gray-700 text-muted hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-gray-50 dark:bg-gray-700 text-muted hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary dark:hover:text-primary transition-colors"
                                             >
                                                 <History className="w-3.5 h-3.5" />
                                                 История проверок
@@ -946,7 +946,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                         {(historyFilterObject || historyFilterManager || historyFilterDateFrom || historyFilterDateTo) && (
                             <button
                                 onClick={() => { setHistoryFilterObject(''); setHistoryFilterManager(''); setHistoryFilterDateFrom(''); setHistoryFilterDateTo(''); setHistoryPage(0); }}
-                                className="text-xs text-primary-500 hover:text-primary-600 mt-2 flex items-center gap-1"
+                                className="text-xs text-primary hover:text-primary mt-2 flex items-center gap-1"
                             >
                                 <X className="w-3 h-3" /> Сбросить фильтры
                             </button>
@@ -962,7 +962,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
 
                     {historyLoading ? (
                         <div className="flex justify-center items-center h-40">
-                            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                         </div>
                     ) : historyChecks.length === 0 ? (
                         <div className="text-center py-16 text-gray-400">
@@ -1030,7 +1030,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                                             )}
 
                                             <div className="mt-3 flex justify-end">
-                                                <span className="text-xs text-primary-500 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                                <span className="text-xs text-primary md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center gap-1">
                                                     <Eye className="w-3.5 h-3.5" /> Подробнее
                                                 </span>
                                             </div>
@@ -1285,7 +1285,7 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                                                 type="button"
                                                 onClick={() => setScheduleForm({ ...scheduleForm, day_of_week: d })}
                                                 className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${scheduleForm.day_of_week === d
-                                                    ? 'bg-primary-600 text-white shadow-md'
+                                                    ? 'bg-primary-hover text-white shadow-md'
                                                     : 'bg-gray-100 dark:bg-gray-700 text-muted hover:bg-gray-200 dark:hover:bg-gray-600'
                                                     }`}
                                             >
@@ -1375,12 +1375,12 @@ export default function QualityControlPanel({ searchTerm = '' }: { searchTerm?: 
                                                     e.stopPropagation();
                                                     fileInputRefs.current[idx]?.click();
                                                 }}
-                                                className="text-gray-400 hover:text-primary-500 p-1.5 transition-colors relative"
+                                                className="text-gray-400 hover:text-primary p-1.5 transition-colors relative"
                                                 title="Добавить фото"
                                             >
                                                 <Camera className="w-4 h-4" />
                                                 {item.photos.length > 0 && (
-                                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary-500 text-white rounded-full text-[10px] flex items-center justify-center">
+                                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white rounded-full text-[10px] flex items-center justify-center">
                                                         {item.photos.length}
                                                     </span>
                                                 )}

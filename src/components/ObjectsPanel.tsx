@@ -654,7 +654,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -1436,7 +1436,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                                         });
                                                                     }
                                                                 }}
-                                                                className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                                className="rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary-500"
                                                             />
                                                             <span className="text-sm font-medium text-main">{admin.name} ({admin.role})</span>
                                                         </label>
@@ -1670,7 +1670,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                     type="checkbox"
                                                     checked={formData.reminder_active}
                                                     onChange={(e) => setFormData({ ...formData, reminder_active: e.target.checked })}
-                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary-500"
                                                 />
                                                 <div className="flex items-center gap-2">
                                                     <Clock className="w-4 h-4 text-blue-500" />
@@ -1954,7 +1954,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                                             });
                                                                         }
                                                                     }}
-                                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary-500"
                                                                 />
                                                                 <span className="text-main flex-1">
                                                                     {worker.first_name} {worker.last_name}
@@ -2031,7 +2031,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                 type="checkbox"
                                                 checked={formData.requires_photos}
                                                 onChange={(e) => setFormData({ ...formData, requires_photos: e.target.checked })}
-                                                className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                className="rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary-500"
                                             />
                                             <div className="flex items-center gap-2">
                                                 <Camera className="w-4 h-4 text-blue-500" />
@@ -2044,7 +2044,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                 type="checkbox"
                                                 checked={formData.requires_tasks}
                                                 onChange={(e) => setFormData({ ...formData, requires_tasks: e.target.checked })}
-                                                className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                                                className="rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary-500"
                                             />
                                             <div className="flex items-center gap-2">
                                                 <CheckSquare className="w-4 h-4 text-purple-500" />

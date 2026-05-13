@@ -578,7 +578,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
 
                     {loading ? (
                         <div className="flex-1 flex items-center justify-center">
-                            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                         </div>
                     ) : (
                         <>
@@ -666,9 +666,9 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                             onDrop={(e) => handleDrop(e, `day-${day}`)}
                                         >
                                             <div className={`p-3 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 text-sm flex justify-between items-center sticky top-0 bg-card rounded-t-xl z-20 
-                                                ${day === (new Date().getDay() || 7) ? 'text-primary-600 dark:text-primary-400' : ''}`}>
+                                                ${day === (new Date().getDay() || 7) ? 'text-primary dark:text-primary' : ''}`}>
                                                 <span>{dayNames[day]}</span>
-                                                <span className={`px-2 py-0.5 rounded-full text-xs ${day === (new Date().getDay() || 7) ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'bg-gray-100 dark:bg-gray-700 text-muted'}`}>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs ${day === (new Date().getDay() || 7) ? 'bg-primary-100 text-primary dark:bg-primary-900/50 dark:text-primary-300' : 'bg-gray-100 dark:bg-gray-700 text-muted'}`}>
                                                     {dayTasks.length}
                                                 </span>
                                             </div>

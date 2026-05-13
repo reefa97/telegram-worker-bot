@@ -96,7 +96,7 @@ export default function LogsPanel() {
     if (loading && logs.length === 0) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -134,7 +134,7 @@ export default function LogsPanel() {
                             type="checkbox"
                             checked={autoRefresh}
                             onChange={(e) => setAutoRefresh(e.target.checked)}
-                            className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                            className="rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary-500"
                         />
                         Авто-обновление
                     </label>
@@ -290,7 +290,7 @@ export default function LogsPanel() {
                                         {expandedRow === log.id && (
                                             <tr key={`${log.id}-expanded`} className="bg-gray-50/50 dark:bg-gray-800/30">
                                                 <td colSpan={4} className="p-4 relative">
-                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary-500"></div>
+                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
                                                     <div className="pl-2">
                                                         <div className="text-xs font-semibold text-muted mb-2 uppercase tracking-wide">Метаданные события</div>
                                                         {log.metadata ? (

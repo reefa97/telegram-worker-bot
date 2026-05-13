@@ -153,7 +153,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                 <div className="modal-header">
                     <div>
                         <h3 className="text-xl font-bold text-main flex items-center gap-2">
-                            <History className="w-5 h-5 text-primary-500" />
+                            <History className="w-5 h-5 text-primary" />
                             История работы
                         </h3>
                         <p className="text-sm text-muted mt-1">
@@ -168,7 +168,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                 <div className="modal-body p-0">
                     {loading ? (
                         <div className="flex justify-center items-center h-64">
-                            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                         </div>
                     ) : sessions.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 text-muted">

@@ -404,7 +404,7 @@ export default function MyFinancesPanel() {
 
     const netPayout = totalObjectSalary + totalExtraIncome + totalExtraHoursPay + reimbursements;
 
-    if (loading && !objects.length) return <div className="flex justify-center items-center h-64"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div></div>;
+    if (loading && !objects.length) return <div className="flex justify-center items-center h-64"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>;
 
     return (
         <div className="space-y-6 pb-20 md:pb-0">

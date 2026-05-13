@@ -142,7 +142,7 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                 <div className="modal-header">
                     <div>
                         <h3 className="text-xl font-bold text-main flex items-center gap-2">
-                            <span className="bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 p-2 rounded-lg">
+                            <span className="bg-primary-100 dark:bg-primary-900/30 text-primary dark:text-primary p-2 rounded-lg">
                                 <User size={20} />
                             </span>
                             {session.workers?.first_name} {session.workers?.last_name}
@@ -150,7 +150,7 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                         {session.workers?.phone_number && (
                             <a
                                 href={`tel:${session.workers.phone_number}`}
-                                className="flex items-center gap-1.5 text-sm text-muted mt-2 hover:text-primary-600 dark:hover:text-primary-400 transition-colors w-fit"
+                                className="flex items-center gap-1.5 text-sm text-muted mt-2 hover:text-primary dark:hover:text-primary transition-colors w-fit"
                             >
                                 <Phone size={14} />
                                 {session.workers.phone_number}
@@ -237,7 +237,7 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                             <div className="bg-card rounded-xl border border-border overflow-hidden min-h-[300px]">
                                 {loadingHistory ? (
                                     <div className="flex justify-center items-center h-48">
-                                        <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                                        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                                     </div>
                                 ) : history.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center h-48 text-gray-400">

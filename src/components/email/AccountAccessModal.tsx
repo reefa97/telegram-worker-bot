@@ -121,7 +121,7 @@ export const AccountAccessModal: React.FC<AccountAccessModalProps> = ({ account,
                                             }`}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-full ${hasAccess ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40' : 'bg-zinc-200 text-zinc-500 dark:bg-zinc-800'}`}>
+                                            <div className={`p-2 rounded-full ${hasAccess ? 'bg-primary-100 text-primary dark:bg-primary-900/40' : 'bg-zinc-200 text-zinc-500 dark:bg-zinc-800'}`}>
                                                 <User className="w-4 h-4" />
                                             </div>
                                             <div className="text-left">
@@ -130,7 +130,7 @@ export const AccountAccessModal: React.FC<AccountAccessModalProps> = ({ account,
                                             </div>
                                         </div>
                                         {hasAccess ? (
-                                            <Check className="w-5 h-5 text-primary-600" />
+                                            <Check className="w-5 h-5 text-primary" />
                                         ) : (
                                             <div className="w-5 h-5 rounded-full border border-zinc-300 dark:border-zinc-700"></div>
                                         )}

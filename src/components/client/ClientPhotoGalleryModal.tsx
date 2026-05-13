@@ -154,7 +154,7 @@ export default function ClientPhotoGalleryModal({ sessionId, clientId, onClose }
                                 <button
                                     key={photo.id}
                                     onClick={() => setCurrentIndex(idx)}
-                                    className={`relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${idx === currentIndex ? 'border-primary-500 scale-110 z-10' : 'border-transparent opacity-50 hover:opacity-100'
+                                    className={`relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${idx === currentIndex ? 'border-primary scale-110 z-10' : 'border-transparent opacity-50 hover:opacity-100'
                                         }`}
                                 >
                                     <img src={photo.photo_url} className="w-full h-full object-cover" alt="" />

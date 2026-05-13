@@ -300,7 +300,7 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
                         <div>
                             <button
                                 onClick={() => setShowPointsHistory(!showPointsHistory)}
-                                className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                                className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white hover:text-primary dark:hover:text-primary transition-colors"
                             >
                                 <TrendingUp className="w-4 h-4 text-zinc-500" />
                                 История начислений

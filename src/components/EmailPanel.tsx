@@ -39,7 +39,7 @@ export default function EmailPanel() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-main flex items-center gap-2">
-                        <Mail className="text-primary-500" />
+                        <Mail className="text-primary" />
                         Почта
                     </h2>
                     <p className="text-muted text-sm mt-1">Управление почтовыми ящиками и рассылками</p>
@@ -50,7 +50,7 @@ export default function EmailPanel() {
                         <button
                             onClick={() => setView('inbox')}
                             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'inbox'
-                                ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400'
+                                ? 'bg-white dark:bg-gray-700 shadow-sm text-primary dark:text-primary'
                                 : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                                 }`}
                         >
@@ -59,7 +59,7 @@ export default function EmailPanel() {
                         <button
                             onClick={() => setView('settings')}
                             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'settings'
-                                ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400'
+                                ? 'bg-white dark:bg-gray-700 shadow-sm text-primary dark:text-primary'
                                 : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                                 }`}
                         >
@@ -113,7 +113,7 @@ function SettingsView({ accounts, loading, onDelete, onEdit }: { accounts: any[]
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -352,7 +352,7 @@ function AccountModal({ account, onClose, onSave }: { account?: any, onClose: ()
                                         }));
                                     }}
                                 />
-                                <Image size={14} className="text-primary-600 dark:text-primary-400" />
+                                <Image size={14} className="text-primary dark:text-primary" />
                                 <span className="text-xs font-medium text-main">Добавить фото</span>
                             </label>
                         </div>
@@ -514,13 +514,13 @@ function InboxView({ accounts, selectedAccount, onSelectAccount }: { accounts: a
                     <div className="flex bg-subtle p-1 rounded-lg">
                         <button
                             onClick={() => { setCurrentFolder('inbox'); setSelectedMessage(null); setShowCompose(false); }}
-                            className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-medium transition-all ${currentFolder === 'inbox' ? 'bg-card shadow-sm text-primary-600 dark:text-primary-400' : 'text-muted hover:text-main'}`}
+                            className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-medium transition-all ${currentFolder === 'inbox' ? 'bg-card shadow-sm text-primary dark:text-primary' : 'text-muted hover:text-main'}`}
                         >
                             <Inbox size={14} /> Входящие
                         </button>
                         <button
                             onClick={() => { setCurrentFolder('sent'); setSelectedMessage(null); setShowCompose(false); }}
-                            className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-medium transition-all ${currentFolder === 'sent' ? 'bg-card shadow-sm text-primary-600 dark:text-primary-400' : 'text-muted hover:text-main'}`}
+                            className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-medium transition-all ${currentFolder === 'sent' ? 'bg-card shadow-sm text-primary dark:text-primary' : 'text-muted hover:text-main'}`}
                         >
                             <SendIcon size={14} /> Отправленные
                         </button>
@@ -537,7 +537,7 @@ function InboxView({ accounts, selectedAccount, onSelectAccount }: { accounts: a
                             />
                             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         </div>
-                        <button onClick={() => { setShowCompose(true); setSelectedMessage(null); }} className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors shadow-sm" title="Написать письмо">
+                        <button onClick={() => { setShowCompose(true); setSelectedMessage(null); }} className="p-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors shadow-sm" title="Написать письмо">
                             <Plus size={18} />
                         </button>
                         <button onClick={() => loadMessages(true)} className="p-2 hover:bg-subtle rounded-lg text-muted hover:text-main transition-colors" title="Обновить и синхронизировать">
@@ -556,7 +556,7 @@ function InboxView({ accounts, selectedAccount, onSelectAccount }: { accounts: a
                             <div
                                 key={msg.id}
                                 onClick={() => { setSelectedMessage(msg); setShowCompose(false); }}
-                                className={`p-4 cursor-pointer hover:bg-subtle/50 transition-all ${selectedMessage?.id === msg.id ? 'bg-primary-50 dark:bg-primary-900/10 border-l-4 border-primary-500 pl-3' : 'pl-4 border-l-4 border-transparent'}`}
+                                className={`p-4 cursor-pointer hover:bg-subtle/50 transition-all ${selectedMessage?.id === msg.id ? 'bg-primary-50 dark:bg-primary-900/10 border-l-4 border-primary pl-3' : 'pl-4 border-l-4 border-transparent'}`}
                             >
                                 <div className="flex justify-between items-start mb-1">
                                     <span className={`text-sm truncate pr-2 ${!msg.is_read ? 'font-bold text-main' : 'font-medium text-main'}`}>
@@ -624,7 +624,7 @@ function InboxView({ accounts, selectedAccount, onSelectAccount }: { accounts: a
                             <h2 className="text-xl font-bold mb-4 text-main leading-tight">{selectedMessage.subject}</h2>
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center text-primary-700 dark:text-primary-300 font-bold text-lg shadow-sm">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center text-primary dark:text-primary-300 font-bold text-lg shadow-sm">
                                         {(selectedMessage.from_name || selectedMessage.from_address)[0].toUpperCase()}
                                     </div>
                                     <div>

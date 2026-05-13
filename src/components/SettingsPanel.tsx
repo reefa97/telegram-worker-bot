@@ -116,14 +116,14 @@ export default function SettingsPanel() {
                 <div className="space-y-6">
                     {loading ? (
                         <div className="flex justify-center items-center h-64">
-                            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                         </div>
                     ) : (
                         <>
                             {/* Bot Settings */}
                             <div className="card">
                                 <div className="flex items-center gap-3 mb-6">
-                                    <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-xl text-primary-600 dark:text-primary-400">
+                                    <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-xl text-primary dark:text-primary">
                                         <SettingsIcon className="w-6 h-6" />
                                     </div>
                                     <div>
@@ -169,7 +169,7 @@ export default function SettingsPanel() {
                                                 className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer peer checked:right-0 right-6"
                                                 style={{ top: 0 }}
                                             />
-                                            <label htmlFor="bot-active" className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer ${botActive ? 'bg-primary-500' : 'bg-gray-300 dark:bg-gray-600'}`}></label>
+                                            <label htmlFor="bot-active" className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer ${botActive ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></label>
                                         </div>
                                         <label htmlFor="bot-active" className="text-main font-medium cursor-pointer select-none">
                                             Бот активен
