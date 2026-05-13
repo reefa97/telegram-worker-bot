@@ -378,8 +378,11 @@ body { background-color: var(--bg-app); color: var(--text-main); }
     @apply flex items-center gap-0 border-b;
     border-color: var(--border-color);
     overflow-x: auto;
+    overflow-y: hidden;        /* prevent vertical scrollbar from ::after indicator */
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;     /* Firefox */
   }
+  .tabs::-webkit-scrollbar { display: none; }
   .tab {
     @apply relative inline-flex items-center gap-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap;
     color: var(--text-muted);
@@ -392,10 +395,10 @@ body { background-color: var(--bg-app); color: var(--text-main); }
   .tab[aria-selected="true"]::after, .tab.is-active::after {
     content: '';
     position: absolute;
-    left: 0; right: 0; bottom: -1px;
+    left: 0; right: 0; bottom: 0;
     height: 2px;
     background: var(--accent);
-    border-radius: 2px;
+    border-radius: 2px 2px 0 0;
   }
 
   /* ===== Modal / Sheet ===== */
