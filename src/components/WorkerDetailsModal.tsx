@@ -280,7 +280,7 @@ export default function WorkerDetailsModal({ worker, onClose }: WorkerDetailsMod
                                                 <button
                                                     onClick={() => handleUnlinkObject(obj.id)}
                                                     disabled={unlinkingObjectId === obj.id}
-                                                    className="shrink-0 p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                                                    className="shrink-0 p-1.5 rounded-lg text-red-500 hover:bg-danger/10 transition-colors disabled:opacity-50"
                                                     title="Отвязать объект"
                                                 >
                                                     <Unlink className="w-4 h-4" />

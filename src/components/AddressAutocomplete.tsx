@@ -123,7 +123,7 @@ export default function AddressAutocomplete({ value, onChange, placeholder = "В
                             className="w-full text-left p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-start gap-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0"
                         >
                             <MapPin className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
-                            <span className="text-sm text-gray-700 dark:text-gray-300 leading-snug">
+                            <span className="text-sm text-main leading-snug">
                                 {item.display_name}
                             </span>
                         </button>

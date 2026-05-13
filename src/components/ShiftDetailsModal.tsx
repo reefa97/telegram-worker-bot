@@ -172,9 +172,9 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                                     <Edit2 className="w-4 h-4" />
                                     Редактирование смены
                                 </h4>
-                                <div className="space-y-4 bg-gray-50 dark:bg-gray-900/30 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <div className="space-y-4 bg-subtle/30 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Время начала</label>
+                                        <label className="block text-xs font-medium text-muted mb-1.5">Время начала</label>
                                         <input
                                             type="datetime-local"
                                             value={editForm.start_time}
@@ -183,7 +183,7 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Время окончания</label>
+                                        <label className="block text-xs font-medium text-muted mb-1.5">Время окончания</label>
                                         <input
                                             type="datetime-local"
                                             value={editForm.end_time}
@@ -207,8 +207,8 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                                     <MapPin className="w-4 h-4" />
                                     Информация об объекте
                                 </h4>
-                                <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
-                                    <div className="font-semibold text-lg text-gray-900 dark:text-white mb-1">
+                                <div className="bg-primary/5 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                                    <div className="font-semibold text-lg text-main mb-1">
                                         {session.cleaning_objects?.name}
                                     </div>
                                     {session.cleaning_objects?.address && (
@@ -234,7 +234,7 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                                 История смен на объекте
                             </h4>
 
-                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden min-h-[300px]">
+                            <div className="bg-card rounded-xl border border-border overflow-hidden min-h-[300px]">
                                 {loadingHistory ? (
                                     <div className="flex justify-center items-center h-48">
                                         <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
@@ -251,14 +251,14 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                                             {history.map(item => (
                                                 <div key={item.id} className="flex items-center justify-between px-4 py-3">
                                                     <div>
-                                                        <div className="font-medium text-gray-900 dark:text-white text-sm">
+                                                        <div className="font-medium text-main text-sm">
                                                             {item.workers?.first_name} {item.workers?.last_name}
                                                         </div>
                                                         <div className="text-xs text-gray-500 mt-0.5">{formatDate(item.start_time)}</div>
                                                     </div>
                                                     <div>
                                                         {item.duration_minutes ? (
-                                                            <span className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{formatDuration(item.duration_minutes)}</span>
+                                                            <span className="text-xs bg-subtle px-2 py-0.5 rounded">{formatDuration(item.duration_minutes)}</span>
                                                         ) : (
                                                             <span className="text-amber-500 text-xs">В процессе</span>
                                                         )}
@@ -269,7 +269,7 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                                         {/* Desktop table */}
                                         <div className="hidden sm:block overflow-x-auto">
                                             <table className="w-full text-sm">
-                                                <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-500 font-semibold uppercase">
+                                                <thead className="bg-subtle/50 text-xs text-gray-500 font-semibold uppercase">
                                                     <tr>
                                                         <th className="px-4 py-3 text-left">Работник</th>
                                                         <th className="px-4 py-3 text-left">Дата</th>
@@ -280,16 +280,16 @@ export default function ShiftDetailsModal({ session, onClose, onUpdate }: ShiftD
                                                     {history.map(item => (
                                                         <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                                             <td className="px-4 py-3">
-                                                                <div className="font-medium text-gray-900 dark:text-white">
+                                                                <div className="font-medium text-main">
                                                                     {item.workers?.first_name} {item.workers?.last_name}
                                                                 </div>
                                                             </td>
-                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                                                            <td className="px-4 py-3 text-muted">
                                                                 {formatDate(item.start_time)}
                                                             </td>
                                                             <td className="px-4 py-3 text-right">
                                                                 {item.duration_minutes ? (
-                                                                    <span className="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-xs">
+                                                                    <span className="inline-flex items-center gap-1 bg-subtle px-2 py-0.5 rounded text-xs">
                                                                         {formatDuration(item.duration_minutes)}
                                                                     </span>
                                                                 ) : (

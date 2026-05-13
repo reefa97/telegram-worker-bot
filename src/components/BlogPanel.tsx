@@ -678,11 +678,11 @@ function StatusBadge({ status }: { status: BlogStatus | TopicStatus }) {
     const styles: Record<string, string> = {
         draft: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
         published: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
-        archived: 'bg-gray-500/15 text-gray-700 dark:text-gray-300 border-gray-500/30',
+        archived: 'bg-gray-500/15 text-main border-gray-500/30',
         pending: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
         generating: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
         generated: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
-        skipped: 'bg-gray-500/15 text-gray-700 dark:text-gray-300 border-gray-500/30',
+        skipped: 'bg-gray-500/15 text-main border-gray-500/30',
         failed: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30',
     };
     return (

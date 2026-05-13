@@ -463,7 +463,7 @@ export default function EmailTrackingPanel() {
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleDelete(track.id); }}
                                                 disabled={deleting === track.id}
-                                                className="p-1.5 text-muted hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
+                                                className="p-1.5 text-muted hover:text-red-500 rounded-lg hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>

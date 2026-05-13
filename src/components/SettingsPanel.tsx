@@ -127,8 +127,8 @@ export default function SettingsPanel() {
                                         <SettingsIcon className="w-6 h-6" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Настройки Telegram бота</h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Конфигурация токена и статуса бота</p>
+                                        <h3 className="text-lg font-semibold text-main">Настройки Telegram бота</h3>
+                                        <p className="text-sm text-muted">Конфигурация токена и статуса бота</p>
                                     </div>
                                 </div>
 
@@ -140,7 +140,7 @@ export default function SettingsPanel() {
 
                                 <div className="space-y-6">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                        <label className="block text-sm font-medium text-main mb-1.5">
                                             Telegram Bot Token
                                         </label>
                                         <input
@@ -151,13 +151,13 @@ export default function SettingsPanel() {
                                             placeholder="1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ"
                                             disabled={!isSuperAdmin}
                                         />
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 flex items-center gap-1">
+                                        <p className="text-xs text-muted mt-1.5 flex items-center gap-1">
                                             <Info className="w-3 h-3" />
                                             Получите токен у @BotFather в Telegram
                                         </p>
                                     </div>
 
-                                    <div className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="flex items-center gap-3 p-3 border border-border rounded-xl bg-subtle/50">
                                         <div className="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
                                             <input
                                                 type="checkbox"
@@ -171,7 +171,7 @@ export default function SettingsPanel() {
                                             />
                                             <label htmlFor="bot-active" className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer ${botActive ? 'bg-primary-500' : 'bg-gray-300 dark:bg-gray-600'}`}></label>
                                         </div>
-                                        <label htmlFor="bot-active" className="text-gray-700 dark:text-gray-300 font-medium cursor-pointer select-none">
+                                        <label htmlFor="bot-active" className="text-main font-medium cursor-pointer select-none">
                                             Бот активен
                                         </label>
                                     </div>
@@ -197,18 +197,18 @@ export default function SettingsPanel() {
                                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
                                         <Bell className="w-5 h-5" />
                                     </div>
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                    <h3 className="text-lg font-semibold text-main">
                                         Уведомления в Telegram
                                     </h3>
                                 </div>
 
                                 <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300">
                                     <p>
-                                        Уведомления о начале и окончании работы теперь отправляются <strong className="text-gray-900 dark:text-white">автоматически</strong> тому администратору, который создал работника.
+                                        Уведомления о начале и окончании работы теперь отправляются <strong className="text-main">автоматически</strong> тому администратору, который создал работника.
                                     </p>
 
                                     <div className="grid md:grid-cols-2 gap-4">
-                                        <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4">
+                                        <div className="bg-primary/5 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4">
                                             <p className="text-blue-700 dark:text-blue-300 font-medium mb-2">Как настроить уведомления:</p>
                                             <ol className="list-decimal list-inside space-y-1.5 text-blue-600 dark:text-blue-400">
                                                 <li>Перейдите в раздел <strong>"Роли"</strong></li>
@@ -217,10 +217,10 @@ export default function SettingsPanel() {
                                             </ol>
                                         </div>
 
-                                        <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+                                        <div className="bg-subtle/50 border border-border rounded-xl p-4">
                                             <p className="text-gray-700 dark:text-gray-200 font-medium mb-2">Как получить Chat ID:</p>
-                                            <ol className="list-decimal list-inside space-y-1.5 text-gray-600 dark:text-gray-400">
-                                                <li>Напишите боту <code className="bg-white dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 font-mono text-xs">@userinfobot</code></li>
+                                            <ol className="list-decimal list-inside space-y-1.5 text-muted">
+                                                <li>Напишите боту <code className="bg-white dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-main font-mono text-xs">@userinfobot</code></li>
                                                 <li>Он отправит вам ваш Chat ID</li>
                                                 <li>Скопируйте его в поле "Telegram Chat ID"</li>
                                             </ol>

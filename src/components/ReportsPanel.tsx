@@ -664,7 +664,7 @@ export default function ReportsPanel() {
                                         {!session.end_time && (
                                             <button
                                                 onClick={() => handleFinishSession(session.id, session.start_time)}
-                                                className="btn-icon text-danger hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                className="btn-icon text-danger hover:bg-danger/10"
                                                 title="Завершить смену"
                                             >
                                                 <StopCircle size={16} />
@@ -679,7 +679,7 @@ export default function ReportsPanel() {
                                         </button>
                                         <button
                                             onClick={() => handleDeleteSession(session.id)}
-                                            className="btn-icon text-danger hover:bg-red-50 dark:hover:bg-red-900/20"
+                                            className="btn-icon text-danger hover:bg-danger/10"
                                             title="Удалить"
                                         >
                                             <Trash2 size={16} />

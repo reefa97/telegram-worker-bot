@@ -158,7 +158,7 @@ export default function TrashPanel() {
                                     <button
                                         onClick={() => handleRestore(item.id)}
                                         disabled={!!processingId}
-                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-medium disabled:opacity-50"
+                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-primary/5 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-medium disabled:opacity-50"
                                     >
                                         {processingId === item.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                                         Восстановить
@@ -198,7 +198,7 @@ export default function TrashPanel() {
                                 </tr>
                             ) : items.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="py-12 text-center text-gray-500 dark:text-gray-400">
+                                    <td colSpan={4} className="py-12 text-center text-muted">
                                         <Trash2 className="w-12 h-12 mx-auto mb-3 opacity-20" />
                                         Корзина пуста
                                     </td>
@@ -206,13 +206,13 @@ export default function TrashPanel() {
                             ) : (
                                 items.map((item) => (
                                     <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                        <td className="font-medium text-gray-900 dark:text-white">
+                                        <td className="font-medium text-main">
                                             {item.name}
                                         </td>
-                                        <td className="text-gray-500 dark:text-gray-400 text-sm">
+                                        <td className="text-muted text-sm">
                                             {item.info}
                                         </td>
-                                        <td className="text-gray-500 dark:text-gray-400 text-sm">
+                                        <td className="text-muted text-sm">
                                             {new Date(item.deleted_at).toLocaleString('ru-RU')}
                                         </td>
                                         <td>
@@ -220,7 +220,7 @@ export default function TrashPanel() {
                                                 <button
                                                     onClick={() => handleRestore(item.id)}
                                                     disabled={!!processingId}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/5 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
                                                 >
                                                     {processingId === item.id ? (
                                                         <RefreshCw className="w-4 h-4 animate-spin" />

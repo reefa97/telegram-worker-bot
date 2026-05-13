@@ -106,7 +106,7 @@ export default function LeadModal({ isOpen, onClose, onSave, leadToEdit }: LeadM
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn flex flex-col max-h-[90vh]">
+            <div className="bg-card w-full max-w-2xl rounded-xl shadow-xl border border-border overflow-hidden animate-scaleIn flex flex-col max-h-[90vh]">
 
                 {/* Header */}
                 <div className="p-4 border-b border-border flex justify-between items-center bg-subtle shrink-0">

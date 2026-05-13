@@ -806,7 +806,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                         </>
                                     )}
                                     {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
-                                        <button onClick={(e) => { e.stopPropagation(); handleDelete(object.id, e); }} className="p-1.5 text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg" title="Удалить"><Trash2 size={14} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDelete(object.id, e); }} className="p-1.5 text-muted hover:text-red-600 hover:bg-danger/10 rounded-lg" title="Удалить"><Trash2 size={14} /></button>
                                     )}
                                 </div>
                             </div>
@@ -953,7 +953,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                 {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleDelete(object.id, e); }}
-                                                        className="p-1.5 text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                        className="p-1.5 text-muted hover:text-red-600 hover:bg-danger/10 rounded-lg transition-colors"
                                                         title="Удалить"
                                                     >
                                                         <Trash2 size={16} />
@@ -1105,13 +1105,13 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                 if (adminUser?.role === 'super_admin' && allRates.length > 0) {
                                                     const total = allRates.reduce((a, b) => a + b, 0);
                                                     return (
-                                                        <span className="text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-900/30">
+                                                        <span className="text-blue-600 dark:text-blue-400 font-bold bg-primary/5 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-900/30">
                                                             {total} zł (О)
                                                         </span>
                                                     );
                                                 } else if (ownRate !== undefined) {
                                                     return (
-                                                        <span className="text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-900/30">
+                                                        <span className="text-blue-600 dark:text-blue-400 font-bold bg-primary/5 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-900/30">
                                                             {ownRate} zł (О)
                                                         </span>
                                                     );
@@ -1365,7 +1365,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                     <div className="modal-overlay" onClick={closeModal}>
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <div className="modal-header">
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                <h3 className="text-xl font-bold text-main">
                                     {editingObject ? 'Редактировать объект' : 'Новый объект'}
                                 </h3>
                                 <button onClick={closeModal} className="btn-icon">
@@ -1376,7 +1376,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                             <form onSubmit={handleSubmit}>
                                 <div className="modal-body space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Название</label>
+                                        <label className="block text-sm font-medium text-main mb-1">Название</label>
                                         <input
                                             type="text"
                                             value={formData.name}
@@ -1387,7 +1387,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Адрес</label>
+                                        <label className="block text-sm font-medium text-main mb-1">Адрес</label>
                                         <AddressAutocomplete
                                             value={formData.address}
                                             onChange={(val, lat, lon) => {
@@ -1410,10 +1410,10 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                     {(adminUser?.role === 'super_admin') && (
                                         <>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            <label className="block text-sm font-medium text-main mb-1">
                                                 Владельцы (Опекуны) и их ставки
                                             </label>
-                                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-56 overflow-y-auto border border-gray-200 dark:border-gray-700 space-y-2">
+                                            <div className="bg-subtle/50 rounded-lg p-3 max-h-56 overflow-y-auto border border-border space-y-2">
                                                 {adminsList.filter(a => a.role !== 'client').map((admin) => (
                                                     <div key={admin.id} className="flex flex-col gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
                                                         <label className="flex items-center gap-2 cursor-pointer">
@@ -1438,7 +1438,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                                 }}
                                                                 className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
                                                             />
-                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{admin.name} ({admin.role})</span>
+                                                            <span className="text-sm font-medium text-main">{admin.name} ({admin.role})</span>
                                                         </label>
                                                         {formData.owner_ids.includes(admin.id) && (
                                                             <div className="flex items-center gap-2 pl-6 animate-fadeIn">
@@ -1474,7 +1474,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                     {adminUser?.role === 'super_admin' ? (
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Тип оплаты</label>
+                                                <label className="block text-sm font-medium text-main mb-1">Тип оплаты</label>
                                                 <select
                                                     value={formData.salary_type}
                                                     onChange={(e) => setFormData({
@@ -1488,7 +1488,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                <label className="block text-sm font-medium text-main mb-1">
                                                     {formData.salary_type === 'hourly' ? 'Ставка работника (в час)' : 'Зарплата работника (в месяц)'}
                                                 </label>
                                                 <div className="relative">
@@ -1510,7 +1510,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                                        <div className="p-3 bg-subtle/50 rounded-lg border border-gray-100 dark:border-gray-800">
                                             <div className="text-[10px] text-muted uppercase font-bold mb-2">Оплата работнику</div>
                                             <div className="text-sm font-medium text-main">
                                                 {formData.salary_type === 'hourly'
@@ -1543,10 +1543,10 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                     )}
 
                                     {/* Client Contacts (Phones & Emails) */}
-                                    <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+                                    <div className="space-y-4 pt-4 border-t border-border">
                                         <div>
                                             <div className="flex justify-between items-center mb-2">
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Телефоны клиента</label>
+                                                <label className="block text-sm font-medium text-main">Телефоны клиента</label>
                                                 <button
                                                     type="button"
                                                     onClick={() => setFormData({
@@ -1586,7 +1586,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                                             client_contact_names: newNames
                                                                         });
                                                                     }}
-                                                                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded h-10 w-10 flex items-center justify-center border border-transparent"
+                                                                    className="p-2 text-red-500 hover:bg-danger/10 rounded h-10 w-10 flex items-center justify-center border border-transparent"
                                                                 >
                                                                     <Trash2 size={16} />
                                                                 </button>
@@ -1616,7 +1616,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
 
                                         <div>
                                             <div className="flex justify-between items-center mb-2">
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email клиента</label>
+                                                <label className="block text-sm font-medium text-main">Email клиента</label>
                                                 <button
                                                     type="button"
                                                     onClick={() => setFormData({ ...formData, client_emails: [...formData.client_emails, ''] })}
@@ -1646,7 +1646,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                                     const newEmails = formData.client_emails.filter((_, i) => i !== index);
                                                                     setFormData({ ...formData, client_emails: newEmails });
                                                                 }}
-                                                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                                                className="p-2 text-red-500 hover:bg-danger/10 rounded"
                                                             >
                                                                 <Trash2 size={16} />
                                                             </button>
@@ -1659,7 +1659,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
 
                                     {/* Reminder Settings (Super-Admin Only) */}
                                     {adminUser?.role === 'super_admin' && (
-                                        <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+                                        <div className="space-y-4 pt-4 border-t border-border">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200">Напоминания о звонке клиенту</h4>
                                                 <span className="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">NEW</span>
@@ -1674,14 +1674,14 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                 />
                                                 <div className="flex items-center gap-2">
                                                     <Clock className="w-4 h-4 text-blue-500" />
-                                                    <span className="text-sm text-gray-700 dark:text-gray-300">Активировать напоминания</span>
+                                                    <span className="text-sm text-main">Активировать напоминания</span>
                                                 </div>
                                             </label>
 
                                             {formData.reminder_active && (
                                                 <div className="grid grid-cols-2 gap-4 animate-fadeIn">
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Периодичность</label>
+                                                        <label className="block text-sm font-medium text-main mb-1">Периодичность</label>
                                                         <select
                                                             value={formData.reminder_frequency}
                                                             onChange={(e) => setFormData({
@@ -1696,7 +1696,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                         </select>
                                                     </div>
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ответственный</label>
+                                                        <label className="block text-sm font-medium text-main mb-1">Ответственный</label>
                                                         <select
                                                             value={formData.reminder_assignee_id}
                                                             onChange={(e) => setFormData({
@@ -1720,11 +1720,11 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                     )}
 
                                     {/* Schedule */}
-                                    <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-800">
+                                    <div className="space-y-3 pt-2 border-t border-border">
                                         <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-200">График работы</h4>
 
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дни недели</label>
+                                            <label className="block text-sm font-medium text-main mb-2">Дни недели</label>
                                             <div className="flex flex-wrap gap-2">
                                                 {[
                                                     { val: 1, label: 'Пн' }, { val: 2, label: 'Вт' }, { val: 3, label: 'Ср' },
@@ -1749,7 +1749,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                         }}
                                                         className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${formData.schedule_days.includes(day.val)
                                                             ? 'bg-blue-600 text-white shadow-md transform scale-105'
-                                                            : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                                            : 'bg-gray-200 dark:bg-gray-700 text-muted hover:bg-gray-300 dark:hover:bg-gray-600'
                                                             }`}
                                                     >
                                                         {day.label}
@@ -1761,7 +1761,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                         {/* Default time */}
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Начало (по умолч.)</label>
+                                                <label className="block text-sm font-medium text-main mb-1">Начало (по умолч.)</label>
                                                 <input
                                                     type="time"
                                                     value={formData.schedule_time_start}
@@ -1770,7 +1770,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Конец (по умолч.)</label>
+                                                <label className="block text-sm font-medium text-main mb-1">Конец (по умолч.)</label>
                                                 <input
                                                     type="time"
                                                     value={formData.schedule_time_end}
@@ -1843,9 +1843,9 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                     </div>
 
                                     {/* Late notifications toggle */}
-                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <div className="flex items-center justify-between p-3 bg-subtle/50 rounded-lg border border-border">
                                         <div>
-                                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Уведомления об опозданиях</label>
+                                            <label className="text-sm font-medium text-main">Уведомления об опозданиях</label>
                                             <p className="text-xs text-gray-500 mt-0.5">Отправлять уведомления при опоздании на смену</p>
                                         </div>
                                         <button
@@ -1860,13 +1860,13 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                     {/* Documents */}
                                     {editingObject && adminUser?.role === 'super_admin' && (
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            <label className="block text-sm font-medium text-main mb-1">
                                                 Документы
                                             </label>
-                                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-2">
+                                            <div className="bg-subtle/50 rounded-lg p-3 border border-border space-y-2">
                                                 {objectDocuments.length > 0 ? (
                                                     objectDocuments.map(doc => (
-                                                        <div key={doc.id} className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                                                        <div key={doc.id} className="flex items-center justify-between gap-2 p-2 bg-card rounded-lg border border-border">
                                                             <div className="flex items-center gap-2 min-w-0">
                                                                 <FileText className="w-4 h-4 text-blue-500 shrink-0" />
                                                                 <div className="min-w-0">
@@ -1889,7 +1889,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleDocDelete(doc, editingObject.id)}
-                                                                    className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                                                                    className="p-1.5 text-red-600 hover:bg-danger/10 rounded-lg"
                                                                     title="Удалить"
                                                                 >
                                                                     <Trash2 className="w-4 h-4" />
@@ -1913,7 +1913,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                     type="button"
                                                     onClick={() => docInputRef.current?.click()}
                                                     disabled={uploadingDoc}
-                                                    className="w-full flex items-center justify-center gap-2 p-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+                                                    className="w-full flex items-center justify-center gap-2 p-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-muted hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
                                                 >
                                                     <Upload className="w-4 h-4" />
                                                     {uploadingDoc ? 'Загрузка...' : 'Загрузить документ'}
@@ -1924,17 +1924,17 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
 
                                     {/* Workers Selection */}
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        <label className="block text-sm font-medium text-main mb-1">
                                             Назначенные работники
                                         </label>
-                                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-700 space-y-1">
+                                        <div className="bg-subtle/50 rounded-lg p-3 max-h-64 overflow-y-auto border border-border space-y-1">
                                             {allWorkers.length > 0 ? (
                                                 allWorkers.map((worker) => {
                                                     const isAssigned = formData.worker_ids.includes(worker.id);
                                                     const workerDays = formData.worker_schedule_days[worker.id];
                                                     const hasCustomDays = workerDays && workerDays.length > 0;
                                                     return (
-                                                        <div key={worker.id} className={`rounded-lg transition-colors ${isAssigned ? 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700' : ''}`}>
+                                                        <div key={worker.id} className={`rounded-lg transition-colors ${isAssigned ? 'bg-card border border-border' : ''}`}>
                                                             <label className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg">
                                                                 <input
                                                                     type="checkbox"
@@ -1956,7 +1956,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                                     }}
                                                                     className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
                                                                 />
-                                                                <span className="text-gray-700 dark:text-gray-300 flex-1">
+                                                                <span className="text-main flex-1">
                                                                     {worker.first_name} {worker.last_name}
                                                                 </span>
                                                                 {isAssigned && (
@@ -2003,7 +2003,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                                                                     className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium transition-colors ${
                                                                                         isSelected
                                                                                             ? 'bg-primary text-white'
-                                                                                            : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500'
+                                                                                            : 'bg-gray-200 dark:bg-gray-700 text-muted'
                                                                                     }`}
                                                                                 >
                                                                                     {day.label}
@@ -2035,7 +2035,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                             />
                                             <div className="flex items-center gap-2">
                                                 <Camera className="w-4 h-4 text-blue-500" />
-                                                <span className="text-sm text-gray-700 dark:text-gray-300">Требуются фото отчеты</span>
+                                                <span className="text-sm text-main">Требуются фото отчеты</span>
                                             </div>
                                         </label>
 
@@ -2048,7 +2048,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                             />
                                             <div className="flex items-center gap-2">
                                                 <CheckSquare className="w-4 h-4 text-purple-500" />
-                                                <span className="text-sm text-gray-700 dark:text-gray-300">Требуется выполнение задач</span>
+                                                <span className="text-sm text-main">Требуется выполнение задач</span>
                                             </div>
                                         </label>
                                     </div>

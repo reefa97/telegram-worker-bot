@@ -303,7 +303,7 @@ export default function ClientCalendar() {
                                     key={event.id}
                                     className={`rounded-xl p-4 border-l-4 ${event.type === 'completed'
                                             ? 'bg-emerald-50 dark:bg-emerald-900/10 border-l-emerald-500'
-                                            : 'bg-blue-50 dark:bg-blue-900/10 border-l-blue-500'
+                                            : 'bg-primary/5 border-l-blue-500'
                                         }`}
                                 >
                                     <div className="flex items-center gap-2 mb-2">

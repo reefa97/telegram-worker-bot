@@ -411,11 +411,11 @@ export default function MyFinancesPanel() {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Мои финансы</h2>
+                    <h2 className="text-2xl font-bold text-main">Мои финансы</h2>
                     <p className="text-muted text-sm mt-1">Финансовая статистика и управление</p>
                 </div>
                 <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg p-1 border border-border shadow-sm flex-1 md:flex-none justify-between md:justify-start">
+                    <div className="flex items-center bg-card rounded-lg p-1 border border-border shadow-sm flex-1 md:flex-none justify-between md:justify-start">
                         <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} className="p-1.5 hover:bg-subtle rounded-md text-muted hover:text-main">
                             <ChevronLeft size={20} />
                         </button>
@@ -428,7 +428,7 @@ export default function MyFinancesPanel() {
                         </button>
                     </div>
                     {adminUser?.role === 'super_admin' && (
-                        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hidden md:flex">
+                        <div className="flex items-center gap-2 bg-card p-2 rounded-lg border border-border shadow-sm hidden md:flex">
                             <span className="text-xs font-bold text-muted uppercase px-2">Пользователь:</span>
                             <select value={selectedAdminId} onChange={(e) => setSelectedAdminId(e.target.value)} className="bg-transparent border-none text-sm font-medium focus:ring-0 cursor-pointer min-w-[150px] outline-none text-main">
                                 {adminsList.map(a => <option key={a.id} value={a.id}>{a.id === adminUser.id ? 'Мой (Я)' : a.name}</option>)}
@@ -438,7 +438,7 @@ export default function MyFinancesPanel() {
                 </div>
                 {adminUser?.role === 'super_admin' && (
                     <div className="md:hidden w-full">
-                        <select value={selectedAdminId} onChange={(e) => setSelectedAdminId(e.target.value)} className="w-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-lg p-2 text-sm text-main">
+                        <select value={selectedAdminId} onChange={(e) => setSelectedAdminId(e.target.value)} className="w-full bg-card border-border rounded-lg p-2 text-sm text-main">
                             {adminsList.map(a => <option key={a.id} value={a.id}>{a.id === adminUser.id ? 'Мой (Я)' : a.name}</option>)}
                         </select>
                     </div>
@@ -510,7 +510,7 @@ export default function MyFinancesPanel() {
                         <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Зарплата (Объекты)</p>
                         <h3 className="text-2xl font-bold text-main">{totalObjectSalary.toLocaleString()} <span className="text-sm font-normal text-muted">zł</span></h3>
                     </div>
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/10 rounded-lg text-blue-600 dark:text-blue-400"><Briefcase size={20} /></div>
+                    <div className="p-2 bg-primary/5 rounded-lg text-blue-600 dark:text-blue-400"><Briefcase size={20} /></div>
                 </div>
 
                 {/* Expenses */}
@@ -742,13 +742,13 @@ export default function MyFinancesPanel() {
 
                     {/* Delete Confirmation Modal */}
                     {deleteConfirm && (
-                        <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn">
+                        <div className="bg-card w-full max-w-sm rounded-xl shadow-xl border border-border overflow-hidden animate-scaleIn">
                             <div className="p-4 border-b border-border flex justify-between items-center bg-red-50 dark:bg-red-900/20">
                                 <h3 className="font-bold text-lg text-red-700 dark:text-red-400">Подтверждение</h3>
                                 <button onClick={() => setDeleteConfirm(null)} className="text-muted hover:text-main"><X size={20} /></button>
                             </div>
                             <div className="p-6">
-                                <p className="text-gray-700 dark:text-gray-300 mb-6">{deleteConfirm.title}</p>
+                                <p className="text-main mb-6">{deleteConfirm.title}</p>
                                 <div className="flex justify-end gap-3 font-medium">
                                     <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">Отмена</button>
                                     <button onClick={executeDelete} className="btn-primary bg-red-600 hover:bg-red-700 px-6">Удалить</button>
@@ -759,7 +759,7 @@ export default function MyFinancesPanel() {
 
                     {/* Add Credit Modal */}
                     {showAddCreditModal && (
-                        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn">
+                        <div className="bg-card w-full max-w-md rounded-xl shadow-xl border border-border overflow-hidden animate-scaleIn">
                             <div className="p-4 border-b border-border flex justify-between items-center bg-green-50 dark:bg-green-900/20">
                                 <h3 className="font-bold text-lg text-green-700 dark:text-green-400">Пополнить баланс</h3>
                                 <button onClick={() => setShowAddCreditModal(false)} className="text-muted hover:text-main"><X size={20} /></button>
@@ -787,7 +787,7 @@ export default function MyFinancesPanel() {
 
                     {/* Deduct Credit Modal */}
                     {showDeductCreditModal && (
-                        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn">
+                        <div className="bg-card w-full max-w-md rounded-xl shadow-xl border border-border overflow-hidden animate-scaleIn">
                             <div className="p-4 border-b border-border flex justify-between items-center bg-red-50 dark:bg-red-900/20">
                                 <h3 className="font-bold text-lg text-red-700 dark:text-red-400">Списать с баланса</h3>
                                 <button onClick={() => setShowDeductCreditModal(false)} className="text-muted hover:text-main"><X size={20} /></button>
@@ -815,7 +815,7 @@ export default function MyFinancesPanel() {
 
                     {/* Expense Modal (Existing) */}
                     {showExpenseModal && (
-                        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn">
+                        <div className="bg-card w-full max-w-md rounded-xl shadow-xl border border-border overflow-hidden animate-scaleIn">
                             <div className="p-4 border-b border-border flex justify-between items-center bg-subtle">
                                 <h3 className="font-bold text-lg text-main">Новый расход</h3>
                                 <button onClick={() => setShowExpenseModal(false)} className="text-muted hover:text-main"><X size={20} /></button>
@@ -847,7 +847,7 @@ export default function MyFinancesPanel() {
 
                     {/* Hours Modal (Existing) */}
                     {showHoursModal && (
-                        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn">
+                        <div className="bg-card w-full max-w-md rounded-xl shadow-xl border border-border overflow-hidden animate-scaleIn">
                             <div className="p-4 border-b border-border flex justify-between items-center bg-subtle">
                                 <h3 className="font-bold text-lg text-main">Лог работы</h3>
                                 <button onClick={() => setShowHoursModal(false)} className="text-muted hover:text-main"><X size={20} /></button>
@@ -873,7 +873,7 @@ export default function MyFinancesPanel() {
 
                     {/* Income Modal (Existing) */}
                     {showIncomeModal && (
-                        <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn">
+                        <div className="bg-card w-full max-w-md rounded-xl shadow-xl border border-border overflow-hidden animate-scaleIn">
                             <div className="p-4 border-b border-border flex justify-between items-center bg-subtle">
                                 <h3 className="font-bold text-lg text-main">Начисление бонуса</h3>
                                 <button onClick={() => setShowIncomeModal(false)} className="text-muted hover:text-main"><X size={20} /></button>

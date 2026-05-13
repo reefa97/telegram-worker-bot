@@ -800,7 +800,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                 <div className="modal-overlay" onClick={closeModal}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                            <h3 className="text-xl font-bold text-main">
                                 {editingWorker ? 'Редактировать работника' : 'Новый работник'}
                             </h3>
                             <button onClick={closeModal} className="btn-icon">
@@ -812,7 +812,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                             <div className="modal-body space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Имя</label>
+                                        <label className="block text-sm font-medium text-main mb-1">Имя</label>
                                         <input
                                             type="text"
                                             value={formData.first_name}
@@ -822,7 +822,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Фамилия</label>
+                                        <label className="block text-sm font-medium text-main mb-1">Фамилия</label>
                                         <input
                                             type="text"
                                             value={formData.last_name}
@@ -834,7 +834,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Телефон</label>
+                                    <label className="block text-sm font-medium text-main mb-1">Телефон</label>
                                     <input
                                         type="tel"
                                         value={formData.phone_number}
@@ -845,7 +845,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
 
                                 <div>
                                     <div className="flex justify-between items-center mb-1">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Роль</label>
+                                        <label className="block text-sm font-medium text-main">Роль</label>
                                         {!isAddingRole && (
                                             <button
                                                 type="button"
@@ -901,7 +901,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
 
                                 {adminUser?.role === 'super_admin' && (
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Опекун (кто видит работника)</label>
+                                        <label className="block text-sm font-medium text-main mb-1">Опекун (кто видит работника)</label>
                                         <div className="relative">
                                             <select
                                                 value={formData.created_by}
@@ -918,8 +918,8 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                                 )}
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Объекты работы</label>
-                                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700">
+                                    <label className="block text-sm font-medium text-main mb-2">Объекты работы</label>
+                                    <div className="bg-subtle/50 rounded-lg p-3 max-h-40 overflow-y-auto border border-border">
                                         {objects.map((obj) => (
                                             <label key={obj.id} className="flex items-center gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded cursor-pointer transition-colors">
                                                 <input
@@ -940,7 +940,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                                                     }}
                                                     className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
                                                 />
-                                                <span className="text-gray-700 dark:text-gray-300">{obj.name}</span>
+                                                <span className="text-main">{obj.name}</span>
                                                 <span className="text-gray-500 text-xs ml-auto">{obj.address}</span>
                                             </label>
                                         ))}
@@ -966,7 +966,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                 <div className="modal-overlay" onClick={() => setShowBulkModal(false)}>
                     <div className="modal-content max-w-md" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                            <h3 className="text-xl font-bold text-main">
                                 Написать {selectedWorkers.size} работникам
                             </h3>
                             <button onClick={() => setShowBulkModal(false)} className="btn-icon">
@@ -976,7 +976,7 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
 
                         <div className="modal-body space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Сообщение</label>
+                                <label className="block text-sm font-medium text-main mb-2">Сообщение</label>
                                 <textarea
                                     value={bulkMessage}
                                     onChange={(e) => setBulkMessage(e.target.value)}

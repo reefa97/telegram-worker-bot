@@ -181,18 +181,18 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
             {/* Header Area */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Закупки</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Управление заявками на материалы</p>
+                    <h2 className="text-2xl font-bold text-main">Закупки</h2>
+                    <p className="text-sm text-muted">Управление заявками на материалы</p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                     {/* Tabs */}
-                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex bg-subtle p-1 rounded-lg border border-border">
                         <button
                             onClick={() => setActiveTab('active')}
                             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'active'
-                                ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
-                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                ? 'bg-white dark:bg-gray-700 shadow-sm text-main'
+                                : 'text-muted hover:text-gray-700 dark:hover:text-gray-200'
                                 }`}
                         >
                             <ShoppingCart size={14} />
@@ -201,8 +201,8 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                         <button
                             onClick={() => setActiveTab('archive')}
                             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'archive'
-                                ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
-                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                ? 'bg-white dark:bg-gray-700 shadow-sm text-main'
+                                : 'text-muted hover:text-gray-700 dark:hover:text-gray-200'
                                 }`}
                         >
                             <Archive size={14} />
@@ -212,7 +212,7 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
 
                     <button
                         onClick={fetchRequests}
-                        className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors shadow-sm"
+                        className="p-2 bg-card border border-border rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors shadow-sm"
                         title="Обновить"
                     >
                         <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
@@ -222,12 +222,12 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
 
             {/* Grid Content */}
             {filteredRequests.length === 0 && !loading ? (
-                <div className="flex flex-col items-center justify-center py-16 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 border-dashed text-center">
-                    <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-full mb-4">
-                        <Package className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                <div className="flex flex-col items-center justify-center py-16 bg-card rounded-2xl border border-border border-dashed text-center">
+                    <div className="bg-subtle p-4 rounded-full mb-4">
+                        <Package className="w-8 h-8 text-muted" />
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">Нет заявок</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xs mx-auto">
+                    <h3 className="text-lg font-medium text-main">Нет заявок</h3>
+                    <p className="text-sm text-muted mt-1 max-w-xs mx-auto">
                         {activeTab === 'active' ? 'Новые заявки от работников появятся здесь.' : 'В архиве пока пусто.'}
                     </p>
                 </div>
@@ -237,11 +237,11 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                         <div
                             key={req.id}
                             onClick={() => setSelectedRequest(req)}
-                            className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden hover:shadow-md hover:border-blue-500 dark:hover:border-blue-500/50 transition-all cursor-pointer flex flex-col"
+                            className="group bg-card border border-border rounded-xl shadow-sm overflow-hidden hover:shadow-md hover:border-blue-500 dark:hover:border-blue-500/50 transition-all cursor-pointer flex flex-col"
                         >
                             {/* Card Image */}
                             {req.photo_url && (
-                                <div className="h-48 w-full bg-gray-100 dark:bg-gray-900 overflow-hidden relative border-b border-gray-200 dark:border-gray-700">
+                                <div className="h-48 w-full bg-gray-100 dark:bg-gray-900 overflow-hidden relative border-b border-border">
                                     <img
                                         src={req.photo_url}
                                         alt={req.item_name}
@@ -257,30 +257,30 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                                     <span className={`
                                         px-2.5 py-1 text-xs font-semibold rounded-full border
                                         ${req.status === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-900/30' : ''}
-                                        ${req.status === 'ordered' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30' : ''}
+                                        ${req.status === 'ordered' ? 'badge-accent' : ''}
                                         ${req.status === 'delivered' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30' : ''}
                                     `}>
                                         {req.status === 'pending' && 'Ожидает'}
                                         {req.status === 'ordered' && 'Заказано'}
                                         {req.status === 'delivered' && 'Доставлено'}
                                     </span>
-                                    <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                                    <span className="text-xs text-muted flex items-center gap-1">
                                         <Clock size={12} />
                                         {new Date(req.created_at).toLocaleDateString()}
                                     </span>
                                 </div>
 
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 line-clamp-2 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                <h3 className="text-lg font-bold text-main mb-2 line-clamp-2 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                     {req.item_name}
                                 </h3>
 
                                 <div className="space-y-2 mt-2 mb-6">
-                                    <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                        <Briefcase size={16} className="mt-0.5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                                    <div className="flex items-start gap-2 text-sm text-muted">
+                                        <Briefcase size={16} className="mt-0.5 text-muted flex-shrink-0" />
                                         <span className="line-clamp-1">{req.object?.name || 'Неизвестный объект'}</span>
                                     </div>
-                                    <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                        <Users size={16} className="mt-0.5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                                    <div className="flex items-start gap-2 text-sm text-muted">
+                                        <Users size={16} className="mt-0.5 text-muted flex-shrink-0" />
                                         <span className="line-clamp-1">{req.worker?.first_name} {req.worker?.last_name}</span>
                                     </div>
                                 </div>
@@ -314,7 +314,7 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                                         </button>
                                     )}
                                     {req.status === 'delivered' && (
-                                        <div className="w-full py-2 px-4 bg-gray-50 dark:bg-gray-800/50 text-green-600 dark:text-green-500 rounded-lg text-sm font-medium flex items-center justify-center gap-2 border border-gray-100 dark:border-gray-700">
+                                        <div className="w-full py-2 px-4 bg-subtle/50 text-green-600 dark:text-green-500 rounded-lg text-sm font-medium flex items-center justify-center gap-2 border border-gray-100 dark:border-gray-700">
                                             <CheckCircle size={16} />
                                             Выполнено
                                         </div>
@@ -330,14 +330,14 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
             {selectedRequest && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
                     <div
-                        className="bg-white dark:bg-gray-800 w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col animate-in scale-95 duration-200"
+                        className="bg-card w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col animate-in scale-95 duration-200"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Modal Header */}
                         <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700">
                             <div>
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Детали заявки #{selectedRequest.id}</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                                <h3 className="text-xl font-bold text-main">Детали заявки #{selectedRequest.id}</h3>
+                                <p className="text-sm text-muted mt-0.5">
                                     Создана {formatDate(selectedRequest.created_at)}
                                 </p>
                             </div>
@@ -353,7 +353,7 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                         <div className="overflow-y-auto p-6 space-y-8">
                             {/* Photo Section */}
                             {selectedRequest.photo_url ? (
-                                <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 relative group aspect-video">
+                                <div className="rounded-xl overflow-hidden border border-border bg-subtle relative group aspect-video">
                                     <img
                                         src={selectedRequest.photo_url}
                                         alt={selectedRequest.item_name}
@@ -370,7 +370,7 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                                     </a>
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-12 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-gray-400 dark:text-gray-500">
+                                <div className="flex flex-col items-center justify-center py-12 rounded-xl border-2 border-dashed border-border bg-subtle/50 text-muted">
                                     <Package size={32} className="mb-2 opacity-50" />
                                     <span className="text-sm">Фото отсутствует</span>
                                 </div>
@@ -381,22 +381,22 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                                 {/* Left Column */}
                                 <div className="space-y-6">
                                     <div>
-                                        <label className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-2">
+                                        <label className="text-xs font-bold text-muted uppercase tracking-wider block mb-2">
                                             Товар / Материал
                                         </label>
-                                        <p className="text-lg font-semibold text-gray-900 dark:text-white leading-tight">
+                                        <p className="text-lg font-semibold text-main leading-tight">
                                             {selectedRequest.item_name}
                                         </p>
                                     </div>
 
                                     <div>
-                                        <label className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-2">
+                                        <label className="text-xs font-bold text-muted uppercase tracking-wider block mb-2">
                                             Статус
                                         </label>
                                         <span className={`
                                             inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold border
                                             ${selectedRequest.status === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-900/30' : ''}
-                                            ${selectedRequest.status === 'ordered' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30' : ''}
+                                            ${selectedRequest.status === 'ordered' ? 'badge-accent' : ''}
                                             ${selectedRequest.status === 'delivered' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30' : ''}
                                         `}>
                                             {selectedRequest.status === 'pending' && 'Ожидает обработки'}
@@ -408,8 +408,8 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
 
                                 {/* Right Column */}
                                 <div className="space-y-4">
-                                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                                        <label className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-3">
+                                    <div className="bg-subtle/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                        <label className="text-xs font-bold text-muted uppercase tracking-wider block mb-3">
                                             Место доставки
                                         </label>
                                         <div className="space-y-3">
@@ -418,8 +418,8 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                                                     <Briefcase size={16} />
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedRequest.object?.name}</p>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">Объект</p>
+                                                    <p className="text-sm font-medium text-main">{selectedRequest.object?.name}</p>
+                                                    <p className="text-xs text-muted">Объект</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-start gap-3">
@@ -427,15 +427,15 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                                                     <MapPin size={16} />
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-medium text-gray-900 dark:text-white leading-snug">{selectedRequest.object?.address}</p>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">Адрес</p>
+                                                    <p className="text-sm font-medium text-main leading-snug">{selectedRequest.object?.address}</p>
+                                                    <p className="text-xs text-muted">Адрес</p>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                                        <label className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-3">
+                                    <div className="bg-subtle/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                        <label className="text-xs font-bold text-muted uppercase tracking-wider block mb-3">
                                             Контактное лицо
                                         </label>
                                         <div className="flex items-start gap-3">
@@ -443,7 +443,7 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                                                 <User size={16} />
                                             </div>
                                             <div>
-                                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                                <p className="text-sm font-medium text-main">
                                                     {selectedRequest.worker?.first_name} {selectedRequest.worker?.last_name}
                                                 </p>
                                                 {selectedRequest.worker?.phone_number && (
@@ -459,10 +459,10 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700 flex gap-3">
+                        <div className="p-4 bg-subtle/50 border-t border-gray-100 dark:border-gray-700 flex gap-3">
                             <button
                                 onClick={() => setSelectedRequest(null)}
-                                className="py-2.5 px-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
+                                className="py-2.5 px-4 bg-card border border-border text-main rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
                             >
                                 Закрыть
                             </button>
@@ -473,7 +473,7 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                                     disabled={processingId === selectedRequest.id}
                                     className={`flex-1 py-2.5 px-2 rounded-xl text-xs font-semibold transition-colors shadow-sm border ${selectedRequest.status === 'pending'
                                         ? 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-900/50'
-                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        : 'bg-card text-main border-border hover:bg-gray-50 dark:hover:bg-gray-700'
                                         }`}
                                 >
                                     Ожидает
@@ -483,7 +483,7 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                                     disabled={processingId === selectedRequest.id}
                                     className={`flex-1 py-2.5 px-2 rounded-xl text-xs font-semibold transition-colors shadow-sm border ${selectedRequest.status === 'ordered'
                                         ? 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-900/50'
-                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        : 'bg-card text-main border-border hover:bg-gray-50 dark:hover:bg-gray-700'
                                         }`}
                                 >
                                     Заказано
@@ -493,7 +493,7 @@ export default function ProcurementPanel({ searchTerm = '' }: { searchTerm?: str
                                     disabled={processingId === selectedRequest.id}
                                     className={`flex-1 py-2.5 px-2 rounded-xl text-xs font-semibold transition-colors shadow-sm border ${selectedRequest.status === 'delivered'
                                         ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-900/50'
-                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        : 'bg-card text-main border-border hover:bg-gray-50 dark:hover:bg-gray-700'
                                         }`}
                                 >
                                     Доставлено

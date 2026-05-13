@@ -291,7 +291,7 @@ export default function MyCabinetPanel() {
             ) : (<>
             {/* Header */}
             <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Мой кабинет</h2>
+                <h2 className="text-2xl font-bold text-main">Мой кабинет</h2>
                 <p className="text-muted text-sm mt-1">Управление задачами и сделками</p>
             </div>
 
@@ -462,7 +462,7 @@ export default function MyCabinetPanel() {
 
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                     {/* Filters */}
-                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex bg-subtle p-1 rounded-lg border border-border">
                         {(['pending', 'all', 'completed'] as const).map((f) => (
                             <button
                                 key={f}
@@ -491,7 +491,7 @@ export default function MyCabinetPanel() {
                     return (
                         <div
                             key={task.id}
-                            className={`card-interactive relative group p-5 flex flex-col gap-4 ${task.is_completed ? 'opacity-60 bg-gray-50 dark:bg-gray-800/50' : ''}`}
+                            className={`card-interactive relative group p-5 flex flex-col gap-4 ${task.is_completed ? 'opacity-60 bg-subtle/50' : ''}`}
                         >
                             {/* Header: Title & Menu */}
                             <div className="flex justify-between items-start">
@@ -501,7 +501,7 @@ export default function MyCabinetPanel() {
                                     </h4>
                                     {task.lead && (
                                         <div className="mt-2 flex">
-                                            <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-900/30">
+                                            <span className="flex items-center gap-1 text-xs text-blue-600 bg-primary/5 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-900/30">
                                                 <Briefcase size={10} />
                                                 {task.lead.title}
                                             </span>
@@ -567,7 +567,7 @@ export default function MyCabinetPanel() {
             {/* Modal */}
             {showModal && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
-                    <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden animate-scaleIn">
+                    <div className="bg-card w-full max-w-md rounded-xl shadow-xl border border-border overflow-hidden animate-scaleIn">
                         <div className="p-4 border-b border-border flex justify-between items-center bg-subtle">
                             <h3 className="font-bold text-lg text-main">Новая задача</h3>
                             <button onClick={() => setShowModal(false)} className="text-muted hover:text-main"><X size={20} /></button>

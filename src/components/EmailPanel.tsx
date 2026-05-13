@@ -155,7 +155,7 @@ function SettingsView({ accounts, loading, onDelete, onEdit }: { accounts: any[]
                                         onDelete();
                                     }
                                 }}
-                                className="p-1.5 text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                className="p-1.5 text-muted hover:text-red-600 hover:bg-danger/10 rounded-lg transition-colors"
                             >
                                 <Trash2 size={16} />
                             </button>
@@ -237,7 +237,7 @@ function AccountModal({ account, onClose, onSave }: { account?: any, onClose: ()
         <div className="modal-overlay">
             <div className="modal-content max-w-2xl">
                 <div className="modal-header">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h3 className="text-xl font-bold text-main">
                         {account ? 'Редактировать аккаунт' : 'Новый аккаунт'}
                     </h3>
                     <button onClick={onClose} className="btn-icon">
@@ -353,7 +353,7 @@ function AccountModal({ account, onClose, onSave }: { account?: any, onClose: ()
                                     }}
                                 />
                                 <Image size={14} className="text-primary-600 dark:text-primary-400" />
-                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Добавить фото</span>
+                                <span className="text-xs font-medium text-main">Добавить фото</span>
                             </label>
                         </div>
                         <textarea

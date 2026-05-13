@@ -99,7 +99,7 @@ export default function CrmPipeline() {
     return (
         <div className="h-[600px] flex flex-col space-y-4">
             {/* Header / Stats */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-4 rounded-xl border border-border shadow-sm">
                 <div>
                     <h2 className="text-xl font-bold text-main">Воронка продаж</h2>
                     <div className="flex gap-4 mt-1 text-sm text-muted">
@@ -143,7 +143,7 @@ export default function CrmPipeline() {
                                 onDrop={(e) => handleDrop(e, column.id)}
                             >
                                 {/* Column Header */}
-                                <div className={`p-3 rounded-t-lg border-b-2 ${column.color.replace('bg-', 'border-')} bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center`}>
+                                <div className={`p-3 rounded-t-lg border-b-2 ${column.color.replace('bg-', 'border-')} bg-subtle/50 flex justify-between items-center`}>
                                     <div>
                                         <h3 className="font-bold text-sm text-main uppercase tracking-wide">{column.title}</h3>
                                         <span className="text-xs text-muted font-medium">{columnLeads.length} • {columnTotal.toLocaleString()} zł</span>
@@ -159,7 +159,7 @@ export default function CrmPipeline() {
                                             onDragStart={(e) => handleDragStart(e, lead)}
                                             onClick={() => { setSelectedLead(lead); setIsLeadModalOpen(true); }}
                                             className={`
-                                                bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-all
+                                                bg-card p-3 rounded-lg border border-border shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-all
                                                 ${draggedLead?.id === lead.id ? 'opacity-50' : 'opacity-100'}
                                             `}
                                         >

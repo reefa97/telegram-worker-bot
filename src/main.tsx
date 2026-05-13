@@ -14,7 +14,7 @@ if (!isSupabaseConfigured) {
     ReactDOM.createRoot(document.getElementById('root')!).render(
         <React.StrictMode>
             <ThemeProvider>
-                <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white p-4 transition-colors">
+                <div className="min-h-screen flex items-center justify-center bg-app text-main p-4 transition-colors">
                     <div className="max-w-md w-full card border-red-200 dark:border-red-500/20">
                         <div className="flex items-center justify-center w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full mb-4 mx-auto">
                             <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -26,7 +26,7 @@ if (!isSupabaseConfigured) {
                             Приложению не хватает переменных окружения для связи с базой данных.
                         </p>
 
-                        <div className="bg-gray-100 dark:bg-gray-900 rounded-xl p-4 mb-4 text-xs font-mono overflow-x-auto text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                        <div className="bg-subtle rounded-xl p-4 mb-4 text-xs font-mono overflow-x-auto text-muted border border-border">
                             <div className="mb-2 text-gray-400 dark:text-gray-500">Добавьте в Vercel Settings:</div>
                             <div className="mb-1"><span className="text-amber-600 dark:text-yellow-500">VITE_SUPABASE_URL</span>=...</div>
                             <div><span className="text-amber-600 dark:text-yellow-500">VITE_SUPABASE_ANON_KEY</span>=...</div>

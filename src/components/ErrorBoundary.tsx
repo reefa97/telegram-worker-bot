@@ -27,7 +27,7 @@ class ErrorBoundary extends Component<Props, State> {
     public render() {
         if (this.state.hasError) {
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+                <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-subtle text-gray-900 dark:text-gray-100">
                     <h1 className="text-2xl font-bold mb-4">Что-то пошло не так</h1>
                     <pre className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg text-red-600 max-w-lg overflow-auto text-sm mb-4">
                         {this.state.error?.toString()}

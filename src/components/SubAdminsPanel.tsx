@@ -243,7 +243,7 @@ export default function SubAdminsPanel() {
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Администраторы и Менеджеры</h2>
+                <h2 className="text-2xl font-bold text-main">Администраторы и Менеджеры</h2>
                 {canManage && (
                     <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
                         <Plus className="w-4 h-4" />
@@ -358,7 +358,7 @@ export default function SubAdminsPanel() {
                                                     </button>
                                                     <button
                                                         onClick={() => handleDelete(admin.id)}
-                                                        className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg transition-colors"
+                                                        className="p-1.5 hover:bg-danger/10 text-red-600 dark:text-red-400 rounded-lg transition-colors"
                                                         title="Удалить"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
@@ -373,7 +373,7 @@ export default function SubAdminsPanel() {
                     </table>
 
                     {subAdmins.length === 0 && (
-                        <div className="text-center text-gray-500 dark:text-gray-400 py-12">
+                        <div className="text-center text-muted py-12">
                             <UserPlus2 className="w-12 h-12 mx-auto mb-4 opacity-20" />
                             <p>Нет пользователей. Создайте первого.</p>
                         </div>
@@ -400,7 +400,7 @@ export default function SubAdminsPanel() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Роль</label>
+                                            <label className="block text-sm font-medium text-main mb-1.5">Роль</label>
                                             <select
                                                 value={formData.role}
                                                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
@@ -413,7 +413,7 @@ export default function SubAdminsPanel() {
                                         </div>
 
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Имя</label>
+                                            <label className="block text-sm font-medium text-main mb-1.5">Имя</label>
                                             <input
                                                 type="text"
                                                 value={formData.name}
@@ -425,7 +425,7 @@ export default function SubAdminsPanel() {
                                         </div>
 
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email (Логин)</label>
+                                            <label className="block text-sm font-medium text-main mb-1.5">Email (Логин)</label>
                                             <input
                                                 type="email"
                                                 value={formData.email}
@@ -440,7 +440,7 @@ export default function SubAdminsPanel() {
 
                                     <div className="space-y-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Telegram Chat ID</label>
+                                            <label className="block text-sm font-medium text-main mb-1.5">Telegram Chat ID</label>
                                             <input
                                                 type="text"
                                                 inputMode="numeric"
@@ -455,7 +455,7 @@ export default function SubAdminsPanel() {
                                         </div>
 
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Телефон</label>
+                                            <label className="block text-sm font-medium text-main mb-1.5">Телефон</label>
                                             <input
                                                 type="tel"
                                                 value={formData.phone}
@@ -476,7 +476,7 @@ export default function SubAdminsPanel() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Права доступа</label>
+                                    <label className="block text-sm font-medium text-main mb-3">Права доступа</label>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
                                         {renderPermissionsGroup('Объекты', [
                                             { key: 'objects_view', label: 'Просмотр объектов' },

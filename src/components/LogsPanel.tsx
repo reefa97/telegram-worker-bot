@@ -78,7 +78,7 @@ export default function LogsPanel() {
             case 'error':
                 return 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800';
             default:
-                return 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
+                return 'text-muted bg-subtle border-border';
         }
     };
 
@@ -104,7 +104,7 @@ export default function LogsPanel() {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Системные логи</h2>
+                <h2 className="text-2xl font-bold text-main">Системные логи</h2>
 
                 <div className="flex items-center gap-3">
                     <button
@@ -129,7 +129,7 @@ export default function LogsPanel() {
                         Тест записи
                     </button>
 
-                    <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <label className="flex items-center gap-2 text-sm text-muted cursor-pointer bg-card px-3 py-1.5 rounded-lg border border-border hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                         <input
                             type="checkbox"
                             checked={autoRefresh}
@@ -140,7 +140,7 @@ export default function LogsPanel() {
                     </label>
                     <button
                         onClick={loadLogs}
-                        className="p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-sm"
+                        className="p-2 bg-card hover:bg-gray-50 dark:hover:bg-gray-700 text-muted rounded-lg border border-border transition-colors shadow-sm"
                         disabled={loading}
                         title="Обновить"
                     >
@@ -153,7 +153,7 @@ export default function LogsPanel() {
             <div className="card p-4">
                 <div className="flex flex-wrap gap-4 items-end">
                     <div className="w-full sm:w-auto">
-                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Уровень</label>
+                        <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wide">Уровень</label>
                         <div className="relative">
                             <select
                                 value={filter}
@@ -169,7 +169,7 @@ export default function LogsPanel() {
                         </div>
                     </div>
                     <div className="w-full sm:w-auto">
-                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Категория</label>
+                        <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wide">Категория</label>
                         <div className="relative">
                             <select
                                 value={categoryFilter}
@@ -214,10 +214,10 @@ export default function LogsPanel() {
                                 </div>
                                 <div className="text-sm text-main font-medium truncate">{log.message}</div>
                                 <div className="text-xs text-muted mt-0.5">
-                                    <span className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-[10px]">{log.category}</span>
+                                    <span className="bg-subtle px-1.5 py-0.5 rounded text-[10px]">{log.category}</span>
                                 </div>
                                 {expandedRow === log.id && log.metadata && (
-                                    <pre className="mt-2 bg-white dark:bg-gray-900 border border-border p-2 rounded text-[10px] font-mono overflow-x-auto">
+                                    <pre className="mt-2 bg-card border border-border p-2 rounded text-[10px] font-mono overflow-x-auto">
                                         {JSON.stringify(log.metadata, null, 2)}
                                     </pre>
                                 )}
@@ -254,7 +254,7 @@ export default function LogsPanel() {
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                             {logs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                    <td colSpan={4} className="text-center py-12 text-muted">
                                         <Terminal className="w-12 h-12 mx-auto mb-4 opacity-20" />
                                         <p>Логов не найдено</p>
                                     </td>
@@ -267,7 +267,7 @@ export default function LogsPanel() {
                                             onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
                                             className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
                                         >
-                                            <td className="text-gray-500 dark:text-gray-400 font-mono text-sm whitespace-nowrap">
+                                            <td className="text-muted font-mono text-sm whitespace-nowrap">
                                                 {formatTime(log.created_at)}
                                             </td>
                                             <td>
@@ -277,11 +277,11 @@ export default function LogsPanel() {
                                                 </div>
                                             </td>
                                             <td>
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-subtle text-main border border-border">
                                                     {log.category}
                                                 </span>
                                             </td>
-                                            <td className="text-gray-900 dark:text-white font-medium text-sm">
+                                            <td className="text-main font-medium text-sm">
                                                 <div className="truncate max-w-lg" title={log.message}>
                                                     {log.message}
                                                 </div>
@@ -292,9 +292,9 @@ export default function LogsPanel() {
                                                 <td colSpan={4} className="p-4 relative">
                                                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary-500"></div>
                                                     <div className="pl-2">
-                                                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wide">Метаданные события</div>
+                                                        <div className="text-xs font-semibold text-muted mb-2 uppercase tracking-wide">Метаданные события</div>
                                                         {log.metadata ? (
-                                                            <pre className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg overflow-x-auto font-mono text-xs text-gray-700 dark:text-gray-300 shadow-sm">
+                                                            <pre className="bg-card border border-border p-4 rounded-lg overflow-x-auto font-mono text-xs text-main shadow-sm">
                                                                 {JSON.stringify(log.metadata, null, 2)}
                                                             </pre>
                                                         ) : (
@@ -304,19 +304,19 @@ export default function LogsPanel() {
                                                         <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                                                             {log.worker_id && (
                                                                 <div className="text-xs">
-                                                                    <span className="text-gray-500 dark:text-gray-400">Worker ID:</span>
+                                                                    <span className="text-muted">Worker ID:</span>
                                                                     <span className="font-mono ml-2 text-gray-900 dark:text-gray-200">{log.worker_id}</span>
                                                                 </div>
                                                             )}
                                                             {log.object_id && (
                                                                 <div className="text-xs">
-                                                                    <span className="text-gray-500 dark:text-gray-400">Object ID:</span>
+                                                                    <span className="text-muted">Object ID:</span>
                                                                     <span className="font-mono ml-2 text-gray-900 dark:text-gray-200">{log.object_id}</span>
                                                                 </div>
                                                             )}
                                                             {log.admin_id && (
                                                                 <div className="text-xs">
-                                                                    <span className="text-gray-500 dark:text-gray-400">Admin ID:</span>
+                                                                    <span className="text-muted">Admin ID:</span>
                                                                     <span className="font-mono ml-2 text-gray-900 dark:text-gray-200">{log.admin_id}</span>
                                                                 </div>
                                                             )}

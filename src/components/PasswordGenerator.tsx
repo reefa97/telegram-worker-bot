@@ -43,7 +43,7 @@ export default function PasswordGenerator({ value, onChange, placeholder, requir
     return (
         <div>
             {label && (
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-main mb-1.5">
                     {label}
                 </label>
             )}

@@ -133,7 +133,7 @@ function SourceBadge({ source }: { source: string | null }) {
     const styles: Record<string, string> = {
         'reefa.pl': 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30',
         'home.reefa.pl': 'bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/30',
-        manual: 'bg-gray-500/15 text-gray-700 dark:text-gray-300 border-gray-500/30',
+        manual: 'bg-gray-500/15 text-main border-gray-500/30',
     };
     return (
         <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${styles[s] || styles.manual}`}>

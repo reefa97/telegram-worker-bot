@@ -178,9 +178,9 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({ onClose, accountId, 
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-fadeIn">
-            <div className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-lg w-full sm:max-w-4xl h-[95vh] sm:h-[85vh] flex flex-col shadow-xl animate-slideUp sm:animate-scaleIn">
+            <div className="bg-card rounded-t-2xl sm:rounded-lg w-full sm:max-w-4xl h-[95vh] sm:h-[85vh] flex flex-col shadow-xl animate-slideUp sm:animate-scaleIn">
                 {/* Header */}
-                <div className="flex justify-between items-center p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900 rounded-t-lg">
+                <div className="flex justify-between items-center p-4 border-b dark:border-gray-700 bg-subtle rounded-t-lg">
                     <h2 className="font-semibold text-gray-700 dark:text-gray-200">
                         {initialData?.replyTo ? 'Ответ на сообщение' : 'Новое сообщение'}
                     </h2>
@@ -198,7 +198,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({ onClose, accountId, 
                 <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center border-b dark:border-gray-700">
-                            <span className="text-sm text-gray-500 dark:text-gray-400 w-12">Кому:</span>
+                            <span className="text-sm text-muted w-12">Кому:</span>
                             <input
                                 className="flex-1 p-2 focus:outline-none text-sm bg-transparent dark:text-gray-100"
                                 placeholder="example1@mail.com, example2@mail.com"
@@ -215,7 +215,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({ onClose, accountId, 
 
                         {showBcc && (
                             <div className="flex items-center border-b dark:border-gray-700 animate-in fade-in slide-in-from-top-1">
-                                <span className="text-sm text-gray-500 dark:text-gray-400 w-12">Bcc:</span>
+                                <span className="text-sm text-muted w-12">Bcc:</span>
                                 <input
                                     className="flex-1 p-2 focus:outline-none text-sm bg-transparent dark:text-gray-100"
                                     placeholder="Скрытые получатели через запятую"
@@ -242,12 +242,12 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({ onClose, accountId, 
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900 rounded-b-lg flex justify-between items-center">
+                <div className="p-4 border-t dark:border-gray-700 bg-subtle rounded-b-lg flex justify-between items-center">
                     <div className="flex gap-1 sm:gap-2">
-                        <button className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-400" title="Прикрепить файл">
+                        <button className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-muted" title="Прикрепить файл">
                             <Paperclip size={20} />
                         </button>
-                        <button onClick={handleTemplate} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-400 flex items-center gap-1" title="Шаблоны">
+                        <button onClick={handleTemplate} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-muted flex items-center gap-1" title="Шаблоны">
                             <FileText size={20} />
                             <span className="text-xs hidden sm:inline">Шаблон</span>
                         </button>

@@ -430,9 +430,9 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                 <div className="flex-1 overflow-hidden flex flex-col relative">
                     {showAddForm && (
                         <div className="absolute inset-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-                            <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6 max-h-full overflow-y-auto custom-scrollbar">
+                            <div className="w-full max-w-2xl bg-card rounded-2xl shadow-xl border border-border p-6 max-h-full overflow-y-auto custom-scrollbar">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h4 className="text-xl font-bold text-gray-900 dark:text-white">
+                                    <h4 className="text-xl font-bold text-main">
                                         {editingTask ? 'Редактирование задачи' : 'Новая задача'}
                                     </h4>
                                     <button onClick={closeForm} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-500">
@@ -443,7 +443,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                     {/* Form Content */}
                                     <div className="space-y-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Название</label>
+                                            <label className="block text-sm font-medium text-main mb-1.5">Название</label>
                                             <textarea
                                                 value={formData.title}
                                                 onChange={e => setFormData({ ...formData, title: e.target.value })}
@@ -454,7 +454,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Описание</label>
+                                            <label className="block text-sm font-medium text-main mb-1.5">Описание</label>
                                             <textarea
                                                 value={formData.description}
                                                 onChange={e => setFormData({ ...formData, description: e.target.value })}
@@ -479,13 +479,13 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                         </div>
 
                                         <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
-                                            <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 mb-4">
+                                            <div className="flex bg-subtle rounded-lg p-1 mb-4">
                                                 <button
                                                     type="button"
                                                     onClick={() => {
                                                         setFormData({ ...formData, frequency: 'weekly', scheduled_days: [] });
                                                     }}
-                                                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${formData.frequency === 'weekly' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                                                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${formData.frequency === 'weekly' ? 'bg-white dark:bg-gray-700 text-main shadow-sm' : 'text-muted hover:text-gray-700 dark:hover:text-gray-200'}`}
                                                 >
                                                     Еженедельно
                                                 </button>
@@ -494,7 +494,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                                     onClick={() => {
                                                         setFormData({ ...formData, frequency: 'monthly', scheduled_days: [] });
                                                     }}
-                                                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${formData.frequency === 'monthly' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                                                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${formData.frequency === 'monthly' ? 'bg-white dark:bg-gray-700 text-main shadow-sm' : 'text-muted hover:text-gray-700 dark:hover:text-gray-200'}`}
                                                 >
                                                     Ежемесячно
                                                 </button>
@@ -503,7 +503,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                                     onClick={() => {
                                                         setFormData({ ...formData, frequency: 'one_time', scheduled_days: [] });
                                                     }}
-                                                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${formData.frequency === 'one_time' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                                                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${formData.frequency === 'one_time' ? 'bg-white dark:bg-gray-700 text-main shadow-sm' : 'text-muted hover:text-gray-700 dark:hover:text-gray-200'}`}
                                                 >
                                                     Точные даты
                                                 </button>
@@ -529,7 +529,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
 
                                             {formData.frequency === 'monthly' && (
                                                 <div className="space-y-3">
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400">Выберите числа месяца, когда выполнять задачу:</p>
+                                                    <p className="text-sm text-muted">Выберите числа месяца, когда выполнять задачу:</p>
                                                     <div className="grid grid-cols-7 gap-2">
                                                         {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
                                                             <button
@@ -538,7 +538,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                                                 onClick={() => toggleDay(day)}
                                                                 className={`h-8 rounded-lg flex items-center justify-center text-xs font-semibold transition-all ${formData.scheduled_days.includes(day)
                                                                     ? 'bg-purple-600 text-white shadow-md'
-                                                                    : 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-purple-300'
+                                                                    : 'bg-subtle border border-border text-muted hover:border-purple-300'
                                                                     }`}
                                                             >
                                                                 {day}
@@ -611,7 +611,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                             </div>
                                             <button
                                                 onClick={(e) => handleDeleteTask(task.id, e)}
-                                                className="p-1.5 text-muted hover:text-danger hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors shrink-0"
+                                                className="p-1.5 text-muted hover:text-danger hover:bg-danger/10 rounded-lg transition-colors shrink-0"
                                             >
                                                 <Trash2 size={15} />
                                             </button>
@@ -630,9 +630,9 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, 'unscheduled')}
                                 >
-                                    <div className="p-3 border-b border-gray-200/50 dark:border-gray-700/50 font-medium text-gray-500 dark:text-gray-400 text-sm flex justify-between items-center sticky top-0 bg-inherit rounded-t-xl z-20">
+                                    <div className="p-3 border-b border-gray-200/50 dark:border-gray-700/50 font-medium text-muted text-sm flex justify-between items-center sticky top-0 bg-inherit rounded-t-xl z-20">
                                         <span>Нераспределенные</span>
-                                        <span className="bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full text-xs text-gray-700 dark:text-gray-300">
+                                        <span className="bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full text-xs text-main">
                                             {getUnscheduledRecurringTasks().length}
                                         </span>
                                     </div>
@@ -661,14 +661,14 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                     return (
                                         <div
                                             key={day}
-                                            className="w-72 flex flex-col bg-white dark:bg-gray-800/80 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors hover:border-primary-200 dark:hover:border-primary-800"
+                                            className="w-72 flex flex-col bg-card/80 rounded-xl border border-border shadow-sm transition-colors hover:border-primary-200 dark:hover:border-primary-800"
                                             onDragOver={handleDragOver}
                                             onDrop={(e) => handleDrop(e, `day-${day}`)}
                                         >
-                                            <div className={`p-3 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 text-sm flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 rounded-t-xl z-20 
+                                            <div className={`p-3 border-b border-gray-100 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 text-sm flex justify-between items-center sticky top-0 bg-card rounded-t-xl z-20 
                                                 ${day === (new Date().getDay() || 7) ? 'text-primary-600 dark:text-primary-400' : ''}`}>
                                                 <span>{dayNames[day]}</span>
-                                                <span className={`px-2 py-0.5 rounded-full text-xs ${day === (new Date().getDay() || 7) ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs ${day === (new Date().getDay() || 7) ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'bg-gray-100 dark:bg-gray-700 text-muted'}`}>
                                                     {dayTasks.length}
                                                 </span>
                                             </div>
@@ -699,7 +699,7 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                         {getMonthlyTasks().map(task => (
                                             <div key={task.id} onClick={() => openEditForm(task)} className="bg-white dark:bg-gray-700 p-3 rounded-lg border border-purple-100 dark:border-gray-600 shadow-sm cursor-pointer hover:shadow-md transition-all group relative">
                                                 <div className="flex justify-between items-start mb-2">
-                                                    <span className="font-medium text-gray-800 dark:text-gray-200 text-sm line-clamp-2">{task.title}</span>
+                                                    <span className="font-medium text-main text-sm line-clamp-2">{task.title}</span>
                                                     <button onClick={(e) => handleDeleteTask(task.id, e)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5">
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
@@ -734,14 +734,14 @@ export default function TaskManagementModal({ objectId, objectName, onClose }: T
                                             {getSpecificDateTasks().map(task => (
                                                 <div key={task.id} onClick={() => openEditForm(task)} className="bg-white dark:bg-gray-700 p-3 rounded-lg border border-amber-100 dark:border-gray-600 shadow-sm cursor-pointer hover:shadow-md transition-all group relative">
                                                     <div className="flex justify-between items-start mb-2">
-                                                        <span className="font-medium text-gray-800 dark:text-gray-200 text-sm line-clamp-2">{task.title}</span>
+                                                        <span className="font-medium text-main text-sm line-clamp-2">{task.title}</span>
                                                         <button onClick={(e) => handleDeleteTask(task.id, e)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5">
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
                                                     </div>
                                                     <div className="flex flex-wrap gap-1">
                                                         {task.scheduled_dates?.slice(0, 3).map(d => (
-                                                            <span key={d} className="text-[10px] bg-gray-50 dark:bg-gray-600 px-1.5 py-0.5 rounded text-gray-500 dark:text-gray-400">
+                                                            <span key={d} className="text-[10px] bg-gray-50 dark:bg-gray-600 px-1.5 py-0.5 rounded text-muted">
                                                                 {new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' })}
                                                             </span>
                                                         ))}
@@ -783,7 +783,7 @@ function TaskCard({ task, onDragStart, onClick, onDelete, showDelete = false }: 
             `}
         >
             <div className="flex justify-between items-start gap-2">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200 line-clamp-3 leading-snug">
+                <p className="text-sm font-medium text-main line-clamp-3 leading-snug">
                     {task.title}
                 </p>
                 {onDelete && (
@@ -803,7 +803,7 @@ function TaskCard({ task, onDragStart, onClick, onDelete, showDelete = false }: 
             )}
             {task.description && (
                 <div className="mt-2 pt-2 border-t border-gray-50 dark:border-gray-600/50">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{task.description}</p>
+                    <p className="text-xs text-muted line-clamp-2">{task.description}</p>
                 </div>
             )}
         </div>

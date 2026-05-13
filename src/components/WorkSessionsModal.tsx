@@ -171,7 +171,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                             <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
                         </div>
                     ) : sessions.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-gray-400 dark:text-gray-500">
+                        <div className="flex flex-col items-center justify-center h-64 text-muted">
                             <History className="w-12 h-12 mb-3 opacity-20" />
                             <p>История смен пуста</p>
                         </div>
@@ -183,7 +183,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                                 <div key={session.id} className="p-4">
                                     <div className="flex items-start justify-between mb-2">
                                         <div>
-                                            <div className="font-medium text-gray-900 dark:text-white text-sm">
+                                            <div className="font-medium text-main text-sm">
                                                 {session.cleaning_objects?.name || 'Объект не указан'}
                                             </div>
                                             <div className="text-xs text-gray-500 mt-0.5">{formatDate(session.start_time)}</div>
@@ -197,7 +197,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                                             ) : (
                                                 <>
                                                     <button onClick={() => startEditing(session)} className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"><Edit2 className="w-4 h-4" /></button>
-                                                    <button onClick={() => handleDeleteSession(session.id)} className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                                                    <button onClick={() => handleDeleteSession(session.id)} className="p-1.5 text-red-600 hover:bg-danger/10 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                                                 </>
                                             )}
                                         </div>
@@ -220,7 +220,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                         {/* Desktop table */}
                         <div className="hidden sm:block overflow-x-auto">
                             <table className="table w-full">
-                                <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
+                                <thead className="bg-subtle/50 sticky top-0 z-10">
                                     <tr>
                                         <th className="pl-6 w-64">Объект</th>
                                         <th className="w-48">Начало</th>
@@ -235,11 +235,11 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                                     {sessions.map((session) => (
                                         <tr key={session.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
                                             <td className="pl-6 py-4">
-                                                <div className="font-medium text-gray-900 dark:text-white">
+                                                <div className="font-medium text-main">
                                                     {session.cleaning_objects?.name || 'Не указан'}
                                                 </div>
                                                 {session.cleaning_objects?.address && (
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-[200px]" title={session.cleaning_objects.address}>
+                                                    <div className="text-xs text-muted mt-0.5 truncate max-w-[200px]" title={session.cleaning_objects.address}>
                                                         {session.cleaning_objects.address}
                                                     </div>
                                                 )}
@@ -279,7 +279,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                                             </td>
                                             <td className="py-4 text-center">
                                                 {session.duration_minutes !== null ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs font-medium text-gray-700 dark:text-gray-300">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-subtle text-xs font-medium text-main">
                                                         <Clock className="w-3 h-3" />
                                                         {formatDuration(session.duration_minutes)}
                                                     </span>
@@ -353,7 +353,7 @@ export default function WorkSessionsModal({ workerId, workerName, onClose }: Wor
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDeleteSession(session.id)}
-                                                                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400 transition-colors"
+                                                                className="p-1.5 hover:bg-danger/10 rounded-lg text-red-600 dark:text-red-400 transition-colors"
                                                                 title="Удалить запись"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
