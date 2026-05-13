@@ -317,16 +317,19 @@ export default function ClientsPanel({ searchTerm = '' }: { searchTerm?: string 
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-border">
+            <div className="tabs mb-4">
                 <button
                     onClick={() => setActiveTab('clients')}
-                    className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${activeTab === 'clients' ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-main'}`}
+                    className={`tab ${activeTab === 'clients' ? 'is-active' : ''}`}
+                    aria-selected={activeTab === 'clients'}
                 >
-                    <User size={14} /> Клиенты ({clients.length})
+                    <User size={14} /> Клиенты
+                    <span className="badge-neutral">{clients.length}</span>
                 </button>
                 <button
                     onClick={() => setActiveTab('requests')}
-                    className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${activeTab === 'requests' ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-main'}`}
+                    className={`tab ${activeTab === 'requests' ? 'is-active' : ''}`}
+                    aria-selected={activeTab === 'requests'}
                 >
                     <MessageSquare size={14} /> Просьбы
                 </button>
@@ -413,16 +416,18 @@ export default function ClientsPanel({ searchTerm = '' }: { searchTerm?: string 
                         </div>
 
                         {/* Tabs */}
-                        <div className="flex border-b border-border px-4 shrink-0">
+                        <div className="tabs px-4 shrink-0">
                             <button
                                 onClick={() => setDetailTab('account')}
-                                className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${detailTab === 'account' ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-main'}`}
+                                className={`tab ${detailTab === 'account' ? 'is-active' : ''}`}
+                                aria-selected={detailTab === 'account'}
                             >
                                 <User size={14} /> Аккаунт
                             </button>
                             <button
                                 onClick={() => setDetailTab('requests')}
-                                className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${detailTab === 'requests' ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-main'}`}
+                                className={`tab ${detailTab === 'requests' ? 'is-active' : ''}`}
+                                aria-selected={detailTab === 'requests'}
                             >
                                 <MessageSquare size={14} /> Просьбы
                             </button>

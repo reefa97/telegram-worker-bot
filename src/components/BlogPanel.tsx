@@ -665,9 +665,8 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     return (
         <button
             onClick={onClick}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-                active ? 'border-primary text-main' : 'border-transparent text-muted hover:text-main'
-            }`}
+            className={`tab ${active ? 'is-active' : ''}`}
+            aria-selected={active}
         >
             {children}
         </button>
