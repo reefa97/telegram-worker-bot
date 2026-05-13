@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useUndo } from '../contexts/UndoContext';
-import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, LayoutGrid, List, Map, UserCheck, UserMinus, FileText, Upload, Download, Archive, ArchiveRestore } from 'lucide-react';
+import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, LayoutGrid, List, Map, UserCheck, UserMinus, FileText, Upload, Download, Archive, ArchiveRestore, Briefcase } from 'lucide-react';
 import ObjectsMap from './ObjectsMap';
 import AddressAutocomplete from './AddressAutocomplete';
 import TaskManagementModal from './TaskManagementModal';
@@ -661,25 +661,20 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
 
     return (
         <div>
-            {/* Sub-tabs: Объекты / График */}
-            <div className="flex gap-1 mb-4 border-b border-border">
+            {/* ---- Row 1: top-level tabs (Объекты / График) ---- */}
+            <div className="tabs mb-4">
                 <button
                     onClick={() => setSubTab('objects')}
-                    className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
-                        subTab === 'objects'
-                            ? 'text-main after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-500'
-                            : 'text-muted hover:text-main'
-                    }`}
+                    className={`tab ${subTab === 'objects' ? 'is-active' : ''}`}
+                    aria-selected={subTab === 'objects'}
                 >
                     Объекты
+                    <span className="badge-neutral">{activeCount + archivedCount}</span>
                 </button>
                 <button
                     onClick={() => setSubTab('schedule')}
-                    className={`px-4 py-2.5 text-sm font-medium transition-colors relative flex items-center gap-1.5 ${
-                        subTab === 'schedule'
-                            ? 'text-main after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-500'
-                            : 'text-muted hover:text-main'
-                    }`}
+                    className={`tab ${subTab === 'schedule' ? 'is-active' : ''}`}
+                    aria-selected={subTab === 'schedule'}
                 >
                     <Calendar className="w-4 h-4" />
                     График
@@ -689,91 +684,88 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
             {subTab === 'schedule' ? (
                 <ShiftPlanningPanel />
             ) : (<>
-            {/* Active / Archive toggle */}
-            <div className="flex gap-1 mb-4 -mt-2">
-                <button
-                    onClick={() => setArchiveView('active')}
-                    className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
-                        archiveView === 'active'
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-muted hover:text-main hover:bg-subtle'
-                    }`}
-                >
-                    Активные клиенты
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${archiveView === 'active' ? 'bg-primary/20' : 'bg-subtle'}`}>
-                        {activeCount}
-                    </span>
-                </button>
-                <button
-                    onClick={() => setArchiveView('archive')}
-                    className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
-                        archiveView === 'archive'
-                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-                            : 'text-muted hover:text-main hover:bg-subtle'
-                    }`}
-                >
-                    <Archive className="w-3.5 h-3.5" />
-                    Архив клиентов
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${archiveView === 'archive' ? 'bg-amber-500/25' : 'bg-subtle'}`}>
-                        {archivedCount}
-                    </span>
-                </button>
-            </div>
-
-            {/* Header with Title, Search, View Toggle, Add Button */}
-            <div className="flex flex-col gap-3 mb-6">
-                {/* Row 1: Title + Add Button */}
-                <div className="flex items-center justify-between">
-                    <h2 className="text-xl sm:text-2xl font-bold text-main">
-                        {archiveView === 'active' ? 'Объекты работы' : 'Архив клиентов'}
-                    </h2>
-                    <div className="flex items-center gap-2">
-                        {adminUser?.role === 'super_admin' && (
-                            <button
-                                onClick={toggleBulkMode}
-                                className={`btn-secondary flex items-center gap-2 whitespace-nowrap ${bulkMode ? 'ring-2 ring-primary' : ''}`}
-                                title="Управление опекунами"
-                            >
-                                <Users className="w-4 h-4" />
-                                <span className="hidden sm:inline">{bulkMode ? 'Отмена' : 'Опекуны'}</span>
-                            </button>
-                        )}
-                        {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_create) && (
-                            <button onClick={() => openModal()} className="btn-primary flex items-center gap-2 whitespace-nowrap">
-                                <Plus className="w-4 h-4" />
-                                <span className="hidden sm:inline">Добавить объект</span>
-                                <span className="sm:hidden">Добавить</span>
-                            </button>
-                        )}
-                    </div>
+            {/* ---- Row 2: toolbar (segmented + view + actions) ---- */}
+            <div className="flex flex-wrap items-center gap-2 mb-5">
+                {/* Active / Archive segmented control */}
+                <div className="inline-flex p-0.5 rounded-md bg-subtle border border-border shrink-0">
+                    <button
+                        onClick={() => setArchiveView('active')}
+                        className={`inline-flex items-center gap-1.5 px-2.5 h-8 text-xs font-medium rounded-[6px] transition-colors
+                            ${archiveView === 'active'
+                                ? 'bg-card text-main shadow-sm'
+                                : 'text-muted hover:text-main'}`}
+                    >
+                        Активные
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${archiveView === 'active' ? 'bg-subtle' : 'opacity-60'}`}>
+                            {activeCount}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setArchiveView('archive')}
+                        className={`inline-flex items-center gap-1.5 px-2.5 h-8 text-xs font-medium rounded-[6px] transition-colors
+                            ${archiveView === 'archive'
+                                ? 'bg-card text-main shadow-sm'
+                                : 'text-muted hover:text-main'}`}
+                    >
+                        <Archive className="w-3 h-3" />
+                        Архив
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${archiveView === 'archive' ? 'bg-subtle' : 'opacity-60'}`}>
+                            {archivedCount}
+                        </span>
+                    </button>
                 </div>
 
-                {/* View Toggle */}
-                <div className="flex items-center gap-2">
-                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700 shrink-0">
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                            title="Плитка"
-                        >
-                            <LayoutGrid className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`hidden sm:block p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                            title="Список"
-                        >
-                            <List className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('map')}
-                            className={`p-1.5 rounded-md transition-all ${viewMode === 'map' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                            title="Карта"
-                        >
-                            <Map className="w-4 h-4" />
-                        </button>
-                    </div>
+                {/* View mode segmented control */}
+                <div className="inline-flex p-0.5 rounded-md bg-subtle border border-border shrink-0">
+                    <button
+                        onClick={() => setViewMode('grid')}
+                        className={`btn-icon ${viewMode === 'grid' ? 'bg-card text-main shadow-sm' : 'text-muted'}`}
+                        style={{ width: 32, height: 32 }}
+                        title="Плитка"
+                        aria-label="Плитка"
+                    >
+                        <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => setViewMode('list')}
+                        className={`hidden sm:flex btn-icon ${viewMode === 'list' ? 'bg-card text-main shadow-sm' : 'text-muted'}`}
+                        style={{ width: 32, height: 32 }}
+                        title="Список"
+                        aria-label="Список"
+                    >
+                        <List className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => setViewMode('map')}
+                        className={`btn-icon ${viewMode === 'map' ? 'bg-card text-main shadow-sm' : 'text-muted'}`}
+                        style={{ width: 32, height: 32 }}
+                        title="Карта"
+                        aria-label="Карта"
+                    >
+                        <Map className="w-4 h-4" />
+                    </button>
                 </div>
+
+                <div className="flex-1" />
+
+                {/* Action buttons */}
+                {adminUser?.role === 'super_admin' && (
+                    <button
+                        onClick={toggleBulkMode}
+                        className={`btn-secondary ${bulkMode ? 'ring-2 ring-primary' : ''}`}
+                        title="Управление опекунами"
+                    >
+                        <Users className="w-4 h-4" />
+                        <span className="hidden sm:inline">{bulkMode ? 'Отмена' : 'Опекуны'}</span>
+                    </button>
+                )}
+                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_create) && (
+                    <button onClick={() => openModal()} className="btn-primary">
+                        <Plus className="w-4 h-4" />
+                        <span className="hidden sm:inline">Добавить объект</span>
+                        <span className="sm:hidden">Добавить</span>
+                    </button>
+                )}
             </div>
 
             {/* List View (Table) */}
@@ -820,7 +812,12 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                             </div>
                         ))}
                         {filteredObjects.length === 0 && (
-                            <div className="text-center text-muted italic py-8">Объекты не найдены</div>
+                            <div className="empty-state">
+                                <Briefcase className="empty-state-icon" />
+                                <div className="empty-state-title">
+                                    {archiveView === 'archive' ? 'Архив пуст' : 'Объекты не найдены'}
+                                </div>
+                            </div>
                         )}
                     </div>
                     {/* Desktop table */}
@@ -968,8 +965,13 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                 ))}
                                 {filteredObjects.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-muted italic">
-                                            Объекты не найдены
+                                        <td colSpan={6}>
+                                            <div className="empty-state">
+                                                <Briefcase className="empty-state-icon" />
+                                                <div className="empty-state-title">
+                                                    {archiveView === 'archive' ? 'Архив пуст' : 'Объекты не найдены'}
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                 )}
@@ -1039,36 +1041,36 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                             <MoreVertical size={18} />
                                         </button>
                                         {openMenuId === object.id && (
-                                            <div className="absolute right-0 top-full pt-1 w-40 z-50 animate-scaleIn origin-top-right">
-                                                <div className="popover-content py-1 p-0 overflow-hidden">
+                                            <div className="absolute right-0 top-full mt-1 w-44 z-50 animate-scaleIn origin-top-right">
+                                                <div className="popover-content">
                                                     {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_edit) && (
                                                         <>
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setManagingTasksFor(object); }}
-                                                                className="w-full text-left px-4 py-2.5 hover:bg-subtle flex items-center gap-2 text-main transition-colors"
+                                                                className="popover-item"
                                                             >
                                                                 <CheckSquare size={14} className="text-muted" /> Задачи
                                                             </button>
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); openModal(object); }}
-                                                                className="w-full text-left px-4 py-2 text-sm text-main hover:bg-subtle flex items-center gap-2"
+                                                                className="popover-item"
                                                             >
-                                                                <Edit2 size={16} className="text-muted" /> Редактировать
+                                                                <Edit2 size={14} className="text-muted" /> Редактировать
                                                             </button>
                                                             <button
                                                                 onClick={(e) => handleToggleArchive(object, e)}
-                                                                className="w-full text-left px-4 py-2.5 hover:bg-amber-500/10 flex items-center gap-2 text-main"
+                                                                className="popover-item"
                                                             >
                                                                 {object.is_active !== false
-                                                                    ? <><Archive size={14} className="text-amber-600 dark:text-amber-400" /> В архив</>
-                                                                    : <><ArchiveRestore size={14} className="text-amber-600 dark:text-amber-400" /> Вернуть в работу</>}
+                                                                    ? <><Archive size={14} className="text-muted" /> В архив</>
+                                                                    : <><ArchiveRestore size={14} className="text-muted" /> Вернуть в работу</>}
                                                             </button>
                                                         </>
                                                     )}
                                                     {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); handleDelete(object.id, e); }}
-                                                            className="w-full text-left px-4 py-2.5 hover:bg-red-500/10 flex items-center gap-2 text-danger"
+                                                            className="popover-item popover-item-danger"
                                                         >
                                                             <Trash2 size={14} /> Удалить
                                                         </button>
@@ -1151,13 +1153,13 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                     <>
                                         <button
                                             onClick={() => openModal(object)}
-                                            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-muted hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                                            className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted hover:text-main hover:bg-subtle rounded-md transition-colors"
                                         >
                                             <Edit2 size={14} /> Изменить
                                         </button>
                                         <button
                                             onClick={(e) => handleToggleArchive(object, e)}
-                                            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-muted hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                                            className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted hover:text-main hover:bg-subtle rounded-md transition-colors"
                                         >
                                             {object.is_active !== false
                                                 ? <><Archive size={14} /> В архив</>
@@ -1168,7 +1170,8 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                 {(adminUser?.role === 'super_admin' || adminUser?.permissions?.objects_delete) && (
                                     <button
                                         onClick={(e) => handleDelete(object.id, e)}
-                                        className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-danger hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-md transition-colors"
+                                        style={{ color: 'var(--danger-fg)' }}
                                     >
                                         <Trash2 size={14} /> Удалить
                                     </button>
@@ -1177,8 +1180,16 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                         </div>
                     ))}
                     {filteredObjects.length === 0 && (
-                        <div className="col-span-full py-12 text-center text-muted italic">
-                            Объекты не найдены
+                        <div className="col-span-full empty-state">
+                            <Briefcase className="empty-state-icon" />
+                            <div className="empty-state-title">
+                                {archiveView === 'archive' ? 'Архив пуст' : 'Объекты не найдены'}
+                            </div>
+                            <div className="empty-state-desc">
+                                {archiveView === 'archive'
+                                    ? 'Объекты, помеченные «в архив», появятся здесь.'
+                                    : 'Добавьте первый объект, чтобы начать работу.'}
+                            </div>
                         </div>
                     )}
                 </div>
