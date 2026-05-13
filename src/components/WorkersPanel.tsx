@@ -528,102 +528,118 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
 
     return (
         <div>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                <div className="flex items-center gap-4 flex-1 w-full">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white shrink-0">Работники</h2>
-                </div>
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    {activeTab === 'list' && selectedWorkers.size > 0 && (
-                        <button
-                            onClick={() => setShowBulkModal(true)}
-                            className="btn-primary flex items-center gap-2"
-                        >
-                            <Users className="w-4 h-4" />
-                            Написать ({selectedWorkers.size})
-                        </button>
-                    )}
-                    {activeTab === 'list' && adminUser?.role === 'super_admin' && (
-                        <button
-                            onClick={() => { setShowMessageModal(true); setMessageRecipients(new Set()); setMessageText(''); setMessageSearch(''); }}
-                            className="btn-secondary flex items-center gap-2"
-                        >
-                            <MessageSquare className="w-4 h-4" />
-                            Написать
-                        </button>
-                    )}
-                    {activeTab === 'list' && (adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_create) && (
-                        <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
-                            <Plus className="w-4 h-4" />
-                            Добавить работника
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* Sub-tabs */}
-            <div className="flex gap-1 mb-4 border-b border-border">
+            {/* ---- Row 1: tabs ---- */}
+            <div className="tabs mb-4">
                 <button
                     onClick={() => setActiveTab('list')}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                        activeTab === 'list'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted hover:text-main'
-                    }`}
+                    className={`tab ${activeTab === 'list' ? 'is-active' : ''}`}
+                    aria-selected={activeTab === 'list'}
                 >
                     Список
+                    <span className="badge-neutral">{workers.length}</span>
                 </button>
                 <button
                     onClick={() => setActiveTab('salaries')}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                        activeTab === 'salaries'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted hover:text-main'
-                    }`}
+                    className={`tab ${activeTab === 'salaries' ? 'is-active' : ''}`}
+                    aria-selected={activeTab === 'salaries'}
                 >
                     Зарплаты
                 </button>
             </div>
 
+            {/* ---- Row 2: action toolbar (list tab only) ---- */}
+            {activeTab === 'list' && (
+                <div className="flex flex-wrap items-center gap-2 mb-5">
+                    {selectedWorkers.size > 0 ? (
+                        <>
+                            <span className="text-sm text-muted">
+                                Выбрано: <span className="font-medium text-main">{selectedWorkers.size}</span>
+                            </span>
+                            <button
+                                onClick={() => setShowBulkModal(true)}
+                                className="btn-primary"
+                            >
+                                <MessageSquare className="w-4 h-4" />
+                                Написать выбранным
+                            </button>
+                            <button
+                                onClick={() => setSelectedWorkers(new Set())}
+                                className="btn-ghost"
+                            >
+                                Снять выбор
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex-1" />
+                            {adminUser?.role === 'super_admin' && (
+                                <button
+                                    onClick={() => { setShowMessageModal(true); setMessageRecipients(new Set()); setMessageText(''); setMessageSearch(''); }}
+                                    className="btn-secondary"
+                                >
+                                    <MessageSquare className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Написать</span>
+                                </button>
+                            )}
+                            {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_create) && (
+                                <button onClick={() => openModal()} className="btn-primary">
+                                    <Plus className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Добавить работника</span>
+                                    <span className="sm:hidden">Добавить</span>
+                                </button>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
             {activeTab === 'salaries' && <SalariesTab />}
 
             {activeTab === 'list' && <>
                 {/* Mobile cards */}
-                <div className="flex flex-col gap-3 p-4 sm:hidden">
+                <div className="flex flex-col gap-2 sm:hidden">
                     {filteredWorkers.map((worker) => (
                         <div
                             key={worker.id}
-                            className={`p-3 rounded-xl border cursor-pointer transition-colors ${selectedWorkers.has(worker.id) ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' : 'border-border bg-card hover:bg-subtle'}`}
+                            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                                selectedWorkers.has(worker.id)
+                                    ? 'bg-primary/5 border-primary/40'
+                                    : 'border-border bg-card hover:bg-subtle'
+                            }`}
                             onClick={() => setViewingWorker(worker)}
                         >
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3 min-w-0" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-3 min-w-0 flex-1" onClick={(e) => e.stopPropagation()}>
                                     <input
                                         type="checkbox"
                                         checked={selectedWorkers.has(worker.id)}
                                         onChange={() => toggleSelectWorker(worker.id)}
-                                        className="rounded border-border text-main focus:ring-1 focus:ring-main shrink-0"
+                                        className="rounded border-border accent-primary shrink-0"
+                                        style={{ width: 18, height: 18 }}
                                     />
-                                    <div className="min-w-0">
+                                    <div className="min-w-0 flex-1">
                                         <div className="font-medium text-main text-sm truncate">{worker.first_name} {worker.last_name}</div>
-                                        <div className="text-xs text-muted">{worker.worker_roles?.name || worker.role || '-'}</div>
+                                        <div className="text-xs text-muted truncate">{worker.worker_roles?.name || worker.role || '—'}</div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-1 ml-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                                     {!worker.telegram_user_id ? (
-                                        <span className="badge-danger text-[10px]"><span className="badge-dot" />Неактивен</span>
+                                        <span className="badge-danger"><span className="badge-dot" style={{ background: 'var(--danger-fg)' }} />Не активен</span>
+                                    ) : worker.is_active ? (
+                                        <span className="badge-success"><span className="badge-dot" style={{ background: 'var(--success-fg)' }} />Активен</span>
                                     ) : (
-                                        <span className={`text-[10px] ${worker.is_active ? 'badge-success' : 'badge-neutral'}`}><span className="badge-dot" />{worker.is_active ? 'Активен' : 'Неактивен'}</span>
-                                    )}
-                                    <button onClick={() => setHistoryWorker(worker)} className="btn-icon" title="История"><History size={15} /></button>
-                                    {canWrite && (adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_edit) && (
-                                        <button onClick={() => openModal(worker)} className="btn-icon" title="Редактировать"><Edit2 size={15} /></button>
+                                        <span className="badge-neutral"><span className="badge-dot" />Off</span>
                                     )}
                                 </div>
                             </div>
                         </div>
                     ))}
                     {filteredWorkers.length === 0 && (
-                        <div className="text-center text-muted py-8">Работники не найдены</div>
+                        <div className="empty-state">
+                            <Users className="empty-state-icon" />
+                            <div className="empty-state-title">Работники не найдены</div>
+                            <div className="empty-state-desc">Попробуйте изменить фильтр или добавьте первого работника.</div>
+                        </div>
                     )}
                 </div>
                 {/* Desktop table */}
@@ -652,22 +668,23 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                         {filteredWorkers.map((worker) => (
                             <tr
                                 key={worker.id}
-                                className={`group cursor-pointer ${selectedWorkers.has(worker.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : 'hover:bg-subtle'}`}
+                                className={`group cursor-pointer ${selectedWorkers.has(worker.id) ? 'bg-primary/5' : ''}`}
                                 onClick={() => setViewingWorker(worker)}
                             >
-                                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                <td onClick={(e) => e.stopPropagation()}>
                                     <input
                                         type="checkbox"
                                         checked={selectedWorkers.has(worker.id)}
                                         onChange={() => toggleSelectWorker(worker.id)}
-                                        className="rounded border-border text-main focus:ring-1 focus:ring-main"
+                                        className="rounded border-border accent-primary"
+                                        style={{ width: 16, height: 16 }}
                                     />
                                 </td>
                                 <td className="font-medium text-main">
                                     {worker.first_name} {worker.last_name}
                                 </td>
                                 <td className="text-muted">
-                                    {worker.worker_roles?.name || worker.role || '-'}
+                                    {worker.worker_roles?.name || worker.role || '—'}
                                 </td>
                                 <td className="text-muted font-mono text-xs hidden sm:table-cell">{worker.phone_number}</td>
                                 <td className="text-muted hidden sm:table-cell" onClick={(e) => e.stopPropagation()}>
@@ -676,33 +693,38 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                                             href={`https://t.me/${worker.telegram_username}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-blue-500 hover:underline"
+                                            className="hover:underline"
+                                            style={{ color: 'var(--accent)' }}
                                         >
                                             @{worker.telegram_username}
                                         </a>
                                     ) : (
-                                        <span className="opacity-50">Не активирован</span>
+                                        <span className="text-faint">Не активирован</span>
                                     )}
                                 </td>
                                 <td className="text-muted hidden md:table-cell">
-                                    {(worker as any).created_by && creators[(worker as any).created_by] ? creators[(worker as any).created_by] : '-'}
+                                    {(worker as any).created_by && creators[(worker as any).created_by] ? creators[(worker as any).created_by] : '—'}
                                 </td>
-
                                 <td>
                                     {!worker.telegram_user_id ? (
                                         <span className="badge-danger">
-                                            <span className="badge-dot" />
-                                            Неактивен
+                                            <span className="badge-dot" style={{ background: 'var(--danger-fg)' }} />
+                                            Не активен
+                                        </span>
+                                    ) : worker.is_active ? (
+                                        <span className="badge-success">
+                                            <span className="badge-dot" style={{ background: 'var(--success-fg)' }} />
+                                            Активен
                                         </span>
                                     ) : (
-                                        <span className={worker.is_active ? 'badge-success' : 'badge-neutral'}>
+                                        <span className="badge-neutral">
                                             <span className="badge-dot" />
-                                            {worker.is_active ? 'Активен' : 'Неактивен'}
+                                            Off
                                         </span>
                                     )}
                                 </td>
                                 <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center justify-end gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => setHistoryWorker(worker)}
                                             className="btn-icon"
@@ -721,23 +743,14 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                                                         <Edit2 size={16} />
                                                     </button>
                                                 )}
-                                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_delete) && (
-                                                    <button
-                                                        onClick={() => handleDelete(worker.id)}
-                                                        className="btn-icon text-danger hover:text-danger hover:bg-red-50 dark:hover:bg-red-900/10"
-                                                        title="Удалить"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                )}
                                                 {(!worker.telegram_user_id || !worker.is_active) && worker.invitation_token && (
                                                     <button
                                                         onClick={() => copyInvitationLink(worker.invitation_token)}
-                                                        className="btn-icon text-success hover:text-success hover:bg-green-50 dark:hover:bg-green-900/10"
+                                                        className="btn-icon"
                                                         title="Скопировать ссылку активации"
                                                     >
                                                         {copiedToken === worker.invitation_token ? (
-                                                            <Check size={16} />
+                                                            <Check size={16} style={{ color: 'var(--success-fg)' }} />
                                                         ) : (
                                                             <Copy size={16} />
                                                         )}
@@ -745,17 +758,38 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                                                 )}
                                                 <button
                                                     onClick={() => regenerateToken(worker)}
-                                                    className="btn-icon text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/10"
+                                                    className="btn-icon"
                                                     title="Сгенерировать новую ссылку активации"
                                                 >
                                                     <RefreshCw size={16} />
                                                 </button>
+                                                {(adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_delete) && (
+                                                    <button
+                                                        onClick={() => handleDelete(worker.id)}
+                                                        className="btn-icon"
+                                                        title="Удалить"
+                                                        style={{ color: 'var(--danger-fg)' }}
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                             </>
                                         )}
                                     </div>
                                 </td>
                             </tr>
                         ))}
+                        {filteredWorkers.length === 0 && (
+                            <tr>
+                                <td colSpan={8}>
+                                    <div className="empty-state">
+                                        <Users className="empty-state-icon" />
+                                        <div className="empty-state-title">Работники не найдены</div>
+                                        <div className="empty-state-desc">Попробуйте изменить фильтр или добавьте первого работника.</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
                 </div>
