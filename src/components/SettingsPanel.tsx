@@ -3,15 +3,16 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Settings as SettingsIcon, Save, Bell, Info, UserCog, UserPlus2, Shield, ScrollText, Trash2,
-    AlertTriangle, Eye, EyeOff, Loader2,
+    AlertTriangle, Eye, EyeOff, Loader2, Tag,
 } from 'lucide-react';
 import UsersPanel from './UsersPanel';
 import SubAdminsPanel from './SubAdminsPanel';
 import RolesPanel from './RolesPanel';
 import LogsPanel from './LogsPanel';
 import TrashPanel from './TrashPanel';
+import ClassificationsPanel from './ClassificationsPanel';
 
-type SettingsTab = 'general' | 'superadmins' | 'subadmins' | 'roles' | 'logs' | 'trash';
+type SettingsTab = 'general' | 'classifications' | 'superadmins' | 'subadmins' | 'roles' | 'logs' | 'trash';
 
 interface BotSettings {
     id: string;
@@ -20,12 +21,13 @@ interface BotSettings {
 }
 
 const SUB_TABS: { id: SettingsTab; label: string; icon: any }[] = [
-    { id: 'general',     label: 'Общие',        icon: SettingsIcon },
-    { id: 'superadmins', label: 'Super Admins', icon: UserCog },
-    { id: 'subadmins',   label: 'Sub Admins',   icon: UserPlus2 },
-    { id: 'roles',       label: 'Роли',         icon: Shield },
-    { id: 'logs',        label: 'Логи',         icon: ScrollText },
-    { id: 'trash',       label: 'Корзина',      icon: Trash2 },
+    { id: 'general',         label: 'Общие',           icon: SettingsIcon },
+    { id: 'classifications', label: 'Классификации',   icon: Tag },
+    { id: 'superadmins',     label: 'Super Admins',    icon: UserCog },
+    { id: 'subadmins',       label: 'Sub Admins',      icon: UserPlus2 },
+    { id: 'roles',           label: 'Роли',            icon: Shield },
+    { id: 'logs',            label: 'Логи',            icon: ScrollText },
+    { id: 'trash',           label: 'Корзина',         icon: Trash2 },
 ];
 
 export default function SettingsPanel() {
@@ -108,11 +110,12 @@ export default function SettingsPanel() {
                 })}
             </div>
 
-            {subTab === 'superadmins' && <UsersPanel />}
-            {subTab === 'subadmins'   && <SubAdminsPanel />}
-            {subTab === 'roles'       && <RolesPanel />}
-            {subTab === 'logs'        && <LogsPanel />}
-            {subTab === 'trash'       && <TrashPanel />}
+            {subTab === 'classifications' && <ClassificationsPanel />}
+            {subTab === 'superadmins'     && <UsersPanel />}
+            {subTab === 'subadmins'       && <SubAdminsPanel />}
+            {subTab === 'roles'           && <RolesPanel />}
+            {subTab === 'logs'            && <LogsPanel />}
+            {subTab === 'trash'           && <TrashPanel />}
 
             {subTab === 'general' && (
                 loading ? (

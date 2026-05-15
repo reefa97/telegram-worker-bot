@@ -40,6 +40,7 @@ interface CleaningObject {
     client_contact_names?: string[];
     late_notifications_enabled?: boolean;
     schedule_day_times?: Record<string, string>;
+    classification_id?: string | null;
 }
 
 export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string }) {
@@ -117,7 +118,21 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
         late_notifications_enabled: true,
         schedule_day_times: {} as Record<string, string>,
         worker_schedule_days: {} as Record<string, number[]>,
+        classification_id: '' as string,
     });
+
+    // Classification dropdown
+    const [classifications, setClassifications] = useState<Array<{ id: string; category: string; name: string; icon: string | null }>>([]);
+    useEffect(() => {
+        let alive = true;
+        supabase
+            .from('object_classifications')
+            .select('id, category, name, icon, sort_order')
+            .eq('is_active', true)
+            .order('sort_order')
+            .then((res: { data: any }) => { if (alive && res.data) setClassifications(res.data); });
+        return () => { alive = false; };
+    }, []);
 
     useEffect(() => {
         loadObjects();
@@ -271,6 +286,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                 reminder_assignee_id: formData.reminder_assignee_id || null,
                 late_notifications_enabled: formData.late_notifications_enabled,
                 schedule_day_times: formData.schedule_day_times,
+                classification_id: formData.classification_id || null,
             };
 
             if (!editingObject) {
@@ -430,6 +446,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                 late_notifications_enabled: object.late_notifications_enabled !== false,
                 schedule_day_times: object.schedule_day_times || {},
                 worker_schedule_days: workerScheduleDays,
+                classification_id: object.classification_id || '',
                 owner_rates: await (async () => {
                     const { data } = await supabase.from('admin_object_rates').select('admin_id, monthly_rate').eq('object_id', object.id);
                     const rates: Record<string, number> = {};
@@ -468,6 +485,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                 late_notifications_enabled: true,
                 schedule_day_times: {},
                 worker_schedule_days: {},
+                classification_id: '',
             });
         }
         setShowModal(true);
@@ -1376,7 +1394,7 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                             <form onSubmit={handleSubmit}>
                                 <div className="modal-body space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-main mb-1">Название</label>
+                                        <label className="label">Название</label>
                                         <input
                                             type="text"
                                             value={formData.name}
@@ -1384,6 +1402,39 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                             className="input"
                                             required
                                         />
+                                    </div>
+
+                                    {/* Classification picker */}
+                                    <div>
+                                        <label className="label">Тип объекта</label>
+                                        <select
+                                            value={formData.classification_id}
+                                            onChange={(e) => setFormData({ ...formData, classification_id: e.target.value })}
+                                            className="select"
+                                        >
+                                            <option value="">— не выбран —</option>
+                                            {['office','residential','specialist','post_work','event'].map(cat => {
+                                                const inCat = classifications.filter(c => c.category === cat);
+                                                if (!inCat.length) return null;
+                                                const label = ({
+                                                    office: 'Офисы и коммерческая',
+                                                    residential: 'Жилые',
+                                                    specialist: 'Специализированные',
+                                                    post_work: 'После работ',
+                                                    event: 'Мероприятия',
+                                                } as Record<string,string>)[cat];
+                                                return (
+                                                    <optgroup key={cat} label={label}>
+                                                        {inCat.map(c => (
+                                                            <option key={c.id} value={c.id}>
+                                                                {c.icon ? `${c.icon} ` : ''}{c.name}
+                                                            </option>
+                                                        ))}
+                                                    </optgroup>
+                                                );
+                                            })}
+                                        </select>
+                                        <p className="help">Определяет стандарт уборки. Стандарты редактируются в Настройках → Классификации.</p>
                                     </div>
 
                                     <div>
