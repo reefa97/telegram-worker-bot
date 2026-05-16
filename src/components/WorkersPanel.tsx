@@ -598,42 +598,87 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
             {activeTab === 'list' && <>
                 {/* Mobile cards */}
                 <div className="flex flex-col gap-2 sm:hidden">
-                    {filteredWorkers.map((worker) => (
-                        <div
-                            key={worker.id}
-                            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                                selectedWorkers.has(worker.id)
-                                    ? 'bg-primary/5 border-primary/40'
-                                    : 'border-border bg-card hover:bg-subtle'
-                            }`}
-                            onClick={() => setViewingWorker(worker)}
-                        >
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-3 min-w-0 flex-1" onClick={(e) => e.stopPropagation()}>
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedWorkers.has(worker.id)}
-                                        onChange={() => toggleSelectWorker(worker.id)}
-                                        className="rounded border-border accent-primary shrink-0"
-                                        style={{ width: 18, height: 18 }}
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                        <div className="font-medium text-main text-sm truncate">{worker.first_name} {worker.last_name}</div>
-                                        <div className="text-xs text-muted truncate">{worker.worker_roles?.name || worker.role || '—'}</div>
+                    {filteredWorkers.map((worker) => {
+                        const initials = `${worker.first_name?.[0] || ''}${worker.last_name?.[0] || ''}`.toUpperCase();
+                        const isSelected = selectedWorkers.has(worker.id);
+                        return (
+                            <div
+                                key={worker.id}
+                                className={`p-3 rounded-lg border transition-colors ${
+                                    isSelected
+                                        ? 'bg-primary/5 border-primary/40'
+                                        : 'border-border bg-card'
+                                }`}
+                            >
+                                <div className="flex items-stretch gap-3">
+                                    {/* Checkbox — own click zone */}
+                                    <label
+                                        className="flex items-center pl-0.5 pr-1 cursor-pointer"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => toggleSelectWorker(worker.id)}
+                                            className="rounded border-border accent-primary"
+                                            style={{ width: 20, height: 20 }}
+                                        />
+                                    </label>
+
+                                    {/* Body — single click target opens details */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewingWorker(worker)}
+                                        className="flex items-center gap-3 min-w-0 flex-1 py-1 text-left focus-ring rounded-md"
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-subtle border border-border flex items-center justify-center text-xs font-semibold text-main shrink-0">
+                                            {initials || '·'}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="font-medium text-main truncate">{worker.first_name} {worker.last_name}</div>
+                                            <div className="text-xs text-muted truncate">
+                                                {worker.worker_roles?.name || worker.role || '—'}
+                                                {worker.phone_number && <span className="text-faint"> · {worker.phone_number}</span>}
+                                            </div>
+                                            <div className="mt-1.5">
+                                                {!worker.telegram_user_id ? (
+                                                    <span className="badge-danger"><span className="badge-dot" style={{ background: 'var(--danger-fg)' }} />Не активен</span>
+                                                ) : worker.is_active ? (
+                                                    <span className="badge-success"><span className="badge-dot" style={{ background: 'var(--success-fg)' }} />Активен</span>
+                                                ) : (
+                                                    <span className="badge-neutral"><span className="badge-dot" />Off</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    {/* Action stack — own click zone */}
+                                    <div className="flex flex-col gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                            onClick={() => setHistoryWorker(worker)}
+                                            className="btn-icon"
+                                            aria-label="История смен"
+                                            title="История смен"
+                                            style={{ width: 36, height: 36 }}
+                                        >
+                                            <History size={16} />
+                                        </button>
+                                        {canWrite && (adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_edit) && (
+                                            <button
+                                                onClick={() => openModal(worker)}
+                                                className="btn-icon"
+                                                aria-label="Редактировать"
+                                                title="Редактировать"
+                                                style={{ width: 36, height: 36 }}
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                    {!worker.telegram_user_id ? (
-                                        <span className="badge-danger"><span className="badge-dot" style={{ background: 'var(--danger-fg)' }} />Не активен</span>
-                                    ) : worker.is_active ? (
-                                        <span className="badge-success"><span className="badge-dot" style={{ background: 'var(--success-fg)' }} />Активен</span>
-                                    ) : (
-                                        <span className="badge-neutral"><span className="badge-dot" />Off</span>
-                                    )}
-                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                     {filteredWorkers.length === 0 && (
                         <div className="empty-state">
                             <Users className="empty-state-icon" />
@@ -1106,6 +1151,15 @@ export default function WorkersPanel({ searchTerm = '' }: { searchTerm?: string 
                 <WorkerDetailsModal
                     worker={viewingWorker}
                     onClose={() => setViewingWorker(null)}
+                    onEdit={
+                        (adminUser?.role === 'super_admin' || adminUser?.permissions?.workers_edit)
+                            ? () => {
+                                const w = viewingWorker;
+                                setViewingWorker(null);
+                                openModal(w);
+                            }
+                            : undefined
+                    }
                 />
             )}
         </div>
