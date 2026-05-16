@@ -418,11 +418,11 @@ body { background-color: var(--bg-app); color: var(--text-main); }
      ============================================================ */
 
   .modal-overlay {
-    @apply fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4;
-    background: rgba(0, 0, 0, 0.5);
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    background: rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    animation: fadeIn 150ms ease-out;
+    animation: fadeIn 180ms ease-out;
   }
 
   /* Modern API — used by new code */
@@ -442,21 +442,28 @@ body { background-color: var(--bg-app); color: var(--text-main); }
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-pop);
     z-index: 50;
-    animation: scaleIn 150ms ease-out;
+    animation: scaleIn 160ms ease-out;
   }
 
   @media (max-width: 640px) {
-    /* Bottom-sheet on mobile (thumb reach) */
+    /* Bottom-sheet on mobile — same pattern as the "Ещё" mobile sheet:
+       full-width, stuck to bottom edge, rounded top corners only,
+       slides up from the bottom with a spring-ish easing. */
+    .modal-overlay {
+      align-items: flex-end;
+      padding: 0;
+    }
     .modal,
     .modal-content {
-      align-self: flex-end;
-      margin-top: auto;
       width: 100%;
       max-width: none;
-      max-height: 92vh;
-      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      max-height: 92svh;             /* small-viewport-height: stable with iOS toolbar */
+      border-radius: 16px 16px 0 0;
+      border-left: 0;
+      border-right: 0;
       border-bottom: 0;
-      animation: slideUp 200ms ease-out;
+      box-shadow: 0 -8px 32px -8px rgba(0, 0, 0, 0.35);
+      animation: slideUp 280ms cubic-bezier(0.16, 1, 0.3, 1);
     }
     /* Drag-handle pill — visual affordance that this is a bottom-sheet */
     .modal::before,
@@ -466,15 +473,15 @@ body { background-color: var(--bg-app); color: var(--text-main); }
       top: 8px;
       left: 50%;
       transform: translateX(-50%);
-      width: 36px;
+      width: 40px;
       height: 4px;
       border-radius: 9999px;
       background: var(--border-strong);
-      opacity: 0.6;
+      opacity: 0.7;
       pointer-events: none;
       z-index: 11;
     }
-    /* Push header below the handle */
+    /* Push header below the handle so title doesn't collide */
     .modal-header,
     .modal > header,
     .modal-content > header {
