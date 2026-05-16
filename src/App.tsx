@@ -27,6 +27,22 @@ function AppContent() {
     const [localLoadingOverride, setLocalLoadingOverride] = useState(false);
     const [showProfileError, setShowProfileError] = useState(false);
 
+    // ESC closes the topmost open .modal-overlay by simulating a click on it.
+    // Existing onClick={onClose} handlers on overlays handle the rest.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return;
+            const overlays = document.querySelectorAll<HTMLElement>('.modal-overlay');
+            const top = overlays[overlays.length - 1];
+            if (top) {
+                e.preventDefault();
+                top.click();
+            }
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, []);
+
     useEffect(() => {
         let timer: NodeJS.Timeout;
         if (loading) {

@@ -401,13 +401,28 @@ body { background-color: var(--bg-app); color: var(--text-main); }
     border-radius: 2px 2px 0 0;
   }
 
-  /* ===== Modal / Sheet ===== */
+  /* ============================================================
+     Modal / Sheet
+     ============================================================
+     Structure (app-style — header and footer pinned, body scrolls):
+
+       .modal-overlay
+         └─ .modal-content (or .modal)        flex column, overflow:hidden
+              ├─ .modal-header                flex:none, sticky to top
+              ├─ .modal-body                  flex:1, overflow-y:auto  ← scroll
+              └─ .modal-footer                flex:none, sticky to bottom
+
+     Mobile (≤640px): bottom-sheet with drag-handle pill on top.
+     Body-scroll lock is applied via :has() — modern browser only;
+     legacy fallback: page may scroll behind, not a blocker.
+     ============================================================ */
 
   .modal-overlay {
     @apply fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4;
     background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(2px);
-    overflow-y: auto;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    animation: fadeIn 150ms ease-out;
   }
 
   /* Modern API — used by new code */
@@ -415,16 +430,19 @@ body { background-color: var(--bg-app); color: var(--text-main); }
   /* Legacy alias — used by existing modals across the codebase */
   .modal-content {
     position: relative;
+    display: flex;
+    flex-direction: column;
     width: 100%;
-    max-width: 32rem; /* sm:max-w-lg default; consumers may override with max-w-* */
-    max-height: 90vh;
-    overflow-y: auto;
+    max-width: 32rem;          /* default; consumers override with max-w-* */
+    max-height: min(90vh, 100% - 32px);
+    overflow: hidden;          /* body scrolls, not the whole modal */
     background: var(--bg-card);
     color: var(--text-main);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-pop);
     z-index: 50;
+    animation: scaleIn 150ms ease-out;
   }
 
   @media (max-width: 640px) {
@@ -433,26 +451,90 @@ body { background-color: var(--bg-app); color: var(--text-main); }
     .modal-content {
       align-self: flex-end;
       margin-top: auto;
+      width: 100%;
+      max-width: none;
       max-height: 92vh;
       border-radius: var(--radius-xl) var(--radius-xl) 0 0;
       border-bottom: 0;
+      animation: slideUp 200ms ease-out;
+    }
+    /* Drag-handle pill — visual affordance that this is a bottom-sheet */
+    .modal::before,
+    .modal-content::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 36px;
+      height: 4px;
+      border-radius: 9999px;
+      background: var(--border-strong);
+      opacity: 0.6;
+      pointer-events: none;
+      z-index: 11;
+    }
+    /* Push header below the handle */
+    .modal-header,
+    .modal > header,
+    .modal-content > header {
+      padding-top: 22px;
     }
   }
 
   .modal-header {
-    @apply flex items-center justify-between gap-3 px-5 py-4 sticky top-0 z-10;
+    @apply flex items-center justify-between gap-3 px-5 py-3.5;
+    flex: 0 0 auto;
     background: var(--bg-card);
     border-bottom: 1px solid var(--border-color);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   }
+
   .modal-body {
     @apply p-5;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;  /* don't scroll page when modal hits its end */
   }
+
+  /* Custom scrollbar inside the body — thinner & less visually loud */
+  @media (pointer: fine) {
+    .modal-body::-webkit-scrollbar { width: 8px; }
+    .modal-body::-webkit-scrollbar-track { background: transparent; }
+    .modal-body::-webkit-scrollbar-thumb {
+      background: var(--border-strong);
+      border-radius: 9999px;
+      border: 2px solid var(--bg-card);
+    }
+    .modal-body::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+  }
+
   .modal-footer {
-    @apply flex items-center justify-end gap-2 px-5 py-4 sticky bottom-0;
+    @apply flex items-center justify-end gap-2 px-5 py-3.5;
+    flex: 0 0 auto;
     background: var(--bg-card);
     border-top: 1px solid var(--border-color);
     border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  }
+  @media (max-width: 640px) {
+    .modal-footer {
+      border-radius: 0;
+      padding-bottom: max(14px, env(safe-area-inset-bottom));
+    }
+  }
+
+  /* Body scroll lock when any modal-overlay is open
+     (modern browsers; fallback: page scrolls — acceptable) */
+  body:has(.modal-overlay) {
+    overflow: hidden;
+  }
+
+  /* The very last button-with-X in .modal-header gets a hint that it
+     accepts ESC (visually subtle; works for screen readers via aria) */
+  .modal-header .btn-icon[aria-label*="акрыть"]::after,
+  .modal-header .btn-icon[aria-label*="lose"]::after {
+    content: '';
   }
 
   /* ===== Popover ===== */
