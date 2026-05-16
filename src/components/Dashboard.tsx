@@ -283,7 +283,7 @@ export default function Dashboard() {
             {/* ---------- Main column ---------- */}
             <main className="flex-1 flex flex-col min-w-0 lg:ml-[260px]">
                 {/* Top bar */}
-                <header className="h-14 flex items-center justify-between px-3 sm:px-4 lg:px-6 border-b border-border bg-card shrink-0">
+                <header className="h-14 flex items-center justify-between px-3 sm:px-4 lg:px-6 border-b border-border bg-card shrink-0 relative z-20">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                         {/* Mobile menu */}
                         <button
@@ -361,7 +361,7 @@ export default function Dashboard() {
 
                             {userMenuOpen && (
                                 <div
-                                    className="absolute right-0 top-full mt-1.5 w-60 animate-scaleIn"
+                                    className="absolute right-0 top-full mt-1.5 w-60 z-50 animate-scaleIn"
                                     role="menu"
                                 >
                                     <div className="popover-content">
