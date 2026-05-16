@@ -447,8 +447,10 @@ body { background-color: var(--bg-app); color: var(--text-main); }
 
   @media (max-width: 640px) {
     /* Bottom-sheet on mobile — same pattern as the "Ещё" mobile sheet:
-       full-width, stuck to bottom edge, rounded top corners only,
-       slides up from the bottom with a spring-ish easing. */
+       full-width, stuck to bottom edge, rounded top corners only.
+       Whole sheet scrolls (header → body → footer) so action buttons
+       are always reachable even when iOS keyboard or address bar
+       shrinks the visible viewport. */
     .modal-overlay {
       align-items: flex-end;
       padding: 0;
@@ -457,17 +459,31 @@ body { background-color: var(--bg-app); color: var(--text-main); }
     .modal-content {
       width: 100%;
       max-width: none;
-      max-height: 92svh;             /* small-viewport-height: stable with iOS toolbar */
+      max-height: 92svh;
       border-radius: 16px 16px 0 0;
       border-left: 0;
       border-right: 0;
       border-bottom: 0;
       box-shadow: 0 -8px 32px -8px rgba(0, 0, 0, 0.35);
       animation: slideUp 280ms cubic-bezier(0.16, 1, 0.3, 1);
+      /* Whole sheet scrolls now (no body-only scroll on mobile) */
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
-    /* Drag-handle pill — visual affordance that this is a bottom-sheet */
-    .modal::before,
-    .modal-content::before {
+    /* Reset body/footer scroll setup so they flow inside the modal scroll */
+    .modal-body   { overflow-y: visible; flex: 0 0 auto; }
+    .modal-footer { position: static; border-radius: 0; }
+
+    /* Sticky header keeps the title and close button visible while user
+       scrolls through a long form, and hosts the drag-handle pill. */
+    .modal-header {
+      position: sticky;
+      top: 0;
+      padding-top: 22px;
+      z-index: 11;
+    }
+    .modal-header::before {
       content: '';
       position: absolute;
       top: 8px;
@@ -479,13 +495,6 @@ body { background-color: var(--bg-app); color: var(--text-main); }
       background: var(--border-strong);
       opacity: 0.7;
       pointer-events: none;
-      z-index: 11;
-    }
-    /* Push header below the handle so title doesn't collide */
-    .modal-header,
-    .modal > header,
-    .modal-content > header {
-      padding-top: 22px;
     }
   }
 
