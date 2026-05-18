@@ -93,6 +93,7 @@ export default function Dashboard() {
     const [, setPendingCallsCount] = useState(0);
     const bellRef = useRef<HTMLButtonElement>(null);
     const userBtnRef = useRef<HTMLButtonElement>(null);
+    const userMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         localStorage.setItem('activeTab', activeTab);
@@ -102,9 +103,12 @@ export default function Dashboard() {
     useEffect(() => {
         if (!userMenuOpen) return;
         const handler = (e: MouseEvent) => {
-            if (userBtnRef.current && !userBtnRef.current.contains(e.target as Node)) {
-                setUserMenuOpen(false);
-            }
+            const target = e.target as Node;
+            // Don't close if click landed inside the trigger button OR inside
+            // the popup itself — otherwise menuitem clicks get swallowed.
+            if (userBtnRef.current?.contains(target)) return;
+            if (userMenuRef.current?.contains(target)) return;
+            setUserMenuOpen(false);
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
@@ -361,6 +365,7 @@ export default function Dashboard() {
 
                             {userMenuOpen && (
                                 <div
+                                    ref={userMenuRef}
                                     className="absolute right-0 top-full mt-1.5 w-60 z-50 animate-scaleIn"
                                     role="menu"
                                 >
@@ -376,7 +381,7 @@ export default function Dashboard() {
 
                                         {/* Theme toggle */}
                                         <button
-                                            onClick={() => { toggleTheme(); }}
+                                            onClick={() => { toggleTheme(); setUserMenuOpen(false); }}
                                             className="popover-item"
                                             role="menuitem"
                                         >
@@ -392,7 +397,7 @@ export default function Dashboard() {
 
                                         {/* Sign out */}
                                         <button
-                                            onClick={handleSignOut}
+                                            onClick={() => { setUserMenuOpen(false); handleSignOut(); }}
                                             className="popover-item popover-item-danger"
                                             role="menuitem"
                                         >
