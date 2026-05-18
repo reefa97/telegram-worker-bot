@@ -285,7 +285,7 @@ export default function Dashboard() {
             </aside>
 
             {/* ---------- Main column ---------- */}
-            <main className="flex-1 flex flex-col min-w-0 lg:ml-[260px]">
+            <main className="flex-1 flex flex-col min-w-0 max-w-full lg:ml-[260px]">
                 {/* Top bar */}
                 <header className="h-14 flex items-center justify-between px-3 sm:px-4 lg:px-6 border-b border-border bg-card shrink-0 relative z-20">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -412,8 +412,8 @@ export default function Dashboard() {
                 </header>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto pb-20 lg:pb-0">
-                    <div className="p-4 sm:p-6 lg:p-8">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden pb-20 lg:pb-0">
+                    <div className="p-4 sm:p-6 lg:p-8 min-w-0 max-w-full">
                         <Suspense fallback={
                             <div className="flex justify-center items-center h-64">
                                 <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
