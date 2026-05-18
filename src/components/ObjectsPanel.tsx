@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useUndo } from '../contexts/UndoContext';
-import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, LayoutGrid, List, Map, UserCheck, UserMinus, FileText, Upload, Download, Archive, ArchiveRestore, Briefcase } from 'lucide-react';
+import { Plus, Edit2, Trash2, MapPin, DollarSign, Camera, CheckSquare, Clock, X, MoreVertical, Users, LayoutGrid, List, Map, UserCheck, UserMinus, FileText, Upload, Download, Archive, ArchiveRestore, Briefcase, KeyRound, DoorOpen, Eye, EyeOff, Copy } from 'lucide-react';
 import ObjectsMap from './ObjectsMap';
 import AddressAutocomplete from './AddressAutocomplete';
 import TaskManagementModal from './TaskManagementModal';
@@ -41,6 +41,8 @@ interface CleaningObject {
     late_notifications_enabled?: boolean;
     schedule_day_times?: Record<string, string>;
     classification_id?: string | null;
+    access_instructions?: string | null;
+    access_codes?: Array<{ label: string; value: string; note?: string }>;
 }
 
 export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string }) {
@@ -119,6 +121,8 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
         schedule_day_times: {} as Record<string, string>,
         worker_schedule_days: {} as Record<string, number[]>,
         classification_id: '' as string,
+        access_instructions: '' as string,
+        access_codes: [] as Array<{ label: string; value: string; note?: string }>,
     });
 
     // Classification dropdown
@@ -287,6 +291,10 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                 late_notifications_enabled: formData.late_notifications_enabled,
                 schedule_day_times: formData.schedule_day_times,
                 classification_id: formData.classification_id || null,
+                access_instructions: formData.access_instructions.trim() || null,
+                access_codes: (formData.access_codes || [])
+                    .map(c => ({ label: c.label.trim(), value: c.value.trim(), note: c.note?.trim() || undefined }))
+                    .filter(c => c.label || c.value),
             };
 
             if (!editingObject) {
@@ -447,6 +455,8 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                 schedule_day_times: object.schedule_day_times || {},
                 worker_schedule_days: workerScheduleDays,
                 classification_id: object.classification_id || '',
+                access_instructions: object.access_instructions || '',
+                access_codes: Array.isArray(object.access_codes) ? object.access_codes : [],
                 owner_rates: await (async () => {
                     const { data } = await supabase.from('admin_object_rates').select('admin_id, monthly_rate').eq('object_id', object.id);
                     const rates: Record<string, number> = {};
@@ -486,6 +496,8 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                 schedule_day_times: {},
                 worker_schedule_days: {},
                 classification_id: '',
+                access_instructions: '',
+                access_codes: [],
             });
         }
         setShowModal(true);
@@ -1457,6 +1469,86 @@ export default function ObjectsPanel({ searchTerm = '' }: { searchTerm?: string 
                                         )}
                                     </div>
 
+                                    {/* ===== Access info ===== */}
+                                    <div className="rounded-lg border border-border bg-subtle/30 p-3 sm:p-4 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <KeyRound className="w-4 h-4 text-muted" />
+                                            <span className="text-sm font-medium text-main">Доступ на объект</span>
+                                        </div>
+
+                                        <div>
+                                            <label className="label">Инструкция входа</label>
+                                            <textarea
+                                                value={formData.access_instructions}
+                                                onChange={(e) => setFormData({ ...formData, access_instructions: e.target.value })}
+                                                className="textarea"
+                                                rows={3}
+                                                placeholder="Напр.: Главный вход — со двора. Лифт направо. Третий этаж, направо."
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <span className="label mb-0">Коды доступа</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({
+                                                        ...formData,
+                                                        access_codes: [...(formData.access_codes || []), { label: '', value: '' }],
+                                                    })}
+                                                    className="btn-ghost btn-sm"
+                                                >
+                                                    <Plus className="w-3 h-3" /> Добавить код
+                                                </button>
+                                            </div>
+                                            {(formData.access_codes || []).length === 0 ? (
+                                                <p className="help">Ни одного кода пока не добавлено. Можно по подъездам, этажам, дверям и т.д.</p>
+                                            ) : (
+                                                <div className="space-y-1.5">
+                                                    {(formData.access_codes || []).map((code, idx) => (
+                                                        <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-1.5 items-start">
+                                                            <input
+                                                                type="text"
+                                                                value={code.label}
+                                                                onChange={(e) => {
+                                                                    const next = [...formData.access_codes];
+                                                                    next[idx] = { ...next[idx], label: e.target.value };
+                                                                    setFormData({ ...formData, access_codes: next });
+                                                                }}
+                                                                placeholder="Где (напр. Подъезд 1)"
+                                                                className="input"
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                value={code.value}
+                                                                onChange={(e) => {
+                                                                    const next = [...formData.access_codes];
+                                                                    next[idx] = { ...next[idx], value: e.target.value };
+                                                                    setFormData({ ...formData, access_codes: next });
+                                                                }}
+                                                                placeholder="Код"
+                                                                className="input font-mono"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const next = formData.access_codes.filter((_, i) => i !== idx);
+                                                                    setFormData({ ...formData, access_codes: next });
+                                                                }}
+                                                                className="btn-icon"
+                                                                aria-label="Удалить код"
+                                                                title="Удалить"
+                                                                style={{ color: 'var(--danger-fg)' }}
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
                                     {/* Owners Selection (Super Admin Only) */}
                                     {(adminUser?.role === 'super_admin') && (
                                         <>
@@ -2315,6 +2407,14 @@ function ObjectDetailsModal({ object, onClose, creators, adminUser }: { object: 
                         </div>
                     </div>
 
+                    {/* Access info */}
+                    {(object.access_instructions || (object.access_codes && object.access_codes.length > 0)) && (
+                        <AccessSection
+                            instructions={object.access_instructions || ''}
+                            codes={object.access_codes || []}
+                        />
+                    )}
+
                     {/* Assigned Workers */}
                     <div>
                         <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-3 flex items-center gap-2">
@@ -2372,5 +2472,108 @@ function ObjectDetailsModal({ object, onClose, creators, adminUser }: { object: 
             </div>
         </div>,
         document.body
+    );
+}
+
+// ============================================================
+// AccessSection — read-only display of entry instructions + codes
+// (used inside ObjectDetailsModal; codes are revealable + copyable)
+// ============================================================
+
+function AccessSection({
+    instructions,
+    codes,
+}: {
+    instructions: string;
+    codes: Array<{ label: string; value: string; note?: string }>;
+}) {
+    const [revealed, setRevealed] = useState<Set<number>>(new Set());
+    const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+
+    const toggleReveal = (idx: number) => {
+        setRevealed(prev => {
+            const next = new Set(prev);
+            next.has(idx) ? next.delete(idx) : next.add(idx);
+            return next;
+        });
+    };
+
+    const copy = async (idx: number, value: string) => {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopiedIdx(idx);
+            setTimeout(() => setCopiedIdx((c) => (c === idx ? null : c)), 1500);
+        } catch {
+            // older browsers — fallback could be implemented if needed
+        }
+    };
+
+    const mask = (v: string) => v ? '•'.repeat(Math.max(4, Math.min(v.length, 8))) : '';
+
+    return (
+        <div>
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider block mb-3 flex items-center gap-2">
+                <span className="bg-primary/10 text-primary p-1 rounded">
+                    <KeyRound size={14} />
+                </span>
+                Доступ на объект
+            </label>
+
+            <div className="rounded-lg border border-border bg-subtle/30 p-3 sm:p-4 space-y-3">
+                {instructions && (
+                    <div className="text-sm text-main whitespace-pre-wrap leading-relaxed">
+                        {instructions}
+                    </div>
+                )}
+
+                {codes.length > 0 && (
+                    <div className={instructions ? 'pt-3 border-t border-border' : ''}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {codes.map((c, idx) => {
+                                const isOn = revealed.has(idx);
+                                const copied = copiedIdx === idx;
+                                return (
+                                    <div
+                                        key={idx}
+                                        className="flex items-center gap-2 p-2 rounded-md bg-card border border-border"
+                                    >
+                                        <DoorOpen className="w-4 h-4 text-muted shrink-0" />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-xs text-muted truncate">
+                                                {c.label || '—'}
+                                                {c.note && <span className="ml-1 text-faint">· {c.note}</span>}
+                                            </div>
+                                            <div className="font-mono text-sm text-main truncate select-all">
+                                                {isOn ? c.value : mask(c.value)}
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleReveal(idx)}
+                                            className="btn-icon"
+                                            style={{ width: 32, height: 32 }}
+                                            aria-label={isOn ? 'Скрыть' : 'Показать'}
+                                            title={isOn ? 'Скрыть' : 'Показать'}
+                                        >
+                                            {isOn ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => copy(idx, c.value)}
+                                            className="btn-icon"
+                                            style={{ width: 32, height: 32 }}
+                                            aria-label="Скопировать"
+                                            title="Скопировать"
+                                        >
+                                            {copied ? <CheckSquare size={14} style={{ color: 'var(--success-fg)' }} /> : <Copy size={14} />}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
     );
 }
