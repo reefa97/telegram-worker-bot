@@ -282,6 +282,74 @@ async function getNotificationRecipients(objectId?: string, workerId?: string) {
   return finalRecipients;
 }
 
+/**
+ * Builds an HTML message describing how to enter an object —
+ * instructions, codes (one per line), and a short summary of the
+ * cleaning standard's section titles based on classification. Returns
+ * empty string if the object has nothing useful to say.
+ */
+async function buildAccessMessage(objectId: string): Promise<string> {
+  try {
+    const { data: obj } = await supabase
+      .from("cleaning_objects")
+      .select("name, access_instructions, access_codes, classification_id")
+      .eq("id", objectId)
+      .single();
+
+    if (!obj) return "";
+
+    const escape = (s: string) =>
+      String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const parts: string[] = [];
+
+    if (obj.access_instructions && obj.access_instructions.trim()) {
+      parts.push(
+        `🗝 <b>Как войти:</b>\n${escape(obj.access_instructions.trim())}`
+      );
+    }
+
+    const codes = Array.isArray(obj.access_codes) ? obj.access_codes : [];
+    const validCodes = codes.filter((c: any) => c && (c.label || c.value));
+    if (validCodes.length > 0) {
+      const lines = validCodes.map((c: any) => {
+        const label = c.label ? escape(String(c.label)) : "—";
+        const value = c.value ? `<code>${escape(String(c.value))}</code>` : "<i>—</i>";
+        const note = c.note ? ` <i>(${escape(String(c.note))})</i>` : "";
+        return `• ${label}: ${value}${note}`;
+      });
+      parts.push(`🔑 <b>Коды доступа:</b>\n${lines.join("\n")}`);
+    }
+
+    // Classification cleaning standard — section titles only (compact)
+    if (obj.classification_id) {
+      const { data: cls } = await supabase
+        .from("object_classifications")
+        .select("name, icon, cleaning_standard")
+        .eq("id", obj.classification_id)
+        .maybeSingle();
+      if (cls?.cleaning_standard) {
+        const sections = Array.isArray(cls.cleaning_standard) ? cls.cleaning_standard : [];
+        const titles = sections
+          .map((s: any) => (typeof s?.section === "string" ? s.section.trim() : ""))
+          .filter((t: string) => !!t);
+        if (titles.length > 0) {
+          const tag = `${cls.icon ? cls.icon + " " : ""}${escape(cls.name || "")}`;
+          parts.push(
+            `📋 <b>Стандарт уборки</b> ${tag ? `<i>(${tag.trim()})</i>` : ""}:\n` +
+            titles.map((t: string) => `• ${escape(t)}`).join("\n")
+          );
+        }
+      }
+    }
+
+    return parts.length > 0 ? parts.join("\n\n") : "";
+  } catch (e) {
+    console.error("[buildAccessMessage] error:", e);
+    return "";
+  }
+}
+
 async function notifyGeofenceViolation(
   botToken: string,
   workerName: string,
@@ -821,6 +889,12 @@ serve(async (req) => {
         }
 
         if (targetWorkerId) {
+          // Send access info BEFORE the location request — so the worker
+          // sees codes/instructions and can scroll up later for reference.
+          const access = await buildAccessMessage(objectId);
+          if (access) {
+            await sendTelegramMessage(botToken, chatId, access);
+          }
           await sendTelegramMessage(
             botToken,
             chatId,
@@ -1736,7 +1810,12 @@ serve(async (req) => {
           } else if (allObjects.length === 1) {
             const obj = allObjects[0];
             await supabase.from("workers").update({ selected_object_id: obj.cleaning_objects.id }).eq("id", obj.worker_id);
-            await sendTelegramMessage(botToken, chatId, `📍 Объект: <b>${obj.cleaning_objects.name}</b>\n\nОтправьте геолокацию для начала.`, {
+            await sendTelegramMessage(botToken, chatId, `📍 Объект: <b>${obj.cleaning_objects.name}</b>`);
+            const access = await buildAccessMessage(obj.cleaning_objects.id);
+            if (access) {
+              await sendTelegramMessage(botToken, chatId, access);
+            }
+            await sendTelegramMessage(botToken, chatId, "Отправьте геолокацию для начала.", {
               keyboard: [[{ text: "📍 Отправить местоположение", request_location: true }]],
               resize_keyboard: true,
               one_time_keyboard: true,
